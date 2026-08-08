@@ -16,10 +16,6 @@ export default defineConfig({
   // cloudflare-module, cần override để ra .output/server theo chuẩn Vercel.
   nitro: {
     preset: "vercel",
-    vercel: {
-      maxDuration: 60,
-      memory: 1024,
-    },
   },
   vite: {
     server: {

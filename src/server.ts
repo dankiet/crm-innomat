@@ -124,6 +124,24 @@ function tryServePublicFile(request: Request): Response | null {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname === "/_health" && request.method === "GET") {
+        try {
+          const { getDb } = await import("./db/index.server");
+          const row = await getDb()
+            .prepare("SELECT COUNT(*) AS total FROM products")
+            .get<{ total: number }>();
+          return new Response(
+            JSON.stringify({ ok: true, products: row?.total ?? -1, provider: "pg" }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        } catch (e) {
+          return new Response(
+            JSON.stringify({ ok: false, message: e instanceof Error ? e.message : String(e) }),
+            { status: 500, headers: { "content-type": "application/json" } },
+          );
+        }
+      }
       const staticRes = tryServePublicFile(request);
       if (staticRes) return staticRes;
 
