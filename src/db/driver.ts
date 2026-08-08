@@ -14,7 +14,10 @@
  *  - Một số cú pháp SQLite được dịch tự động (INSERT OR IGNORE, datetime('now','localtime'),
  *    GROUP_CONCAT(DISTINCT x)).
  */
-import { Pool, type PoolClient, type QueryResult } from "pg";
+import { Pool, types as pgTypes, type PoolClient, type QueryResult } from "pg";
+
+pgTypes.setTypeParser(20, (v) => Number.parseInt(v, 10));
+pgTypes.setTypeParser(1700, (v) => Number(v));
 
 export type SqlValue = string | number | boolean | bigint | null;
 
