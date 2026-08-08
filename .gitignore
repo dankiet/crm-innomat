@@ -1,0 +1,83 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+.output
+.vinxi
+.tanstack/**
+.nitro
+*.local
+
+# Local secrets / env (never commit)
+.env
+.env.*
+!.env.example
+
+# SQLite runtime DB (seed with npm run db:seed)
+data/crm.db
+data/crm.db-*
+
+# Image backups / quarantine (kept local only)
+data/backups/
+data/image-quarantine/
+data/reports/
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+
+# Editor directories and files
+.claude/
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Runtime images — kept local only, not tracked in git
+public/images/
+
+# Local test exports / stock dumps
+data/exports/
+Stock.xlsx
+
+# Vercel build output (generated; deploy happens via Vercel)
+.vercel/
+
+# Temp schema dump used to author schema-pg.sql (regenerable)
+data/_schema_dump.json
+
+# One-off import/OCR reports & caches (not needed at runtime)
+data/*_report.json
+data/*_cache.json
+data/*_matches.csv
+data/*_index.json
+data/*_list.csv
+data/san_pham_*
+data/danh_sach_*
+data/doi_chieu_*
+data/_ocr_*
+data/Bao_Gia_Form_V2.xlsx
+
+# Match-code generated import workbooks
+match_code/output/
+__pycache__/
+*.pyc
+
+# Local debug scripts / temp
+_check_dup.py
+_scan_dups.py
+_dev_*.txt
+

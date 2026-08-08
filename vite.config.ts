@@ -1,0 +1,33 @@
+// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
+// or the app will break with duplicate plugins:
+//   - TanStack devtools (dev-only, first), tanstackStart, viteReact, tailwindcss, tsConfigPaths,
+//     nitro (build-only using cloudflare as a default target), VITE_* env injection, @ path alias,
+//     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
+// You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+
+export default defineConfig({
+  tanstackStart: {
+    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
+    // nitro/vite builds from this
+    server: { entry: "server" },
+  },
+  // Deploy target = Vercel (serverless Node). Local build mặc định của wrapper là
+  // cloudflare-module, cần override để ra .output/server theo chuẩn Vercel.
+  nitro: {
+    preset: "vercel",
+  },
+  vite: {
+    server: {
+      host: true,
+      allowedHosts: true,
+    },
+    // better-sqlite3 is a native Node addon — keep it external for SSR
+    ssr: {
+      external: ["better-sqlite3"],
+    },
+    optimizeDeps: {
+      exclude: ["better-sqlite3"],
+    },
+  },
+});
