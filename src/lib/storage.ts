@@ -1,9 +1,10 @@
 /**
  * Lớp lưu trữ ảnh dùng chung.
  *
- *  - Blob mode (production): Vercel Blob, token `BLOB_READ_WRITE_TOKEN`.
+ *  - Production: Supabase Storage, token `SUPABASE_SERVICE_ROLE_KEY` + URL `SUPABASE_URL`,
+ *    bucket public `BLOB_BUCKET` (mặc định `crm-images`).
  *    Ref trả về là URL công khai.
- *  - Local mode (dev, thiếu token): ghi vào public/images, ref trả về
+ *  - Local mode (dev, thiếu key): ghi vào public/images, ref trả về
  *    `/images/<hash>.<ext>`.
  *
  * Tên file content-addressed theo SHA-256 → tự chống trùng.
@@ -12,24 +13,37 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
-type BlobPut = (
-  pathname: string,
-  body: Buffer,
-  options: { access: "public"; contentType?: string; token?: string },
-) => Promise<{ url: string }>;
+import { StorageClient } from "@supabase/storage-js";
 
-let blobModule: typeof import("@vercel/blob") | null = null;
+let storageClient: StorageClient | null = null;
+let supabaseUrl: string | null = null;
 
-async function loadBlob(): Promise<typeof import("@vercel/blob") | null> {
-  if (!(process.env.BLOB_READ_WRITE_TOKEN ?? "").trim()) return null;
-  if (!blobModule) {
-    blobModule = await import("@vercel/blob");
+function config(): { url: string; key: string; bucket: string } | null {
+  const url = (process.env.SUPABASE_URL ?? "").trim();
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
+  if (!url || !key) return null;
+  return {
+    url: url.replace(/\/+$/, ""),
+    key,
+    bucket: (process.env.BLOB_BUCKET ?? "crm-images").replace(/^\//, "").replace(/\/+$/, ""),
+  };
+}
+
+async function loadStorage(): Promise<StorageClient | null> {
+  const cfg = config();
+  if (!cfg) return null;
+  if (!storageClient || supabaseUrl !== cfg.url) {
+    storageClient = new StorageClient(`${cfg.url}/storage/v1`, {
+      apikey: cfg.key,
+      Authorization: `Bearer ${cfg.key}`,
+    });
+    supabaseUrl = cfg.url;
   }
-  return blobModule;
+  return storageClient;
 }
 
 export function isBlobMode(): boolean {
-  return !!(process.env.BLOB_READ_WRITE_TOKEN ?? "").trim();
+  return !!config();
 }
 
 const BLOB_PREFIX = (process.env.BLOB_STORE_PREFIX ?? "crm").replace(/\/+$/, "");
@@ -48,39 +62,45 @@ function filenameFor(buffer: Buffer, ext: string): string {
   return `${hash}${safeExt.toLowerCase()}`;
 }
 
-/** Ref hình ảnh do CRM quản lý (Blob URL hoặc /images/...). */
+/** Ref hình ảnh do CRM quản lý (Supabase URL hoặc /images/...). */
 export function isManagedImageRef(ref: string): boolean {
   if (!ref) return false;
   if (ref.startsWith("/images/")) return true;
   try {
     const u = new URL(ref);
-    return u.hostname.endsWith("blob.vercel-storage.com");
+    return u.hostname.endsWith("supabase.co");
   } catch {
     return false;
   }
 }
 
-/** Lưu buffer ảnh → trả về ref (Blob URL hoặc đường dẫn /images/...). */
+function publicUrl(cfg: { url: string; bucket: string }, objectPath: string): string {
+  return `${cfg.url}/storage/v1/object/public/${cfg.bucket}/${objectPath}`;
+}
+
+/** Lưu buffer ảnh → trả về ref (Supabase URL hoặc đường dẫn /images/...). */
 export async function putImageBuffer(
   buffer: Buffer,
   ext: string,
 ): Promise<string> {
   const filename = filenameFor(buffer, ext);
+  const objectPath = `${BLOB_PREFIX}/${filename}`;
 
-  const blob = await loadBlob();
-  if (blob) {
-    const pathname = `${BLOB_PREFIX}/${filename}`;
+  const storage = await loadStorage();
+  if (storage) {
+    const cfg = config()!;
     try {
-      const existing = await blob.head(pathname);
-      if (existing?.url) return existing.url;
+      const { data, error } = await storage.from(cfg.bucket).info(objectPath);
+      if (!error && data) return publicUrl(cfg, objectPath);
     } catch {
-      /* chưa tồn tại → tạo mới */
+      /* chưa tồn tại → upload mới */
     }
-    const { url } = await blob.put(pathname, buffer, {
-      access: "public",
+    const { error } = await storage.from(cfg.bucket).upload(objectPath, buffer, {
       contentType: MIME_BY_EXT[filename.slice(filename.lastIndexOf("."))] ?? "application/octet-stream",
+      upsert: true,
     });
-    return url;
+    if (error) throw new Error(`Supabase Storage upload failed: ${error.message}`);
+    return publicUrl(cfg, objectPath);
   }
 
   // Local mode
@@ -91,7 +111,7 @@ export async function putImageBuffer(
   return `/images/${filename}`;
 }
 
-/** Đọc bytes ảnh từ ref (Blob URL hoặc đường dẫn cục bộ). null nếu không tồn tại. */
+/** Đọc bytes ảnh từ ref (Supabase URL hoặc đường dẫn cục bộ). null nếu không tồn tại. */
 export async function readImageBytes(
   ref: string,
 ): Promise<Buffer | null> {
@@ -120,11 +140,15 @@ export async function readImageBytes(
 /** Xoá 1 file ảnh theo ref (chỉ xoá khi không còn bản ghi tham chiếu — caller tự kiểm tra). */
 export async function deleteImageRef(ref: string): Promise<void> {
   if (!ref) return;
-  if (/^https?:\/\//.test(ref)) {
-    const blobMod = await loadBlob();
-    if (!blobMod) return;
+  const storage = await loadStorage();
+  if (/^https?:\/\//.test(ref) && storage) {
+    const cfg = config()!;
     try {
-      await blobMod.del([ref]);
+      const url = new URL(ref);
+      const objectPath = decodeURIComponent(url.pathname.replace(`/storage/v1/object/public/${cfg.bucket}/`, ""));
+      if (objectPath && objectPath !== url.pathname) {
+        await storage.from(cfg.bucket).remove([objectPath]);
+      }
     } catch {
       /* ignore */
     }

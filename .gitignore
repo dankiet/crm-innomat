@@ -81,3 +81,5 @@ _check_dup.py
 _scan_dups.py
 _dev_*.txt
 
+.vercel
+.env*

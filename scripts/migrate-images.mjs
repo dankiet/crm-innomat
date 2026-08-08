@@ -1,25 +1,28 @@
 /**
- * Upload toàn bộ ảnh (public/images, ~3.403 file) lên Vercel Blob
- * và cập nhật các cột ref trong Supabase PostgreSQL từ /images/... → blob URL.
+ * Upload toàn bộ ảnh (public/images, ~3.403 file) lên Supabase Storage
+ * và cập nhật các cột ref trong Supabase PostgreSQL từ /images/... → public URL.
  *
  * Content-addressed (sha256) trùng với storage.ts → tự chống trùng, idempotent:
- * chạy lại sẽ skip ảnh đã có (head) và không đổi rows đã là URL.
+ * chạy lại sẽ skip ảnh đã có (info) và không đổi rows đã là URL.
  *
- * Yêu cầu: BLOB_READ_WRITE_TOKEN, DATABASE_URL (đã migrate data), env LOCAL_DATA_DIR (mặc định ./public).
+ * Yêu cầu: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL (đã migrate data),
+ * env LOCAL_DATA_DIR (mặc định ./public), BLOB_BUCKET (mặc định crm-images).
  * Run: node scripts/migrate-images.mjs   (--dry-run để xem kế hoạch)
  */
 import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
-import { head, put } from "@vercel/blob";
+import { StorageClient } from "@supabase/storage-js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
-const TOKEN = (process.env.BLOB_READ_WRITE_TOKEN ?? "").trim();
+const SUPABASE_URL = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
+const BUCKET = (process.env.BLOB_BUCKET ?? "crm-images").replace(/^\//, "").replace(/\/+$/, "");
 const PREFIX = (process.env.BLOB_STORE_PREFIX ?? "crm").replace(/\/+$/, "");
 const LOCAL_IMAGES = path.resolve(process.env.LOCAL_DATA_DIR || "./public", "images");
 
-if (!TOKEN) {
-  console.error("Missing BLOB_READ_WRITE_TOKEN.");
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error("Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.");
   process.exit(1);
 }
 const url = process.env.DATABASE_URL_UNPOOLED?.trim() || process.env.DATABASE_URL?.trim();
@@ -27,6 +30,11 @@ if (!url) {
   console.error("Missing DATABASE_URL / DATABASE_URL_UNPOOLED.");
   process.exit(1);
 }
+
+const storage = new StorageClient(`${SUPABASE_URL}/storage/v1`, {
+  apikey: SERVICE_KEY,
+  Authorization: `Bearer ${SERVICE_KEY}`,
+});
 
 const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 
@@ -49,39 +57,49 @@ async function distinctRefs() {
   return [...set];
 }
 
+function publicUrl(objectPath) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${objectPath}`;
+}
+
 async function uploadOne(ref) {
-  const name = ref.replace(/^\//, "");
+  const name = ref.replace(/^\/images\//, "");
   const localFile = path.join(LOCAL_IMAGES, name);
   if (!fs.existsSync(localFile) || !fs.statSync(localFile).isFile()) return null;
 
-  const pathname = `${PREFIX}/${name}`;
+  const objectPath = `${PREFIX}/${name}`;
   try {
-    const existing = await head(pathname, { token: TOKEN });
-    if (existing?.url) return existing.url;
+    const { data, error } = await storage.from(BUCKET).info(objectPath);
+    if (!error && data) return publicUrl(objectPath);
   } catch {
-    /* chưa có → put */
+    /* chưa có → upload */
   }
   const buf = fs.readFileSync(localFile);
   const ext = path.extname(name).toLowerCase();
-  const { url } = await put(pathname, buf, {
-    access: "public",
-    token: TOKEN,
-    contentType: (() => {
-      const mime = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif" };
-      return mime[ext] ?? "application/octet-stream";
-    })(),
+  const { error } = await storage.from(BUCKET).upload(objectPath, buf, {
+    contentType: { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif" }[ext] ?? "application/octet-stream",
+    upsert: true,
   });
-  return url;
+  if (error) throw new Error(`Upload ${objectPath} failed: ${error.message}`);
+  return publicUrl(objectPath);
 }
 
 async function updateRefs(map) {
+  const entries = [...map].filter(([, newUrl]) => newUrl);
+  if (!entries.length) return;
   for (const [table, col] of REF_FIELDS) {
-    for (const [oldRef, newUrl] of map) {
-      if (!newUrl) continue;
-      const q = `UPDATE "${table}" SET "${col}" = $1 WHERE "${col}" = $2`;
-      const { rowCount } = await client.query(q, [newUrl, oldRef]);
-      if (rowCount > 0) console.log(`  ${table}.${col}: ${oldRef} → ${newUrl} (${rowCount})`);
+    const oldRefs = [];
+    const newUrls = [];
+    for (const [oldRef, newUrl] of entries) {
+      oldRefs.push(oldRef);
+      newUrls.push(newUrl);
     }
+    const q = `
+      UPDATE "${table}" AS t
+      SET "${col}" = m.new_url
+      FROM (SELECT unnest($1::text[]) AS old_ref, unnest($2::text[]) AS new_url) AS m
+      WHERE t."${col}" = m.old_ref`;
+    const { rowCount } = await client.query(q, [oldRefs, newUrls]);
+    if (rowCount > 0) console.log(`  ${table}.${col}: cập nhật ${rowCount} rows`);
   }
 }
 
@@ -101,7 +119,7 @@ async function main() {
     const results = await Promise.all(
       slice.map(async (ref) => {
         if (!/^\/images\//.test(ref)) return [ref, null];
-        const url = DRY_RUN ? `https://blob.vercel-storage.com/${PREFIX}/${ref.replace(/^\//, "")}` : await uploadOne(ref);
+        const url = DRY_RUN ? publicUrl(`${PREFIX}/${ref.replace(/^\/images\//, "")}`) : await uploadOne(ref);
         return [ref, url];
       }),
     );
@@ -110,11 +128,14 @@ async function main() {
       if (url) done++;
       else skipped++;
     }
-    console.log(`  progress ${Math.min(i + LIMIT, refs.length)}/${refs.length} (done=${done} skip=${skipped})`);
+    if (i % 400 === 0 || i + LIMIT >= refs.length) {
+      console.log(`  progress ${Math.min(i + LIMIT, refs.length)}/${refs.length} (done=${done} skip=${skipped})`);
+    }
   }
 
   if (DRY_RUN) {
     console.log(`\n[DRY RUN] sẽ upload ${done} ảnh, bỏ ${skipped} (không có file local hoặc không phải /images/).`);
+    await client.end();
     process.exitCode = 0;
     return;
   }
