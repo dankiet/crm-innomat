@@ -1,6 +1,6 @@
 /**
  * Upload toàn bộ ảnh (public/images, ~3.403 file) lên Vercel Blob
- * và cập nhật các cột ref trong Neon từ /images/... → blob URL.
+ * và cập nhật các cột ref trong Supabase PostgreSQL từ /images/... → blob URL.
  *
  * Content-addressed (sha256) trùng với storage.ts → tự chống trùng, idempotent:
  * chạy lại sẽ skip ảnh đã có (head) và không đổi rows đã là URL.

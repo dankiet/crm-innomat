@@ -1,5 +1,5 @@
 /**
- * Migrate toàn bộ dữ liệu từ SQLite (data/crm.db) → Neon PostgreSQL, GIỮ NGUYÊN id.
+ * Migrate toàn bộ dữ liệu từ SQLite (data/crm.db) → Supabase PostgreSQL, GIỮ NGUYÊN id.
  * Idempotent: INSERT ... ON CONFLICT DO NOTHING + setval identity sequence.
  *
  * Yêu cầu: schema đã áp (npm run db:migrate), env DATABASE_URL_UNPOOLED / DATABASE_URL.

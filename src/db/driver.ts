@@ -1,5 +1,5 @@
 /**
- * Async database facade over PostgreSQL (Neon).
+ * Async database facade over PostgreSQL (Supabase).
  *
  * Giữ thương hiệu gọi của better-sqlite3 để việc refactor tối thiểu:
  *   const db = getDb();
@@ -194,7 +194,7 @@ export class PostgresDb implements AsyncDb {
     const url = (process.env.DATABASE_URL ?? "").trim();
     if (!url) {
       throw new Error(
-        "DATABASE_URL chưa được đặt. Cấu hình Neon URL (hoặc chạy `npm run db:migrate`) trước khi dùng.",
+        "DATABASE_URL chưa được đặt. Cấu hình Supabase connection string (hoặc chạy `npm run db:migrate`) trước khi dùng.",
       );
     }
     this.pool = new Pool({
