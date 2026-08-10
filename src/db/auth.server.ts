@@ -155,14 +155,14 @@ export class AuthError extends Error {
 
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
-  if (!user) throw new AuthError("Ki?m tra dang nh?p tru?c", 401);
+  if (!user) throw new AuthError("Kiểm tra đăng nhập trước", 401);
   return user;
 }
 
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
   if (user.role !== "admin") {
-    throw new AuthError("Ch? qu?n tr? vi�n du?c th?c hi?n thao t�c n�y", 403);
+    throw new AuthError("Chỉ quản trị viên được thực hiện thao tác này", 403);
   }
   return user;
 }
@@ -175,9 +175,9 @@ export async function assertCanAccessCustomer(
   const row = await getDb()
     .prepare("SELECT owner_id FROM customers WHERE id = ?")
     .get<{ owner_id: number | null }>(customerId);
-  if (!row) throw new AuthError("Kh�ng t�m th?y kh�ch h�ng", 404);
+  if (!row) throw new AuthError("Không tìm thấy khách hàng", 404);
   if (row.owner_id !== user.id) {
-    throw new AuthError("B?n kh�ng c� quy?n truy c?p kh�ch h�ng n�y", 403);
+    throw new AuthError("Bạn không có quyền truy cập khách hàng này", 403);
   }
 }
 
@@ -193,7 +193,7 @@ export function validateUsername(username: string): string {
   const u = normalizeUsername(username);
   if (!/^[a-z0-9._-]{3,32}$/.test(u)) {
     throw new Error(
-      "Username 3�32 k� t?: ch? thu?ng, s?, d?u ch?m, g?ch du?i, g?ch ngang",
+      "Username 3–32 ký tự: chữ thường, số, dấu chấm, gạch dưới, gạch ngang",
     );
   }
   return u;
@@ -201,16 +201,16 @@ export function validateUsername(username: string): string {
 
 export function validatePassword(password: string) {
   if (!password || password.length < 8) {
-    throw new Error("M?t kh?u t?i thi?u 8 k� t?");
+    throw new Error("Mật khẩu tối thiểu 8 ký tự");
   }
   if (password.length > 128) {
-    throw new Error("M?t kh?u qu� d�i");
+    throw new Error("Mật khẩu quá dài");
   }
 }
 
 export function validateRole(role: string): Role {
   if (role !== "admin" && role !== "user") {
-    throw new Error("Role kh�ng h?p l?");
+    throw new Error("Role không hợp lệ");
   }
   return role;
 }
@@ -221,10 +221,10 @@ export async function loginWithPassword(
   userAgent = "",
 ): Promise<{ user: SessionUser } | { error: string }> {
   const u = await getUserByUsername(username);
-  if (!u) return { error: "Sai t�n dang nh?p ho?c m?t kh?u" };
-  if (!u.is_active) return { error: "T�i kho?n d� b? kh�a" };
+  if (!u) return { error: "Sai tên đăng nhập hoặc mật khẩu" };
+  if (!u.is_active) return { error: "Tài khoản đã bị khóa" };
   const ok = await verifyPassword(password, u.password_hash);
-  if (!ok) return { error: "Sai t�n dang nh?p ho?c m?t kh?u" };
+  if (!ok) return { error: "Sai tên đăng nhập hoặc mật khẩu" };
 
   const { sessionId } = await createSession(u.id, userAgent);
   setSessionCookie(sessionId);
