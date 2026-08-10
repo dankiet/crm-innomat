@@ -1,12 +1,12 @@
 /**
  * Async database facade over PostgreSQL (Supabase).
  *
- * Giữ thương hiệu gọi của better-sqlite3 để việc refactor tối thiểu:
+ * API theo kiểu `prepare(...).get/all/run` quen thuộc:
  *   const db = getDb();
  *   await db.prepare(sql).get/all/run(...params);
  *   await db.transaction(async () => { ... })();
  *
- * Sự khác biệt chính so với SQLite sync:
+ * Khác biệt chính so với driver đồng bộ:
  *  - Mọi thao tác trả Promise → call-site phải `await`.
  *  - `run()` trả về { changes, lastInsertRowid } — cho INSERT vào bảng có cột `id`
  *    driver tự append `RETURNING id`.
@@ -147,6 +147,29 @@ function transpile(
   return { text, isIgnore: wasIgnore, targetTable, values };
 }
 
+function isSlowQueryLoggingEnabled(): boolean {
+  return process.env.SQL_DEBUG === "1";
+}
+
+async function executeQuery(
+  query: (text: string, values: unknown[]) => Promise<QueryResult>,
+  text: string,
+  values: unknown[],
+): Promise<QueryResult> {
+  if (!isSlowQueryLoggingEnabled()) return query(text, values);
+  const startedAt = Date.now();
+  try {
+    const result = await query(text, values);
+    console.info(
+      `[sql] ${Date.now() - startedAt}ms rows=${result.rowCount ?? 0} ${text.replace(/\s+/g, " ").slice(0, 180)}`,
+    );
+    return result;
+  } catch (error) {
+    console.error(`[sql] failed after ${Date.now() - startedAt}ms ${text.replace(/\s+/g, " ").slice(0, 180)}`);
+    throw error;
+  }
+}
+
 function makeStmt(
   sql: string,
   query: (text: string, values: unknown[]) => Promise<QueryResult>,
@@ -154,12 +177,12 @@ function makeStmt(
   return {
     async get<T = unknown>(...params: SqlValue[]): Promise<T | undefined> {
       const { text, values } = transpile(sql, params);
-      const res = await query(text, values);
+      const res = await executeQuery(query, text, values);
       return res.rows[0] as T | undefined;
     },
     async all<T = unknown>(...params: SqlValue[]): Promise<T[]> {
       const { text, values } = transpile(sql, params);
-      const res = await query(text, values);
+      const res = await executeQuery(query, text, values);
       return res.rows as T[];
     },
     async run(...params: SqlValue[]): Promise<RunResult> {
@@ -176,7 +199,7 @@ function makeStmt(
           final = text + returning;
         }
       }
-      const res = await query(final, values);
+      const res = await executeQuery(query, final, values);
       return {
         changes: res.rowCount ?? 0,
         lastInsertRowid: res.rows[0]?.id ?? null,
@@ -205,6 +228,7 @@ class PostgresDb implements AsyncDb {
       max: Number(process.env.PG_MAX_CONNECTIONS || 7),
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
+      statement_timeout: Number(process.env.PG_STATEMENT_TIMEOUT_MS || 15_000),
       ssl:
         process.env.PG_SSL_DISABLE === "1"
           ? false

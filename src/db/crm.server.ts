@@ -173,8 +173,11 @@ export async function listProducts(opts?: {
   const where: string[] = [];
   const joinParams: unknown[] = [];
   const params: unknown[] = [];
-  // Lọc danh mục bằng JS (case-insensitive, hỗ trợ tiếng Việt)
   const categoryLower = opts?.category?.trim().toLowerCase();
+  if (categoryLower && categoryLower !== "all") {
+    where.push("LOWER(p.category) = ?");
+    params.push(categoryLower);
+  }
   if (opts?.search?.trim()) {
     where.push(
       "(p.code LIKE ? OR pic.multi_codes_list LIKE ? OR p.name LIKE ? OR p.size LIKE ? OR p.collections LIKE ?)",
@@ -183,11 +186,14 @@ export async function listProducts(opts?: {
     params.push(q, q, q, q, q);
   }
 
-  let stockJoin = '';
-  if (opts?.stockLocation && opts.stockLocation !== 'all') {
-      stockJoin = ' AND inv.stock_location = ?';
-      joinParams.push(opts.stockLocation);
+  let stockJoin = "";
+  if (opts?.stockLocation && opts.stockLocation !== "all") {
+    stockJoin = " AND inv.stock_location = ?";
+    joinParams.push(opts.stockLocation);
   }
+
+  const hasLimit = opts?.limit != null && Number(opts.limit) > 0;
+  if (hasLimit) params.push(Math.floor(Number(opts.limit)));
 
   const sql = `
     SELECT p.*,
@@ -198,8 +204,8 @@ export async function listProducts(opts?: {
       pic.multi_codes_list
     FROM products p
     LEFT JOIN (
-      SELECT pic.product_id, 
-             SUM(inv.quantity_stock) as total_stock, 
+      SELECT pic.product_id,
+             SUM(inv.quantity_stock) as total_stock,
              GROUP_CONCAT(DISTINCT pic.internal_code) as multi_codes_list
       FROM product_internal_codes pic
       LEFT JOIN inventory inv ON inv.internal_code = pic.internal_code${stockJoin}
@@ -207,13 +213,9 @@ export async function listProducts(opts?: {
     ) pic ON pic.product_id = p.id
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY p.category, p.collections, p.code
+    ${hasLimit ? "LIMIT ?" : ""}
   `;
-  const rows = (await db.prepare(sql).all<Product>(...(joinParams as SqlValue[]), ...(params as SqlValue[]))) as Product[];
-  const products =
-    categoryLower && categoryLower !== "all"
-      ? rows.filter((p) => p.category.trim().toLowerCase() === categoryLower)
-      : rows;
-  return opts?.limit ? products.slice(0, Number(opts.limit)) : products;
+  return (await db.prepare(sql).all<Product>(...(joinParams as SqlValue[]), ...(params as SqlValue[]))) as Product[];
 }
 export async function getProduct(id: number): Promise<Product | null> {
   return (
@@ -857,18 +859,21 @@ export async function getCustomerDetail(
   const customer = await getCustomer(id);
   if (!customer) return null;
 
-  const quotes = (await listQuotes(null)).filter((q) => q.customer_id === id);
-  const quotesWithItems = await Promise.all(
-    quotes.map(async (q) => ({
-      ...q,
-      items: await getQuoteItems(q.id),
-    })),
-  );
+  const [quotes, orders, notes, debtDetail, mappingCount] = await Promise.all([
+    listQuotesForCustomer(null, id),
+    listOrdersForCustomer(null, id),
+    listNotes(100, null, id),
+    getCustomerDebtDetail(id, null),
+    getDb()
+      .prepare("SELECT COUNT(*) AS n FROM customer_mappings WHERE customer_id = ?")
+      .get<{ n: number }>(id),
+  ]);
+  const itemsByQuote = await getQuoteItemsForQuotes(quotes.map((q) => q.id));
+  const quotesWithItems = quotes.map((q) => ({
+    ...q,
+    items: itemsByQuote.get(q.id) ?? [],
+  }));
 
-  const orders = (await listOrders(null)).filter((o) => o.customer_id === id);
-  const notes = (await listNotes(100, null)).filter((n) => n.customer_id === id);
-
-  const debtDetail = await getCustomerDebtDetail(id, null);
   const quotedProducts = (await getDb()
     .prepare(
       `SELECT
@@ -936,11 +941,7 @@ export async function getCustomerDetail(
       quote_count: quotes.length,
       order_count: orders.length,
       note_count: notes.length,
-      mapping_count: (
-        (await getDb()
-          .prepare("SELECT COUNT(*) AS n FROM customer_mappings WHERE customer_id = ?")
-          .get<{ n: number }>(id)) as { n: number }
-      ).n,
+      mapping_count: (mappingCount as { n: number }).n,
       debt: debtDetail?.debt ?? 0,
       total_order_amount: debtDetail?.total_order_amount ?? 0,
       total_paid: debtDetail?.total_paid ?? 0,
@@ -1611,10 +1612,24 @@ export async function updateCustomer(
 // ─── Quotes ─────────────────────────────────────────────────
 
 export async function listQuotes(ownerId?: number | null): Promise<Quote[]> {
+  return listQuotesForCustomer(ownerId, null);
+}
+
+async function listQuotesForCustomer(
+  ownerId?: number | null,
+  customerId?: number | null,
+): Promise<Quote[]> {
   const db = getDb();
-  const ownerClause =
-    ownerId != null ? "WHERE c.owner_id = ?" : "";
-  const params = ownerId != null ? [ownerId] : [];
+  const where: string[] = [];
+  const params: number[] = [];
+  if (ownerId != null) {
+    where.push("c.owner_id = ?");
+    params.push(ownerId);
+  }
+  if (customerId != null) {
+    where.push("q.customer_id = ?");
+    params.push(customerId);
+  }
   return (await db
     .prepare(
       `SELECT q.*,
@@ -1624,11 +1639,33 @@ export async function listQuotes(ownerId?: number | null): Promise<Quote[]> {
         COALESCE((SELECT COUNT(*) FROM quote_items qi WHERE qi.quote_id = q.id), 0) AS items_count
        FROM quotes q
        JOIN customers c ON c.id = q.customer_id
-       ${ownerClause}
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
        ORDER BY q.created_at DESC`,
     )
     .all<Quote>(...params)) as Quote[];
 }
+
+async function getQuoteItemsForQuotes(
+  quoteIds: number[],
+): Promise<Map<number, QuoteItem[]>> {
+  const itemsByQuote = new Map<number, QuoteItem[]>();
+  if (quoteIds.length === 0) return itemsByQuote;
+  const placeholders = quoteIds.map(() => "?").join(", ");
+  const rows = (await getDb()
+    .prepare(
+      `SELECT * FROM quote_items
+       WHERE quote_id IN (${placeholders})
+       ORDER BY quote_id, id`,
+    )
+    .all<QuoteItem>(...quoteIds)) as QuoteItem[];
+  for (const item of rows) {
+    const items = itemsByQuote.get(item.quote_id) ?? [];
+    items.push(item);
+    itemsByQuote.set(item.quote_id, items);
+  }
+  return itemsByQuote;
+}
+
 
 export async function getQuote(id: number): Promise<Quote | null> {
   return (
@@ -2003,9 +2040,23 @@ export async function updateQuote(input: {
 // ─── Orders ─────────────────────────────────────────────────
 
 export async function listOrders(ownerId?: number | null): Promise<Order[]> {
-  const ownerClause =
-    ownerId != null ? "WHERE c.owner_id = ?" : "";
-  const params = ownerId != null ? [ownerId] : [];
+  return listOrdersForCustomer(ownerId, null);
+}
+
+async function listOrdersForCustomer(
+  ownerId?: number | null,
+  customerId?: number | null,
+): Promise<Order[]> {
+  const where: string[] = [];
+  const params: number[] = [];
+  if (ownerId != null) {
+    where.push("c.owner_id = ?");
+    params.push(ownerId);
+  }
+  if (customerId != null) {
+    where.push("o.customer_id = ?");
+    params.push(customerId);
+  }
   return (await getDb()
     .prepare(
       `SELECT o.*,
@@ -2014,7 +2065,7 @@ export async function listOrders(ownerId?: number | null): Promise<Order[]> {
         COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.order_id = o.id), 0) AS paid_amount
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
-       ${ownerClause}
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
        ORDER BY o.created_at DESC`,
     )
     .all<Order>(...params)) as Order[];
@@ -2276,24 +2327,46 @@ export async function getCustomerDebtDetail(
   customerId: number,
   ownerId?: number | null,
 ): Promise<CustomerDebtDetail | null> {
-  const debts = await listCustomerDebts(ownerId);
-  const base = debts.find((d) => d.customer_id === customerId);
   const customer = await getCustomer(customerId);
   if (!customer) return null;
   if (ownerId != null && customer.owner_id !== ownerId) return null;
 
-  const summary: CustomerDebt = base ?? {
-    customer_id: customer.id,
-    customer_name: customer.name,
-    source: customer.source,
-    phone: customer.phone,
-    region: customer.region,
-    status: customer.status,
-    order_count: 0,
-    total_order_amount: 0,
-    total_paid: 0,
-    debt: 0,
-  };
+  const base = (await getDb()
+    .prepare(
+      `SELECT
+        c.id AS customer_id,
+        c.name AS customer_name,
+        c.source,
+        c.phone,
+        c.region,
+        c.status,
+        (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS order_count,
+        COALESCE((SELECT SUM(o.amount + o.shipping_fee) FROM orders o WHERE o.customer_id = c.id), 0) AS total_order_amount,
+        COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.customer_id = c.id), 0) AS total_paid
+       FROM customers c
+       WHERE c.id = ?`,
+    )
+    .get<CustomerDebt & { total_paid: number; total_order_amount: number }>(customerId)) as
+    | (CustomerDebt & { total_paid: number; total_order_amount: number })
+    | undefined;
+
+  const summary: CustomerDebt = base
+    ? {
+        ...base,
+        debt: Number(base.total_order_amount) - Number(base.total_paid),
+      }
+    : {
+        customer_id: customer.id,
+        customer_name: customer.name,
+        source: customer.source,
+        phone: customer.phone,
+        region: customer.region,
+        status: customer.status,
+        order_count: 0,
+        total_order_amount: 0,
+        total_paid: 0,
+        debt: 0,
+      };
 
   const orders = (await getDb()
     .prepare(
@@ -2317,23 +2390,29 @@ export async function getCustomerDebtDetail(
 export async function listNotes(
   limit = 50,
   ownerId?: number | null,
+  customerId?: number | null,
 ): Promise<Note[]> {
-  const ownerClause =
-    ownerId != null
-      ? "WHERE (n.customer_id IS NULL OR c.owner_id = ?)"
-      : "";
-  const params: unknown[] =
-    ownerId != null ? [ownerId, limit] : [limit];
+  const where: string[] = [];
+  const params: number[] = [];
+  if (ownerId != null) {
+    where.push("(n.customer_id IS NULL OR c.owner_id = ?)");
+    params.push(ownerId);
+  }
+  if (customerId != null) {
+    where.push("n.customer_id = ?");
+    params.push(customerId);
+  }
+  params.push(limit);
   return (await getDb()
     .prepare(
       `SELECT n.*, c.name AS customer_name, c.source AS customer_source
        FROM notes n
        LEFT JOIN customers c ON c.id = n.customer_id
-       ${ownerClause}
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
        ORDER BY n.created_at DESC
        LIMIT ?`,
     )
-    .all<Note>(...(params as SqlValue[]))) as Note[];
+    .all<Note>(...params)) as Note[];
 }
 
 export async function createNote(input: {
@@ -2365,11 +2444,13 @@ export async function createNote(input: {
 // ─── Dashboard ──────────────────────────────────────────────
 
 export async function getDashboardStats(ownerId?: number | null) {
-  const customers = await listCustomers("all", ownerId);
-  const debts = await listCustomerDebts(ownerId);
-  const orders = await listOrders(ownerId);
-  const quotes = await listQuotes(ownerId);
-  const notes = await listNotes(10, ownerId);
+  const [customers, debts, orders, quotes, notes] = await Promise.all([
+    listCustomers("all", ownerId),
+    listCustomerDebts(ownerId),
+    listOrders(ownerId),
+    listQuotes(ownerId),
+    listNotes(10, ownerId),
+  ]);
 
   const totalDebt = debts.reduce((s, d) => s + Math.max(0, d.debt), 0);
   const totalPaid = debts.reduce((s, d) => s + d.total_paid, 0);

@@ -64,7 +64,7 @@ export type Product = {
   image_path: string;
   /** Số ảnh (optional, join) */
   image_count?: number;
-  /** Thời điểm tạo (SQLite localtime) */
+  /** Thời điểm tạo */
   created_at?: string;
 };
 

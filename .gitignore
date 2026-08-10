@@ -21,15 +21,6 @@ dist-ssr
 .env.*
 !.env.example
 
-# Legacy local SQLite data (not used by the Postgres runtime)
-data/crm.db
-data/crm.db-*
-
-# Image backups / quarantine (kept local only)
-data/backups/
-data/image-quarantine/
-data/reports/
-
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
@@ -55,29 +46,3 @@ Stock.xlsx
 
 # Vercel build output (generated; deploy happens via Vercel)
 .vercel/
-
-# Temp schema dump used to author schema-pg.sql (regenerable)
-data/_schema_dump.json
-
-# One-off import/OCR reports & caches (not needed at runtime)
-data/*_report.json
-data/*_cache.json
-data/*_matches.csv
-data/*_index.json
-data/*_list.csv
-data/san_pham_*
-data/danh_sach_*
-data/doi_chieu_*
-data/_ocr_*
-data/Bao_Gia_Form_V2.xlsx
-
-__pycache__/
-*.pyc
-
-# Local debug scripts / temp
-_check_dup.py
-_scan_dups.py
-_dev_*.txt
-
-.vercel
-.env*

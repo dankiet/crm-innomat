@@ -2,7 +2,7 @@
  * Lớp lưu trữ ảnh dùng chung.
  *
  *  - Production: Supabase Storage, token `SUPABASE_SERVICE_ROLE_KEY` + URL `SUPABASE_URL`,
- *    bucket public `BLOB_BUCKET` (mặc định `crm-images`).
+ *    bucket public `SUPABASE_STORAGE_BUCKET` (mặc định `crm-images`).
  *    Ref trả về là URL công khai.
  *  - Local mode (dev, thiếu key): ghi vào public/images, ref trả về
  *    `/images/<hash>.<ext>`.
@@ -25,7 +25,7 @@ function config(): { url: string; key: string; bucket: string } | null {
   return {
     url: url.replace(/\/+$/, ""),
     key,
-    bucket: (process.env.BLOB_BUCKET ?? "crm-images").replace(/^\//, "").replace(/\/+$/, ""),
+    bucket: (process.env.SUPABASE_STORAGE_BUCKET ?? "crm-images").replace(/^\//, "").replace(/\/+$/, ""),
   };
 }
 
@@ -42,7 +42,7 @@ async function loadStorage(): Promise<StorageClient | null> {
   return storageClient;
 }
 
-const BLOB_PREFIX = (process.env.BLOB_STORE_PREFIX ?? "crm").replace(/\/+$/, "");
+const STORAGE_PREFIX = (process.env.SUPABASE_STORAGE_PREFIX ?? "crm").replace(/\/+$/, "");
 
 const MIME_BY_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -80,7 +80,7 @@ export async function putImageBuffer(
   ext: string,
 ): Promise<string> {
   const filename = filenameFor(buffer, ext);
-  const objectPath = `${BLOB_PREFIX}/${filename}`;
+  const objectPath = `${STORAGE_PREFIX}/${filename}`;
 
   const storage = await loadStorage();
   if (storage) {
