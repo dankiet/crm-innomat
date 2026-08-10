@@ -22,12 +22,5 @@ export default defineConfig({
       host: true,
       allowedHosts: true,
     },
-    // better-sqlite3 is a native Node addon — keep it external for SSR
-    ssr: {
-      external: ["better-sqlite3"],
-    },
-    optimizeDeps: {
-      exclude: ["better-sqlite3"],
-    },
   },
 });

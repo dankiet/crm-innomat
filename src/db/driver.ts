@@ -189,7 +189,7 @@ function isMainInsert(text: string): boolean {
   return /^\s*INSERT\s+INTO/i.test(text);
 }
 
-export class PostgresDb implements AsyncDb {
+class PostgresDb implements AsyncDb {
   private pool: Pool;
   readonly isPg = true;
 
@@ -295,24 +295,4 @@ export function getDb(): AsyncDb {
     globalDb = new PostgresDb();
   }
   return globalDb;
-}
-
-export async function closeDb(): Promise<void> {
-  if (globalDb) {
-    await globalDb.close();
-    globalDb = null;
-  }
-}
-
-/** Kiểm tra nhanh schema đã tồn tại hay chưa (gọi 1 lần khi cần). */
-export async function ensureSchemaReady(): Promise<void> {
-  const db = getDb();
-  const row = await db
-    .prepare(`SELECT to_regclass('public.products') AS t`)
-    .get<{ t: string | null }>();
-  if (!row?.t) {
-    throw new Error(
-      "Schema PostgreSQL chưa được tạo. Chạy `npm run db:migrate` trước khi start.",
-    );
-  }
 }

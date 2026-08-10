@@ -1295,20 +1295,27 @@ export const importStockUpdateFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { getDb } = await import('@/db/index.server'); const db = getDb();
     let updated = 0;
+    let skipped = 0;
     const stmt = db.prepare(`INSERT INTO inventory (internal_code, stock_location, quantity_stock) VALUES (?, ?, ?) ON CONFLICT(internal_code, stock_location) DO UPDATE SET quantity_stock = excluded.quantity_stock`);
+    const existsStmt = db.prepare(`SELECT 1 FROM product_internal_codes WHERE internal_code = ?`);
     await db.transaction(async () => {
       for (const item of data.items) {
-        try {
-          const res = await stmt.run(item.internal_code, item.stock_location, item.quantity);
-          updated += res.changes;
-        } catch (err: any) {
-          if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-            console.warn('Skipping invalid internal_code:', item.internal_code);
-          } else {
-            throw err;
-          }
+        const internal_code = String(item.internal_code ?? '').trim();
+        const stock_location = String(item.stock_location ?? '').trim();
+        if (!internal_code || !stock_location) {
+          skipped++;
+          continue;
         }
+        const mapped = await existsStmt.get(internal_code);
+        if (!mapped) {
+          console.warn('Skipping unmapped internal_code:', internal_code);
+          skipped++;
+          continue;
+        }
+        const quantity = Number(item.quantity);
+        const res = await stmt.run(internal_code, stock_location, Number.isFinite(quantity) ? (quantity < 0 ? 0 : quantity) : 0);
+        updated += res.changes;
       }
     })();
-    return { updated };
+    return { updated, skipped };
   });

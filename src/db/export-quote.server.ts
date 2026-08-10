@@ -1,8 +1,7 @@
-import fs from "node:fs";
-import path from "node:path";
 import { getDb } from "./index.server";
 import { VAT_RATE } from "@/lib/pricing";
 import { readImageBytes } from "@/lib/storage";
+import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";
 
 export type QuoteExportResult = {
   filename: string;
@@ -25,27 +24,6 @@ async function imageRefToDataUrl(ref: string): Promise<string> {
         ? "image/webp"
         : "image/jpeg";
   return `data:${mime};base64,${buf.toString("base64")}`;
-}
-
-async function readPublicAssetBase64(
-  rel: string,
-  mime = "image/png",
-): Promise<string> {
-  const candidates = [
-    path.join(process.cwd(), "public", rel),
-    path.join(process.cwd(), ".output", "public", rel),
-  ];
-  for (const file of candidates) {
-    try {
-      if (fs.existsSync(file) && fs.statSync(file).isFile()) {
-        const buf = fs.readFileSync(file);
-        return `data:${mime};base64,${buf.toString("base64")}`;
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  return "";
 }
 
 /** Chạy fn trên từng phần tử với giới hạn concurrency. */
@@ -242,10 +220,8 @@ export async function exportQuoteToHtml(
 
   const vatNote = "";
 
-  const [logoBase64, stampBase64] = await Promise.all([
-    readPublicAssetBase64("logo.png"),
-    readPublicAssetBase64("dau_do.png"),
-  ]);
+  const logoBase64 = logoDataUrl;
+  const stampBase64 = stampDataUrl;
 
   const html = `<!DOCTYPE html>
 <html lang="vi">
@@ -402,7 +378,7 @@ export async function exportQuoteToHtml(
         <th style="width:55px">Số lượng</th>
         <th style="width:40px">ĐVT</th>
         <th style="width:80px">Đơn giá<br/>(VNĐ)</th>
-        <th style="width:90px">Thành tiền<br/>(VNĐ)</th>
+        <th style="width:100px">Thành tiền<br/>(VNĐ)</th>
         ${showOrigin ? '<th style="width:75px">Xuất xứ</th>' : ""}
         ${showColorVariance ? '<th style="width:60px">Độ khác<br/>biệt màu<br/>sắc</th>' : ""}
         <th style="width:80px">Ghi chú</th>

@@ -21,7 +21,7 @@ dist-ssr
 .env.*
 !.env.example
 
-# SQLite runtime DB (seed with npm run db:seed)
+# Legacy local SQLite data (not used by the Postgres runtime)
 data/crm.db
 data/crm.db-*
 
@@ -71,8 +71,6 @@ data/doi_chieu_*
 data/_ocr_*
 data/Bao_Gia_Form_V2.xlsx
 
-# Match-code generated import workbooks
-match_code/output/
 __pycache__/
 *.pyc
 

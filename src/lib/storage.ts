@@ -42,10 +42,6 @@ async function loadStorage(): Promise<StorageClient | null> {
   return storageClient;
 }
 
-export function isBlobMode(): boolean {
-  return !!config();
-}
-
 const BLOB_PREFIX = (process.env.BLOB_STORE_PREFIX ?? "crm").replace(/\/+$/, "");
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -161,24 +157,5 @@ export async function deleteImageRef(ref: string): Promise<void> {
     } catch {
       /* ignore */
     }
-  }
-}
-
-/** Kiểm tra xem ref có đang trỏ tới file thật không (dùng để bỏ ảnh chết khi render). */
-export async function imageExists(ref: string): Promise<boolean> {
-  if (!ref) return false;
-  if (/^https?:\/\//.test(ref)) {
-    try {
-      const res = await fetch(ref, { method: "HEAD", signal: AbortSignal.timeout(6000) });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-  try {
-    const file = path.join(process.cwd(), "public", ref.replace(/^\//, ""));
-    return fs.existsSync(file) && fs.statSync(file).isFile();
-  } catch {
-    return false;
   }
 }

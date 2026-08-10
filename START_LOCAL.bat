@@ -25,13 +25,6 @@ if not exist "node_modules\" (
   exit /b 1
 )
 
-if not exist "data\crm.db" (
-  echo [ERROR] Chua co data\crm.db.
-  echo Chay: npm run db:seed
-  pause
-  exit /b 1
-)
-
 call :probe_server
 if not errorlevel 1 (
   echo CRM dang chay tai %URL%

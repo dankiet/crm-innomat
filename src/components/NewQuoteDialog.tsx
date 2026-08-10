@@ -320,7 +320,6 @@ export function NewQuoteDialog({
           p.code.toLowerCase().includes(q) ||
           p.name.toLowerCase().includes(q) ||
           p.size.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
           (p.category || "").toLowerCase().includes(q),
       )
       .slice(0, 40);

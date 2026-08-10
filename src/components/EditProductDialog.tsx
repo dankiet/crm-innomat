@@ -96,13 +96,7 @@ export function EditProductDialog({
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    loadFieldOptions().then(() => {
-      if (cancelled) return;
-    });
-    return () => {
-      cancelled = true;
-    };
+    void loadFieldOptions();
   }, [open]);
 
   async function handleDeleteOption(field: SuggestField, value: string) {

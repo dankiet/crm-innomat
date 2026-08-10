@@ -156,7 +156,7 @@ export function titleCaseVn(s: string): string {
 /**
  * Chuẩn hóa ký hiệu diện tích: ㎡ / m² -> m2.
  */
-export function normalizeAreaUnit(u: string): string {
+function normalizeAreaUnit(u: string): string {
   if (!u) return u;
   const u2 = u
     .trim()

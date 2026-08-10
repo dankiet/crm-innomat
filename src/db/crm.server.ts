@@ -1,22 +1,26 @@
 import fs from "node:fs";
-import { normRaw, candidates, extractAliasCodes, extractNameDimPack, titleCaseVn, parsePackaging, type ParsedPackaging } from '@/lib/product-code-matcher';
-import { allProductAliases, parseInternalCodesList, serializeInternalCodes, normalizeInternalCodesInput } from '@/lib/product-internal-codes';
-import { mergePackingVariants, parsePackingFromHhdvName, type PackingByCode } from '@/lib/hhdv-packing';
+import {
+  candidates,
+  extractAliasCodes,
+  extractNameDimPack,
+  normRaw,
+  parsePackaging,
+  titleCaseVn,
+  type ParsedPackaging,
+} from "@/lib/product-code-matcher";
+import {
+  allProductAliases,
+  normalizeInternalCodesInput,
+  parseInternalCodesList,
+  serializeInternalCodes,
+} from "@/lib/product-internal-codes";
+import {
+  mergePackingVariants,
+  parsePackingFromHhdvName,
+  type PackingByCode,
+} from "@/lib/hhdv-packing";
 import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage";
-
-export function extractCoreVariants(code: string): string[] {
-  const parts = code.split('-');
-  if (parts.length > 1) {
-    return [parts[0], code];
-  }
-  return [code];
-}
-
-export type ProductStockRef = { id: number; code: string; name: string; internal_code: string; internal_codes: string; packing: string; packing_pcs: number | null; packing_m2: number | null; stock_m2: number | null; stock_vp: number | null; };
 import path from "node:path";
-export type StockImportRow = { internal_code: string; stock_m2: number; stock_vp?: number; product_name?: string; mo_ta?: string; kho?: string; };
-export type StockImportMatched = { product_id: number; code: string; name: string; internal_code: string; old_stock: number | null; new_stock: number; old_stock_vp?: number | null; new_stock_vp?: number; source_codes?: string[]; source_stocks?: number[]; new_internal_codes?: string; old_internal_codes?: string; multi_codes_added?: string[]; packing_pcs?: number | null; packing_m2?: number | null; packing?: string; packing_changed?: boolean; packing_conflict?: boolean; so_luong_dong_goi?: string; dien_tich?: string; don_vi_tinh?: string; parsed_name?: string; name_changed?: boolean; match_rule?: string; };
-export type StockImportPreview = { matched: StockImportMatched[]; unmatched: StockImportRow[]; matched_count?: number; unmatched_count?: number; packing_update_count?: number; multi_update_count?: number; name_update_count?: number; packing_conflict_count?: number; };
 import { getDb, type SqlValue } from "./index.server";
 import {
   unitPriceForProduct,
@@ -41,6 +45,71 @@ import type {
 } from "@/lib/types";
 import { isPhoneMatchable, phonesMatch } from "@/lib/phone";
 import { statusMeta } from "@/lib/types";
+
+function extractCoreVariants(code: string): string[] {
+  const parts = code.split("-");
+  return parts.length > 1 ? [parts[0], code] : [code];
+}
+
+type ProductStockRef = {
+  id: number;
+  code: string;
+  name: string;
+  internal_code: string;
+  internal_codes: string;
+  packing: string;
+  packing_pcs: number | null;
+  packing_m2: number | null;
+  stock_m2: number | null;
+  stock_vp: number | null;
+};
+
+type StockImportRow = {
+  internal_code: string;
+  stock_m2: number;
+  stock_vp?: number;
+  product_name?: string;
+  mo_ta?: string;
+  kho?: string;
+};
+
+type StockImportMatched = {
+  product_id: number;
+  code: string;
+  name: string;
+  internal_code: string;
+  old_stock: number | null;
+  new_stock: number;
+  old_stock_vp?: number | null;
+  new_stock_vp?: number;
+  source_codes?: string[];
+  source_stocks?: number[];
+  new_internal_codes?: string;
+  old_internal_codes?: string;
+  multi_codes_added?: string[];
+  packing_pcs?: number | null;
+  packing_m2?: number | null;
+  packing?: string;
+  packing_changed?: boolean;
+  packing_conflict?: boolean;
+  so_luong_dong_goi?: string;
+  dien_tich?: string;
+  don_vi_tinh?: string;
+  parsed_name?: string;
+  name_changed?: boolean;
+  match_rule?: string;
+};
+
+type StockImportPreview = {
+  matched: StockImportMatched[];
+  unmatched: StockImportRow[];
+  matched_count?: number;
+  unmatched_count?: number;
+  packing_update_count?: number;
+  multi_update_count?: number;
+  name_update_count?: number;
+  packing_conflict_count?: number;
+};
 
 export { priceAfterDiscount, unitPriceForProduct, effectiveDiscountPct };
 
@@ -146,15 +215,6 @@ export async function listProducts(opts?: {
       : rows;
   return opts?.limit ? products.slice(0, Number(opts.limit)) : products;
 }
-export async function listCategories(): Promise<string[]> {
-  const db = getDb();
-  return (
-    (await db
-      .prepare("SELECT DISTINCT category FROM products WHERE category != '' ORDER BY category")
-      .all<{ category: string }>()) as { category: string }[]
-  ).map((r) => r.category);
-}
-
 export async function getProduct(id: number): Promise<Product | null> {
   return (
     (await getDb()
@@ -178,28 +238,6 @@ export async function getProduct(id: number): Promise<Product | null> {
       )
       .get<Product>(id) as Product | undefined) ?? null
   );
-}
-
-export async function listSections(category?: string): Promise<string[]> {
-  const db = getDb();
-  if (category && category !== "all") {
-    return (
-      (await db
-        .prepare(
-          `SELECT DISTINCT collections FROM products
-           WHERE category = ? AND collections != ''
-           ORDER BY collections`,
-        )
-        .all<{ collections: string }>(category)) as { collections: string }[]
-    ).map((r) => r.collections);
-  }
-  return (
-    (await db
-      .prepare(
-        `SELECT DISTINCT collections FROM products WHERE collections != '' ORDER BY collections`,
-      )
-      .all<{ collections: string }>()) as { collections: string }[]
-  ).map((r) => r.collections);
 }
 
 /** Field cho phép gợi ý (datalist) & bulk apply — whitelist để tránh SQL injection */
@@ -1800,12 +1838,6 @@ export async function createQuote(input: {
   return quote;
 }
 
-export async function updateQuoteStatus(id: number, status: QuoteStatus) {
-  await getDb()
-    .prepare("UPDATE quotes SET status = ?, updated_at = ? WHERE id = ?")
-    .run(status, nowLocal(), id);
-}
-
 /** Xóa báo giá + dòng SP + đơn hàng (và thanh toán của đơn) gắn BG nếu có. */
 export async function deleteQuote(id: number): Promise<{
   ok: true;
@@ -2710,7 +2742,7 @@ function buildCodeGroups(items: StockImportRow[]): Map<string, string[]> {
  * - Option 3: Quy cách / Packing
  * - Option 4: Tên sản phẩm
  */
-export async function previewStockImport(
+async function previewStockImport(
   items: StockImportRow[],
 ): Promise<StockImportPreview> {
   const db = getDb();
@@ -3016,7 +3048,7 @@ export async function previewStockImport(
   };
 }
 
-export type StockImportApplyItem = {
+type StockImportApplyItem = {
   product_id: number;
   stock_m2?: number;
   update_stock?: boolean;
@@ -3033,7 +3065,7 @@ export type StockImportApplyItem = {
 /**
  * Áp dụng tồn + packing + multi-codes + tên sản phẩm từ preview «Nhập tồn kho».
  */
-export async function applyStockImport(
+async function applyStockImport(
   items: StockImportApplyItem[],
   opts?: {
     update_stock?: boolean;
@@ -3127,7 +3159,7 @@ export async function applyStockImport(
   return { stock_count, packing_count, multi_count, name_count };
 }
 
-export async function bulkUpdateStockByProductId(
+async function bulkUpdateStockByProductId(
   items: Array<{ product_id: number; stock_m2: number }>,
 ): Promise<number> {
   const db = getDb();
@@ -3149,7 +3181,7 @@ export async function bulkUpdateStockByProductId(
   return updatedCount;
 }
 
-export async function bulkUpdateStock(
+async function bulkUpdateStock(
   items: Array<{ internal_code: string; stock_m2: number }>,
 ): Promise<number> {
   const preview = await previewStockImport(items);

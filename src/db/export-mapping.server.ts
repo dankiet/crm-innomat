@@ -1,7 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
 import { getDb } from "./index.server";
 import { readImageBytes } from "@/lib/storage";
+import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";
 
 export type MappingExportResult = {
   filename: string;
@@ -35,23 +34,6 @@ async function imageDataUrl(publicPath: string): Promise<string> {
       ? "image/webp"
       : "image/jpeg";
   return `data:${mime};base64,${buf.toString("base64")}`;
-}
-
-async function staticImage(filename: string): Promise<string> {
-  const candidates = [
-    path.join(process.cwd(), "public", filename),
-    path.join(process.cwd(), ".output", "public", filename),
-  ];
-  for (const fullPath of candidates) {
-    try {
-      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-        return `data:image/png;base64,${fs.readFileSync(fullPath).toString("base64")}`;
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  return "";
 }
 
 export async function getMappingCustomerId(mappingId: number): Promise<number | null> {
@@ -210,10 +192,8 @@ export async function exportMappingToHtml(mappingId: number): Promise<MappingExp
   const dateText = Number.isNaN(date.getTime())
     ? mapping.updated_at
     : `Ngày ${date.getDate()} tháng ${date.getMonth() + 1} năm ${date.getFullYear()}`;
-  const [logo, stamp] = await Promise.all([
-    staticImage("logo.png"),
-    staticImage("dau_do.png"),
-  ]);
+  const logo = logoDataUrl;
+  const stamp = stampDataUrl;
   const noteLines = mapping.note
     ? mapping.note.split("\n").filter(Boolean)
     : ["Các phương án được lập theo thông tin và hình ảnh hiện có."];

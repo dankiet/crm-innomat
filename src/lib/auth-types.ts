@@ -38,10 +38,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   user: "Sales",
 };
 
-export function isAdmin(user: { role: Role }): boolean {
-  return user.role === "admin";
-}
-
 export function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "?";

@@ -4,7 +4,7 @@
  * - 84xxxxxxxxx / +84… → 0xxxxxxxxx
  * - 9 số (911084668) → 0911084668 (thiếu số 0 đầu)
  */
-export function normalizePhone(raw: string): string {
+function normalizePhone(raw: string): string {
   let d = (raw || "").replace(/\D/g, "");
   if (!d) return "";
 
@@ -30,7 +30,7 @@ export function normalizePhone(raw: string): string {
 }
 
 /** 9 số cuối (bỏ 0 đầu) — dùng so khớp phụ. */
-export function phoneCore(raw: string): string {
+function phoneCore(raw: string): string {
   const n = normalizePhone(raw);
   if (!n) return "";
   return n.replace(/^0+/, "").slice(-9);

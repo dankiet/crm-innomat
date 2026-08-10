@@ -1,6 +1,6 @@
 /**
  * Bootstrap admin user vào DB PostgreSQL khi bảng users rỗng.
- * Run: npm run db:seed  (dùng env CRM_ADMIN_USERNAME / CRM_ADMIN_PASSWORD / CRM_ADMIN_NAME)
+ * Run: npm run db:seed-admin  (dùng env CRM_ADMIN_USERNAME / CRM_ADMIN_PASSWORD / CRM_ADMIN_NAME)
  */
 import pg from "pg";
 import crypto from "node:crypto";

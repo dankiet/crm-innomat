@@ -8,7 +8,7 @@
  *  "(17 vĩ/1.215㎡)"        → pcs=17, m2=1.215 (vỉ mosaic)
  */
 
-export type PackingInfo = {
+type PackingInfo = {
   packing_pcs: number | null;
   packing_m2: number | null;
   /** viên | vỉ */
@@ -73,7 +73,7 @@ export function parsePackingFromHhdvName(ten: string): PackingInfo {
   };
 }
 
-export function formatPackingLabel(
+function formatPackingLabel(
   pcs: number | null | undefined,
   m2: number | null | undefined,
   unit: "viên" | "vỉ" | "" = "viên",

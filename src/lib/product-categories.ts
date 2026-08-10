@@ -27,7 +27,7 @@ export const PRODUCT_GROUPS = [
   },
 ] as const;
 
-export type ProductGroupSlug = (typeof PRODUCT_GROUPS)[number]["slug"];
+type ProductGroupSlug = (typeof PRODUCT_GROUPS)[number]["slug"];
 
 export const ALL_PRODUCTS_SLUG: ProductGroupSlug = "tat-ca";
 

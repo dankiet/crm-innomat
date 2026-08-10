@@ -36,7 +36,11 @@ export function ImportStockDialog({
         toast.success(`Đã Thêm / Cập Nhật ${res.added} Liên Kết Mã Nội Bộ`);
       } else {
         const res = await importStockUpdateFn({ data: { items: previewData } });
-        toast.success(`Đã Cập Nhật Tồn Kho Cho ${res.updated} Mã`);
+        if (res.skipped > 0) {
+          toast.success(`Đã Cập Nhật Tồn Kho Cho ${res.updated} Mã (Bỏ Qua ${res.skipped} Mã Chưa Được Ánh Xạ)`);
+        } else {
+          toast.success(`Đã Cập Nhật Tồn Kho Cho ${res.updated} Mã`);
+        }
       }
       handleClose();
       await router.invalidate();
