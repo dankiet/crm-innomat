@@ -4,12 +4,7 @@
  * Every private handler requires a session; mutations enforce role/owner.
  */
 import { createServerFn } from "@tanstack/react-start";
-import type {
-  CustomerStatus,
-  DiscountType,
-  OrderStatus,
-  QuoteStatus,
-} from "@/lib/types";
+import type { CustomerStatus, DiscountType, OrderStatus, QuoteStatus } from "@/lib/types";
 import type { Role } from "@/lib/auth-types";
 
 // ─── Auth ───────────────────────────────────────────────────
@@ -45,9 +40,7 @@ export const loginFn = createServerFn({ method: "POST" })
   });
 
 export const logoutFn = createServerFn({ method: "POST" }).handler(async () => {
-  const { getCurrentUser, logoutCurrentSession } = await import(
-    "@/db/auth.server"
-  );
+  const { getCurrentUser, logoutCurrentSession } = await import("@/db/auth.server");
   const { writeAudit } = await import("@/db/audit.server");
   const me = await getCurrentUser();
   await logoutCurrentSession();
@@ -65,14 +58,12 @@ export const logoutFn = createServerFn({ method: "POST" }).handler(async () => {
 
 // ─── Users (admin) ──────────────────────────────────────────
 
-export const fetchUsers = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { requireAdmin } = await import("@/db/auth.server");
-    await requireAdmin();
-    const { listUsers } = await import("@/db/users.server");
-    return await listUsers();
-  },
-);
+export const fetchUsers = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireAdmin } = await import("@/db/auth.server");
+  await requireAdmin();
+  const { listUsers } = await import("@/db/users.server");
+  return await listUsers();
+});
 
 export const createUserFn = createServerFn({ method: "POST" })
   .inputValidator(
@@ -176,10 +167,7 @@ export const checkCustomerPhoneFn = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { requireUser } = await import("@/db/auth.server");
     await requireUser();
-    const {
-      findCustomerByPhone,
-      phoneConflictPayload,
-    } = await import("@/db/crm.server");
+    const { findCustomerByPhone, phoneConflictPayload } = await import("@/db/crm.server");
     const hit = await findCustomerByPhone(data.phone, data.excludeId);
     if (!hit) return { conflict: null as null };
     return { conflict: phoneConflictPayload(hit) };
@@ -188,9 +176,7 @@ export const checkCustomerPhoneFn = createServerFn({ method: "GET" })
 // ─── Audit ──────────────────────────────────────────────────
 
 export const fetchAuditLogs = createServerFn({ method: "GET" })
-  .inputValidator(
-    (data?: { limit?: number; userId?: number; action?: string }) => data,
-  )
+  .inputValidator((data?: { limit?: number; userId?: number; action?: string }) => data)
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     await requireAdmin();
@@ -214,7 +200,15 @@ export const fetchProducts = createServerFn({ method: "GET" })
 export const fetchProductFieldValues = createServerFn({ method: "GET" })
   .inputValidator(
     (data: {
-      field: "color" | "collections" | "category" | "surface" | "finish_effect" | "shape" | "material" | "size";
+      field:
+        | "color"
+        | "collections"
+        | "category"
+        | "surface"
+        | "finish_effect"
+        | "shape"
+        | "material"
+        | "size";
     }) => data,
   )
   .handler(async ({ data }) => {
@@ -228,7 +222,15 @@ export const bulkUpdateProductFieldFn = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
       ids: number[];
-      field: "color" | "collections" | "category" | "surface" | "finish_effect" | "shape" | "material" | "size";
+      field:
+        | "color"
+        | "collections"
+        | "category"
+        | "surface"
+        | "finish_effect"
+        | "shape"
+        | "material"
+        | "size";
       value: string;
     }) => data,
   )
@@ -251,7 +253,15 @@ export const bulkUpdateProductFieldFn = createServerFn({ method: "POST" })
 export const clearProductFieldValueFn = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
-      field: "color" | "collections" | "category" | "surface" | "finish_effect" | "shape" | "material" | "size";
+      field:
+        | "color"
+        | "collections"
+        | "category"
+        | "surface"
+        | "finish_effect"
+        | "shape"
+        | "material"
+        | "size";
       value: string;
     }) => data,
   )
@@ -370,12 +380,7 @@ export const uploadProductImageFn = createServerFn({ method: "POST" })
 
 export const addProductImageByPathFn = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: {
-      product_id: number;
-      path: string;
-      caption?: string;
-      is_primary?: boolean;
-    }) => data,
+    (data: { product_id: number; path: string; caption?: string; is_primary?: boolean }) => data,
   )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
@@ -605,9 +610,7 @@ export const fetchCustomers = createServerFn({ method: "GET" })
 export const fetchCustomerMappings = createServerFn({ method: "GET" })
   .inputValidator((data: { customerId: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.customerId);
     const { listCustomerMappings } = await import("@/db/crm.server");
@@ -615,13 +618,7 @@ export const fetchCustomerMappings = createServerFn({ method: "GET" })
   });
 
 export const uploadMappingImageFn = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: {
-      filename: string;
-      dataBase64: string;
-      mimeType?: string;
-    }) => data,
-  )
+  .inputValidator((data: { filename: string; dataBase64: string; mimeType?: string }) => data)
   .handler(async ({ data }) => {
     const { requireUser } = await import("@/db/auth.server");
     const me = await requireUser();
@@ -645,26 +642,24 @@ export const saveCustomerMappingFn = createServerFn({ method: "POST" })
       name?: string;
       version?: string;
       note?: string;
-        items?: Array<{
-          description?: string;
-          size?: string;
-          product_id?: number | null;
-          image_path?: string;
-          sort_order?: number;
-          area_group_key?: string;
-          custom_product_code?: string;
-          custom_product_name?: string;
-          custom_product_size?: string;
-          custom_product_surface?: string;
-          custom_product_retail_price?: number;
-          custom_product_image_path?: string;
-        }>;
+      items?: Array<{
+        description?: string;
+        size?: string;
+        product_id?: number | null;
+        image_path?: string;
+        sort_order?: number;
+        area_group_key?: string;
+        custom_product_code?: string;
+        custom_product_name?: string;
+        custom_product_size?: string;
+        custom_product_surface?: string;
+        custom_product_retail_price?: number;
+        custom_product_image_path?: string;
+      }>;
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.customer_id);
     const { saveCustomerMapping } = await import("@/db/crm.server");
@@ -700,13 +695,10 @@ export const deleteCustomerMappingFn = createServerFn({ method: "POST" })
 export const exportMappingPrintFn = createServerFn({ method: "POST" })
   .inputValidator((data: { mappingId: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
-    const { exportMappingToHtml, getMappingCustomerId } = await import(
-      "@/db/export-mapping.server"
-    );
+    const { exportMappingToHtml, getMappingCustomerId } =
+      await import("@/db/export-mapping.server");
     const customerId = await getMappingCustomerId(data.mappingId);
     if (customerId == null) throw new Error("Không tìm thấy mapping");
     await assertCanAccessCustomer(me, customerId);
@@ -725,14 +717,10 @@ export const exportMappingPrintFn = createServerFn({ method: "POST" })
 export const createQuoteFromMappingFn = createServerFn({ method: "POST" })
   .inputValidator((data: { mappingId: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
-    const {
-      getCustomerMappingCustomerId,
-      createQuoteFromCustomerMapping,
-    } = await import("@/db/crm.server");
+    const { getCustomerMappingCustomerId, createQuoteFromCustomerMapping } =
+      await import("@/db/crm.server");
     const customerId = await getCustomerMappingCustomerId(data.mappingId);
     if (customerId == null) throw new Error("Không tìm thấy đề xuất vật liệu");
     await assertCanAccessCustomer(me, customerId);
@@ -769,8 +757,7 @@ export const saveCustomer = createServerFn({ method: "POST" })
     const me = await requireUser();
     const { createCustomer } = await import("@/db/crm.server");
     const { writeAudit } = await import("@/db/audit.server");
-    const ownerId =
-      me.role === "admin" && data.owner_id ? data.owner_id : me.id;
+    const ownerId = me.role === "admin" && data.owner_id ? data.owner_id : me.id;
     const customer = await createCustomer({ ...data, owner_id: ownerId });
     await writeAudit({
       user: me,
@@ -798,9 +785,7 @@ export const updateCustomerFn = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.id);
     const { updateCustomer } = await import("@/db/crm.server");
@@ -820,9 +805,7 @@ export const updateCustomerFn = createServerFn({ method: "POST" })
 export const setCustomerStatus = createServerFn({ method: "POST" })
   .inputValidator((data: { id: number; status: CustomerStatus }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.id);
     const { updateCustomerStatus } = await import("@/db/crm.server");
@@ -841,9 +824,7 @@ export const setCustomerStatus = createServerFn({ method: "POST" })
 export const fetchCustomerDetail = createServerFn({ method: "GET" })
   .inputValidator((data: { id: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.id);
     const { getCustomerDetail } = await import("@/db/crm.server");
@@ -852,13 +833,9 @@ export const fetchCustomerDetail = createServerFn({ method: "GET" })
 
 /** Thêm nhanh 1 SP vào tab "SP đã báo" của KH (không cần tạo báo giá) */
 export const addManualCustomerProductFn = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { customer_id: number; product_id: number }) => data,
-  )
+  .inputValidator((data: { customer_id: number; product_id: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.customer_id);
     const { addManualCustomerProduct } = await import("@/db/crm.server");
@@ -874,13 +851,9 @@ export const setCustomerProductSampleSentFn = createServerFn({
 })
   .inputValidator((data: { id: number; sample_sent: boolean }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
-    const { getCustomerProductSampleCustomerId } = await import(
-      "@/db/crm.server"
-    );
+    const { getCustomerProductSampleCustomerId } = await import("@/db/crm.server");
     const customerId = await getCustomerProductSampleCustomerId(data.id);
     if (customerId != null) await assertCanAccessCustomer(me, customerId);
     const { setCustomerProductSampleSent } = await import("@/db/crm.server");
@@ -893,13 +866,9 @@ export const deleteCustomerProductSampleFn = createServerFn({
 })
   .inputValidator((data: { id: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
-    const { getCustomerProductSampleCustomerId } = await import(
-      "@/db/crm.server"
-    );
+    const { getCustomerProductSampleCustomerId } = await import("@/db/crm.server");
     const customerId = await getCustomerProductSampleCustomerId(data.id);
     if (customerId != null) await assertCanAccessCustomer(me, customerId);
     const { deleteCustomerProductSample } = await import("@/db/crm.server");
@@ -933,37 +902,31 @@ export const deleteCustomerFn = createServerFn({ method: "POST" })
 
 // ─── Quotes ─────────────────────────────────────────────────
 
-export const fetchQuotes = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { requireUser, ownerFilter } = await import("@/db/auth.server");
-    const me = await requireUser();
-    const { listQuotes } = await import("@/db/crm.server");
-    return await listQuotes(ownerFilter(me));
-  },
-);
+export const fetchQuotes = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser, ownerFilter } = await import("@/db/auth.server");
+  const me = await requireUser();
+  const { listQuotes } = await import("@/db/crm.server");
+  return await listQuotes(ownerFilter(me));
+});
 
 export const fetchQuote = createServerFn({ method: "GET" })
   .inputValidator((data: { id: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     const { getQuote, getQuoteItems } = await import("@/db/crm.server");
     const quote = await getQuote(data.id);
     if (!quote) return null;
     await assertCanAccessCustomer(me, quote.customer_id);
     const { getDb } = await import("@/db/index.server");
-    const sourceMapping = await getDb()
+    const sourceMapping = (await getDb()
       .prepare(
         `SELECT m.id, m.code, m.name
          FROM customer_mapping_quote_links l
          JOIN customer_mappings m ON m.id = l.mapping_id
          WHERE l.quote_id = ? LIMIT 1`,
       )
-      .get(data.id) as
-      | { id: number; code: string; name: string }
-      | undefined;
+      .get(data.id)) as { id: number; code: string; name: string } | undefined;
     return {
       quote,
       items: await getQuoteItems(data.id),
@@ -991,9 +954,7 @@ export const saveQuote = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.customer_id);
     const { createQuote } = await import("@/db/crm.server");
@@ -1031,9 +992,7 @@ export const updateQuoteFn = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.customer_id);
     const { updateQuote } = await import("@/db/crm.server");
@@ -1052,9 +1011,7 @@ export const updateQuoteFn = createServerFn({ method: "POST" })
 export const deleteQuoteFn = createServerFn({ method: "POST" })
   .inputValidator((data: { id: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     const { getQuote, deleteQuote } = await import("@/db/crm.server");
     const quote = await getQuote(data.id);
@@ -1082,21 +1039,17 @@ export const deleteQuoteFn = createServerFn({ method: "POST" })
 
 // ─── Orders ─────────────────────────────────────────────────
 
-export const fetchOrders = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { requireUser, ownerFilter } = await import("@/db/auth.server");
-    const me = await requireUser();
-    const { listOrders } = await import("@/db/crm.server");
-    return await listOrders(ownerFilter(me));
-  },
-);
+export const fetchOrders = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser, ownerFilter } = await import("@/db/auth.server");
+  const me = await requireUser();
+  const { listOrders } = await import("@/db/crm.server");
+  return await listOrders(ownerFilter(me));
+});
 
 export const setOrderStatusFn = createServerFn({ method: "POST" })
   .inputValidator((data: { id: number; status: OrderStatus }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     const { getOrder, updateOrderStatus } = await import("@/db/crm.server");
     const existing = await getOrder(data.id);
@@ -1117,9 +1070,7 @@ export const setOrderStatusFn = createServerFn({ method: "POST" })
 export const deleteOrderFn = createServerFn({ method: "POST" })
   .inputValidator((data: { id: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     const { getOrder, deleteOrder } = await import("@/db/crm.server");
     const existing = await getOrder(data.id);
@@ -1134,9 +1085,7 @@ export const deleteOrderFn = createServerFn({ method: "POST" })
       entity_id: data.id,
       summary:
         `Xóa đơn ${result.code}` +
-        (result.payments_deleted
-          ? ` (+${result.payments_deleted} TT)`
-          : ""),
+        (result.payments_deleted ? ` (+${result.payments_deleted} TT)` : ""),
       meta: { payments_deleted: result.payments_deleted },
     });
     return result;
@@ -1145,9 +1094,7 @@ export const deleteOrderFn = createServerFn({ method: "POST" })
 export const convertQuoteToOrder = createServerFn({ method: "POST" })
   .inputValidator((data: { quoteId: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     const { getQuote, createOrderFromQuote } = await import("@/db/crm.server");
     const quote = await getQuote(data.quoteId);
@@ -1167,21 +1114,17 @@ export const convertQuoteToOrder = createServerFn({ method: "POST" })
 
 // ─── Debt & payments ────────────────────────────────────────
 
-export const fetchCustomerDebts = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { requireUser, ownerFilter } = await import("@/db/auth.server");
-    const me = await requireUser();
-    const { listCustomerDebts } = await import("@/db/crm.server");
-    return await listCustomerDebts(ownerFilter(me));
-  },
-);
+export const fetchCustomerDebts = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser, ownerFilter } = await import("@/db/auth.server");
+  const me = await requireUser();
+  const { listCustomerDebts } = await import("@/db/crm.server");
+  return await listCustomerDebts(ownerFilter(me));
+});
 
 export const fetchCustomerDebtDetail = createServerFn({ method: "GET" })
   .inputValidator((data: { customerId: number }) => data)
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer, ownerFilter } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer, ownerFilter } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.customerId);
     const { getCustomerDebtDetail } = await import("@/db/crm.server");
@@ -1199,9 +1142,7 @@ export const savePayment = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     await assertCanAccessCustomer(me, data.customer_id);
     const { addPayment } = await import("@/db/crm.server");
@@ -1280,18 +1221,10 @@ export const fetchNotes = createServerFn({ method: "GET" })
   });
 
 export const saveNote = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: {
-      content: string;
-      customer_id?: number | null;
-      author?: string;
-    }) => data,
-  )
+  .inputValidator((data: { content: string; customer_id?: number | null; author?: string }) => data)
   .handler(async ({ data }) => {
     if (!data.content?.trim()) throw new Error("Nội dung ghi chú bắt buộc");
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     if (data.customer_id) {
       await assertCanAccessCustomer(me, data.customer_id);
@@ -1316,14 +1249,12 @@ export const saveNote = createServerFn({ method: "POST" })
 
 // ─── Dashboard ──────────────────────────────────────────────
 
-export const fetchDashboard = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { requireUser, ownerFilter } = await import("@/db/auth.server");
-    const me = await requireUser();
-    const { getDashboardStats } = await import("@/db/crm.server");
-    return await getDashboardStats(ownerFilter(me));
-  },
-);
+export const fetchDashboard = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser, ownerFilter } = await import("@/db/auth.server");
+  const me = await requireUser();
+  const { getDashboardStats } = await import("@/db/crm.server");
+  return await getDashboardStats(ownerFilter(me));
+});
 
 /** Xuất catalog SP ra Excel */
 export const exportProductsXlsxFn = createServerFn({ method: "POST" })
@@ -1331,9 +1262,7 @@ export const exportProductsXlsxFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
-    const { exportProductsXlsx } = await import(
-      "@/db/product-import-export.server"
-    );
+    const { exportProductsXlsx } = await import("@/db/product-import-export.server");
     const { writeAudit } = await import("@/db/audit.server");
     const result = await exportProductsXlsx({ category: data?.category });
     await writeAudit({
@@ -1347,30 +1276,24 @@ export const exportProductsXlsxFn = createServerFn({ method: "POST" })
 
 /** Xem trước import SP (upsert theo code) — items = rows object từ Excel */
 export const previewProductImportFn = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { items: Array<Record<string, unknown>> }) => data,
-  )
+  .inputValidator((data: { items: Array<Record<string, unknown>> }) => data)
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     await requireAdmin();
-    const { parseProductImportRows, previewProductImport } = await import(
-      "@/db/product-import-export.server"
-    );
+    const { parseProductImportRows, previewProductImport } =
+      await import("@/db/product-import-export.server");
     const rows = parseProductImportRows(data.items ?? []);
     return await previewProductImport(rows);
   });
 
 /** Áp dụng import SP sau verify */
 export const importProductsFn = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { items: Array<Record<string, unknown>> }) => data,
-  )
+  .inputValidator((data: { items: Array<Record<string, unknown>> }) => data)
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
-    const { parseProductImportRows, applyProductImport } = await import(
-      "@/db/product-import-export.server"
-    );
+    const { parseProductImportRows, applyProductImport } =
+      await import("@/db/product-import-export.server");
     const { writeAudit } = await import("@/db/audit.server");
     const rows = parseProductImportRows(data.items ?? []);
     const result = await applyProductImport(rows);
@@ -1398,9 +1321,7 @@ export const exportQuotePrintFn = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { requireUser, assertCanAccessCustomer } = await import(
-      "@/db/auth.server"
-    );
+    const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     const { getQuote } = await import("@/db/crm.server");
     const quote = await getQuote(data.quoteId);
@@ -1428,15 +1349,15 @@ export const exportQuotePrintFn = createServerFn({ method: "POST" })
     return result;
   });
 
-export const exportInternalCodesXlsxFn = createServerFn({ method: "POST" })
-  .handler(async () => {
-    const { exportInternalCodesXlsx } = await import("@/db/product-import-export.server");
-    return await exportInternalCodesXlsx();
-  });
+export const exportInternalCodesXlsxFn = createServerFn({ method: "POST" }).handler(async () => {
+  const { exportInternalCodesXlsx } = await import("@/db/product-import-export.server");
+  return await exportInternalCodesXlsx();
+});
 export const importInternalCodeMappingFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { items: any[] }) => data)
+  .inputValidator((data: { items: Array<{ internal_code: string; product_code: string }> }) => data)
   .handler(async ({ data }) => {
-    const { getDb } = await import('@/db/index.server'); const db = getDb();
+    const { getDb } = await import("@/db/index.server");
+    const db = getDb();
     let added = 0;
     const stmt = db.prepare(`
       INSERT OR IGNORE INTO product_internal_codes (product_id, internal_code)
@@ -1447,9 +1368,9 @@ export const importInternalCodeMappingFn = createServerFn({ method: "POST" })
         try {
           const res = await stmt.run(item.internal_code, item.product_code);
           added += res.changes;
-        } catch (err: any) {
-          if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-            console.warn('Skipping invalid product_code:', item.product_code);
+        } catch (err: unknown) {
+          if (err instanceof Error && err.message.includes("FOREIGN KEY constraint failed")) {
+            console.warn("Skipping invalid product_code:", item.product_code);
           } else {
             throw err;
           }
@@ -1460,31 +1381,79 @@ export const importInternalCodeMappingFn = createServerFn({ method: "POST" })
   });
 
 export const importStockUpdateFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { items: any[] }) => data)
+  .inputValidator(
+    (data: {
+      items: Array<{
+        internal_code: string;
+        stock_location: string;
+        quantity: number;
+      }>;
+    }) => data,
+  )
   .handler(async ({ data }) => {
-    const { getDb } = await import('@/db/index.server'); const db = getDb();
-    let updated = 0;
-    let skipped = 0;
-    const stmt = db.prepare(`INSERT INTO inventory (internal_code, stock_location, quantity_stock) VALUES (?, ?, ?) ON CONFLICT(internal_code, stock_location) DO UPDATE SET quantity_stock = excluded.quantity_stock`);
-    const existsStmt = db.prepare(`SELECT 1 FROM product_internal_codes WHERE internal_code = ?`);
-    await db.transaction(async () => {
-      for (const item of data.items) {
-        const internal_code = String(item.internal_code ?? '').trim();
-        const stock_location = String(item.stock_location ?? '').trim();
-        if (!internal_code || !stock_location) {
-          skipped++;
-          continue;
-        }
-        const mapped = await existsStmt.get(internal_code);
-        if (!mapped) {
-          console.warn('Skipping unmapped internal_code:', internal_code);
-          skipped++;
-          continue;
-        }
-        const quantity = Number(item.quantity);
-        const res = await stmt.run(internal_code, stock_location, Number.isFinite(quantity) ? (quantity < 0 ? 0 : quantity) : 0);
-        updated += res.changes;
+    const { requireAdmin } = await import("@/db/auth.server");
+    await requireAdmin();
+    const { getDb } = await import("@/db/index.server");
+    const db = getDb();
+    const normalized = new Map<
+      string,
+      {
+        internal_code: string;
+        stock_location: string;
+        quantity: number;
       }
-    })();
+    >();
+    let skipped = 0;
+
+    for (const item of data.items ?? []) {
+      const internal_code = String(item.internal_code ?? "").trim();
+      const stock_location = String(item.stock_location ?? "").trim();
+      if (!internal_code || !stock_location) {
+        skipped++;
+        continue;
+      }
+      const rawQuantity = Number(item.quantity);
+      const quantity = Number.isFinite(rawQuantity) ? Math.max(0, rawQuantity) : 0;
+      // File MISA có thể chứa trùng mã/kho; giữ dòng cuối cùng như import tuần tự cũ.
+      normalized.set(`${internal_code}|${stock_location}`, {
+        internal_code,
+        stock_location,
+        quantity,
+      });
+    }
+
+    const rows = [...normalized.values()];
+    const CHUNK_SIZE = 500;
+    let updated = 0;
+    const runTx = db.transaction(async (tx) => {
+      for (let offset = 0; offset < rows.length; offset += CHUNK_SIZE) {
+        const chunk = rows.slice(offset, offset + CHUNK_SIZE);
+        const codePlaceholders = chunk.map(() => "?").join(", ");
+        const mappedRows = (await tx
+          .prepare(
+            `SELECT internal_code FROM product_internal_codes
+             WHERE internal_code IN (${codePlaceholders})`,
+          )
+          .all<{ internal_code: string }>(...chunk.map((row) => row.internal_code))) as Array<{
+          internal_code: string;
+        }>;
+        const mapped = new Set(mappedRows.map((row) => row.internal_code));
+        const valid = chunk.filter((row) => mapped.has(row.internal_code));
+        skipped += chunk.length - valid.length;
+        if (!valid.length) continue;
+
+        const valuePlaceholders = valid.map(() => "(?, ?, ?)").join(", ");
+        const result = await tx
+          .prepare(
+            `INSERT INTO inventory (internal_code, stock_location, quantity_stock)
+             VALUES ${valuePlaceholders}
+             ON CONFLICT(internal_code, stock_location)
+             DO UPDATE SET quantity_stock = excluded.quantity_stock`,
+          )
+          .run(...valid.flatMap((row) => [row.internal_code, row.stock_location, row.quantity]));
+        updated += Number(result.changes) || 0;
+      }
+    });
+    await runTx();
     return { updated, skipped };
   });

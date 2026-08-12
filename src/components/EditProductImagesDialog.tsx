@@ -76,7 +76,7 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
           continue;
         }
         if (file.size > 30 * 1024 * 1024) {
-          toast.error(`B? qua ${file.name}: ?nh g?c qu? 30MB`);
+          toast.error(`Bỏ qua ${file.name}: ảnh gốc quá 30MB`);
           continue;
         }
         const dataBase64 = await readImageFileAsWebpDataUrl(file);
@@ -241,9 +241,7 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
           ) : images.length === 0 ? (
             <div className="rounded-xl ring-1 ring-dashed ring-black/10 py-12 text-center">
               <ImagePlus className="size-8 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Chưa có ảnh. Tải ảnh lên.
-              </p>
+              <p className="text-sm text-muted-foreground">Chưa có ảnh. Tải ảnh lên.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -318,9 +316,7 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
             </div>
           )}
 
-          <p className="text-[11px] text-muted-foreground">
-            {images.length} ảnh
-          </p>
+          <p className="text-[11px] text-muted-foreground">{images.length} ảnh</p>
         </div>
 
         <DialogFooter>

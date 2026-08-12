@@ -135,11 +135,7 @@ export const PRODUCT_COLORS = [
 /** Nguồn khách hàng / lead */
 export type LeadSource = "Facebook" | "Zalo" | "Khác" | "";
 
-export const LEAD_SOURCES: Exclude<LeadSource, "">[] = [
-  "Facebook",
-  "Zalo",
-  "Khác",
-];
+export const LEAD_SOURCES: Exclude<LeadSource, "">[] = ["Facebook", "Zalo", "Khác"];
 
 export type Customer = {
   id: number;
@@ -254,10 +250,7 @@ export type CustomerDebtDetail = CustomerDebt & {
   payments: Payment[];
 };
 
-export const statusMeta: Record<
-  CustomerStatus,
-  { label: string; className: string }
-> = {
+export const statusMeta: Record<CustomerStatus, { label: string; className: string }> = {
   consulting: {
     label: "Đang tư vấn",
     className: "bg-sky-50 text-sky-800",
@@ -277,20 +270,14 @@ export const statusMeta: Record<
   lost: { label: "Bỏ lỡ", className: "bg-rose-50 text-rose-800" },
 };
 
-export const quoteStatusMeta: Record<
-  QuoteStatus,
-  { label: string; className: string }
-> = {
+export const quoteStatusMeta: Record<QuoteStatus, { label: string; className: string }> = {
   draft: { label: "Nháp", className: "bg-stone-200 text-stone-700" },
   sent: { label: "Đã gửi", className: "bg-blue-50 text-blue-700" },
   accepted: { label: "Đã duyệt", className: "bg-moss-soft text-moss" },
   expired: { label: "Hết hạn", className: "bg-stone-200 text-stone-500" },
 };
 
-export const orderStatusMeta: Record<
-  OrderStatus,
-  { label: string; className: string }
-> = {
+export const orderStatusMeta: Record<OrderStatus, { label: string; className: string }> = {
   preparing: {
     label: "Đang soạn kho",
     className: "bg-amber-50 text-amber-700",
@@ -356,4 +343,3 @@ export const pipelineStages: Array<{
     dotClass: "bg-rose-400",
   },
 ];
-

@@ -20,13 +20,10 @@ import {
   type PackingByCode,
 } from "@/lib/hhdv-packing";
 import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage";
+import { normalizeUploadImageBuffer } from "@/lib/image-upload.server";
 import path from "node:path";
 import { getDb, type SqlValue } from "./index.server";
-import {
-  unitPriceForProduct,
-  effectiveDiscountPct,
-  priceAfterDiscount,
-} from "@/lib/pricing";
+import { unitPriceForProduct, effectiveDiscountPct, priceAfterDiscount } from "@/lib/pricing";
 import type {
   Customer,
   CustomerDebt,
@@ -215,11 +212,13 @@ export async function listProducts(opts?: {
     ORDER BY p.category, p.collections, p.code
     ${hasLimit ? "LIMIT ?" : ""}
   `;
-  return (await db.prepare(sql).all<Product>(...(joinParams as SqlValue[]), ...(params as SqlValue[]))) as Product[];
+  return (await db
+    .prepare(sql)
+    .all<Product>(...(joinParams as SqlValue[]), ...(params as SqlValue[]))) as Product[];
 }
 export async function getProduct(id: number): Promise<Product | null> {
   return (
-    (await getDb()
+    ((await getDb()
       .prepare(
         `SELECT p.*,
           COALESCE((
@@ -236,9 +235,9 @@ export async function getProduct(id: number): Promise<Product | null> {
            LEFT JOIN inventory inv ON inv.internal_code = pic.internal_code
            GROUP BY pic.product_id
          ) pic ON pic.product_id = p.id
-         WHERE p.id = ?`
+         WHERE p.id = ?`,
       )
-      .get<Product>(id) as Product | undefined) ?? null
+      .get<Product>(id)) as Product | undefined) ?? null
   );
 }
 
@@ -256,18 +255,14 @@ export const PRODUCT_SUGGEST_FIELDS = [
 export type ProductSuggestField = (typeof PRODUCT_SUGGEST_FIELDS)[number];
 
 /** Lấy danh sách giá trị distinct đã dùng cho 1 field phân loại — dùng làm gợi ý datalist */
-export async function listProductFieldValues(
-  field: ProductSuggestField,
-): Promise<string[]> {
+export async function listProductFieldValues(field: ProductSuggestField): Promise<string[]> {
   if (!PRODUCT_SUGGEST_FIELDS.includes(field)) {
     throw new Error("Field không hợp lệ");
   }
   const db = getDb();
   return (
     (await db
-      .prepare(
-        `SELECT DISTINCT ${field} AS v FROM products WHERE ${field} != '' ORDER BY ${field}`,
-      )
+      .prepare(`SELECT DISTINCT ${field} AS v FROM products WHERE ${field} != '' ORDER BY ${field}`)
       .all<{ v: string }>()) as { v: string }[]
   ).map((r) => r.v);
 }
@@ -287,9 +282,7 @@ export async function bulkUpdateProductField(
   const db = getDb();
   const placeholders = cleanIds.map(() => "?").join(",");
   const result = await db
-    .prepare(
-      `UPDATE products SET ${field} = ? WHERE id IN (${placeholders})`,
-    )
+    .prepare(`UPDATE products SET ${field} = ? WHERE id IN (${placeholders})`)
     .run(trimmed, ...cleanIds);
   return { ok: true, updated: result.changes };
 }
@@ -311,18 +304,14 @@ export async function clearProductFieldValue(
   return { ok: true, updated: result.changes };
 }
 
-export async function deleteProduct(
-  id: number,
-): Promise<{ ok: true; code: string }> {
+export async function deleteProduct(id: number): Promise<{ ok: true; code: string }> {
   const db = getDb();
   const product = await getProduct(id);
   if (!product) throw new Error("Không tìm thấy sản phẩm");
 
   const inQuotes = (
     (await db
-      .prepare(
-        "SELECT COUNT(*) AS n FROM quote_items WHERE product_id = ?",
-      )
+      .prepare("SELECT COUNT(*) AS n FROM quote_items WHERE product_id = ?")
       .get<{ n: number }>(id)) as { n: number }
   ).n;
   if (inQuotes > 0) {
@@ -388,9 +377,7 @@ async function syncPrimaryImagePath(productId: number) {
     .run(primary?.path ?? "", productId);
 }
 
-export async function listProductImages(
-  productId: number,
-): Promise<ProductImageRow[]> {
+export async function listProductImages(productId: number): Promise<ProductImageRow[]> {
   return (await getDb()
     .prepare(
       `SELECT * FROM product_images
@@ -415,26 +402,20 @@ export async function addProductImage(input: {
 
   const count = (
     (await db
-      .prepare(
-        "SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?",
-      )
+      .prepare("SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?")
       .get<{ n: number }>(input.product_id)) as { n: number }
   ).n;
 
   const makePrimary = input.is_primary === true || count === 0;
   if (makePrimary) {
     await db
-      .prepare(
-        "UPDATE product_images SET is_primary = 0 WHERE product_id = ?",
-      )
+      .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ?")
       .run(input.product_id);
   }
 
   const maxSort = (
     (await db
-      .prepare(
-        "SELECT COALESCE(MAX(sort_order), -1) AS m FROM product_images WHERE product_id = ?",
-      )
+      .prepare("SELECT COALESCE(MAX(sort_order), -1) AS m FROM product_images WHERE product_id = ?")
       .get<{ m: number }>(input.product_id)) as { m: number }
   ).m;
 
@@ -444,13 +425,7 @@ export async function addProductImage(input: {
         (product_id, path, sort_order, is_primary, caption)
        VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(
-      input.product_id,
-      pathStr,
-      maxSort + 1,
-      makePrimary ? 1 : 0,
-      (input.caption ?? "").trim(),
-    );
+    .run(input.product_id, pathStr, maxSort + 1, makePrimary ? 1 : 0, (input.caption ?? "").trim());
 
   await syncPrimaryImagePath(input.product_id);
   return (await db
@@ -459,47 +434,6 @@ export async function addProductImage(input: {
 }
 
 /** Chuẩn ảnh SP khi upload: cạnh dài tối đa (giữ tỉ lệ). */
-export const PRODUCT_IMAGE_MAX_SIDE = 1600;
-
-/**
- * Scale ảnh upload về tiêu chuẩn CRM (max cạnh PRODUCT_IMAGE_MAX_SIDE).
- * Giữ aspect ratio; JPEG/WebP nén gọn; PNG giữ alpha nếu cần.
- */
-async function normalizeUploadImageBuffer(
-  input: Buffer,
-  preferredExt: string,
-): Promise<{ buffer: Buffer; ext: string; mime: string }> {
-  const sharp = (await import("sharp")).default;
-  let pipeline = sharp(input, { failOn: "none" }).rotate(); // honor EXIF orientation
-  const meta = await pipeline.metadata();
-  const w = meta.width ?? 0;
-  const h = meta.height ?? 0;
-
-  if (w > PRODUCT_IMAGE_MAX_SIDE || h > PRODUCT_IMAGE_MAX_SIDE) {
-    pipeline = pipeline.resize({
-      width: PRODUCT_IMAGE_MAX_SIDE,
-      height: PRODUCT_IMAGE_MAX_SIDE,
-      fit: "inside",
-      withoutEnlargement: true,
-    });
-  }
-
-  const ext = preferredExt.toLowerCase();
-  // GIF animated → flatten to JPEG (simpler, smaller for catalog)
-  if (ext === ".png") {
-    const buf = await pipeline.png({ compressionLevel: 8, effort: 6 }).toBuffer();
-    return { buffer: buf, ext: ".png", mime: "image/png" };
-  }
-  if (ext === ".webp") {
-    const buf = await pipeline.webp({ quality: 85 }).toBuffer();
-    return { buffer: buf, ext: ".webp", mime: "image/webp" };
-  }
-  // default jpeg (also for .gif / unknown)
-  const buf = await pipeline
-    .jpeg({ quality: 85, mozjpeg: true })
-    .toBuffer();
-  return { buffer: buf, ext: ".jpg", mime: "image/jpeg" };
-}
 
 async function saveManagedImage(buffer: Buffer, ext: string): Promise<string> {
   return await putImageBuffer(buffer, ext);
@@ -528,29 +462,8 @@ export async function uploadProductImageFile(input: {
     throw new Error("Ảnh quá lớn (tối đa 12MB)");
   }
 
-  const mimeIn = input.mimeType || dataUrlMatch?.[1] || "image/jpeg";
-  const extFromMime: Record<string, string> = {
-    "image/jpeg": ".jpg",
-    "image/jpg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-  };
-  let ext =
-    extFromMime[mimeIn] || path.extname(input.filename).toLowerCase();
-  if (!ext || ext === ".") ext = ".jpg";
-
-  let outBuf: Buffer;
-  try {
-    const normalized = await normalizeUploadImageBuffer(rawBuf, ext);
-    outBuf = normalized.buffer;
-    ext = normalized.ext;
-  } catch (err) {
-    console.warn("Image normalize failed, saving original:", err);
-    outBuf = rawBuf;
-  }
-
-const publicPath = await saveManagedImage(outBuf, ext);
+  const normalized = await normalizeUploadImageBuffer(rawBuf);
+  const publicPath = await saveManagedImage(normalized, ".webp");
   return await addProductImage({
     product_id: input.product_id,
     path: publicPath,
@@ -565,23 +478,15 @@ export async function setPrimaryProductImage(
 ): Promise<ProductImageRow[]> {
   const db = getDb();
   const row = (await db
-    .prepare(
-      "SELECT * FROM product_images WHERE id = ? AND product_id = ?",
-    )
+    .prepare("SELECT * FROM product_images WHERE id = ? AND product_id = ?")
     .get<ProductImageRow>(imageId, productId)) as ProductImageRow | undefined;
   if (!row) throw new Error("Không tìm thấy ảnh của sản phẩm này");
 
   const runTx = getDb().transaction(async () => {
     await db
-      .prepare(
-        "UPDATE product_images SET is_primary = 0 WHERE product_id = ?",
-      )
+      .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ?")
       .run(productId);
-    await db
-      .prepare(
-        "UPDATE product_images SET is_primary = 1 WHERE id = ?",
-      )
-      .run(imageId);
+    await db.prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?").run(imageId);
   });
   await runTx();
   await syncPrimaryImagePath(productId);
@@ -610,26 +515,15 @@ export async function deleteProductImage(imageId: number): Promise<{
       )
       .get<{ id: number }>(row.product_id)) as { id: number } | undefined;
     if (next) {
-      await db
-        .prepare(
-          "UPDATE product_images SET is_primary = 1 WHERE id = ?",
-        )
-        .run(next.id);
+      await db.prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?").run(next.id);
     }
   }
 
   await syncPrimaryImagePath(row.product_id);
 
   // Chỉ xóa file được CRM quản lý khi không còn bản ghi nào dùng chung path.
-  if (row.path.startsWith("/images/")) {
-    const filePath = path.join(process.cwd(), "public", row.path);
-    try {
-      if ((await isPublicImagePathReferenced(db, row.path)) === false && fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch {
-      /* ignore */
-    }
+  if (isManagedImageRef(row.path) && !(await isPublicImagePathReferenced(db, row.path))) {
+    await deleteImageRef(row.path);
   }
 
   return {
@@ -670,14 +564,14 @@ export async function listCustomers(
 
 export async function getCustomer(id: number): Promise<Customer | null> {
   return (
-    (await getDb()
+    ((await getDb()
       .prepare(
         `SELECT c.*, u.display_name AS owner_name
          FROM customers c
          LEFT JOIN users u ON u.id = c.owner_id
          WHERE c.id = ?`,
       )
-      .get<Customer>(id) as Customer | undefined) ?? null
+      .get<Customer>(id)) as Customer | undefined) ?? null
   );
 }
 
@@ -735,9 +629,7 @@ export async function assertPhoneAvailable(
   const trimmed = (phone ?? "").trim();
   if (!trimmed) {
     if (opts?.requirePhone) {
-      throw new Error(
-        "Vui lòng nhập số điện thoại để tránh trùng khách giữa các sales",
-      );
+      throw new Error("Vui lòng nhập số điện thoại để tránh trùng khách giữa các sales");
     }
     return;
   }
@@ -813,9 +705,7 @@ export async function createCustomer(input: {
 
 export async function updateCustomerStatus(id: number, status: CustomerStatus) {
   await getDb()
-    .prepare(
-      "UPDATE customers SET status = ?, updated_at = ? WHERE id = ?",
-    )
+    .prepare("UPDATE customers SET status = ?, updated_at = ? WHERE id = ?")
     .run(status, nowLocal(), id);
   return await getCustomer(id);
 }
@@ -854,9 +744,7 @@ export type CustomerDetail = {
 };
 
 /** Hồ sơ KH: BG (+items), đơn, ghi chú, SP đã từng báo (gộp). */
-export async function getCustomerDetail(
-  id: number,
-): Promise<CustomerDetail | null> {
+export async function getCustomerDetail(id: number): Promise<CustomerDetail | null> {
   const customer = await getCustomer(id);
   if (!customer) return null;
 
@@ -922,15 +810,13 @@ export async function getCustomerDetail(
          COALESCE(qs.last_quoted_at, cps.created_at) DESC,
          cps.product_code ASC`,
     )
-    .all<Omit<QuotedProductSummary, "sample_sent"> & { sample_sent: number }>(
-      id,
-      id,
-    )) as Array<
+    .all<Omit<QuotedProductSummary, "sample_sent"> & { sample_sent: number }>(id, id)) as Array<
     Omit<QuotedProductSummary, "sample_sent"> & { sample_sent: number }
   >;
-  const normalizedQuotedProducts: QuotedProductSummary[] = quotedProducts.map(
-    (r) => ({ ...r, sample_sent: Boolean(r.sample_sent) }),
-  );
+  const normalizedQuotedProducts: QuotedProductSummary[] = quotedProducts.map((r) => ({
+    ...r,
+    sample_sent: Boolean(r.sample_sent),
+  }));
 
   return {
     customer,
@@ -963,13 +849,8 @@ export async function addManualCustomerProduct(input: {
   if (!product) throw new Error("Không tìm thấy sản phẩm");
 
   const existing = (await db
-    .prepare(
-      "SELECT id FROM customer_product_samples WHERE customer_id = ? AND product_id = ?",
-    )
-    .get<{ id: number }>(
-      input.customer_id,
-      input.product_id,
-    )) as { id: number } | undefined;
+    .prepare("SELECT id FROM customer_product_samples WHERE customer_id = ? AND product_id = ?")
+    .get<{ id: number }>(input.customer_id, input.product_id)) as { id: number } | undefined;
 
   let rowId: number;
   if (existing) {
@@ -981,13 +862,7 @@ export async function addManualCustomerProduct(input: {
           (customer_id, product_id, product_code, product_name, sample_sent, source, created_at)
          VALUES (?, ?, ?, ?, 0, 'manual', ?)`,
       )
-      .run(
-        input.customer_id,
-        product.id,
-        product.code,
-        product.name,
-        nowLocal(),
-      );
+      .run(input.customer_id, product.id, product.code, product.name, nowLocal());
     rowId = Number(info.lastInsertRowid);
   }
 
@@ -1006,18 +881,17 @@ export async function addManualCustomerProduct(input: {
        LEFT JOIN products p ON p.id = cps.product_id
        WHERE cps.id = ?`,
     )
-    .get<
-      Omit<QuotedProductSummary, "sample_sent"> & { sample_sent: number }
-    >(rowId)) as Omit<QuotedProductSummary, "sample_sent"> & {
+    .get<Omit<QuotedProductSummary, "sample_sent"> & { sample_sent: number }>(rowId)) as Omit<
+    QuotedProductSummary,
+    "sample_sent"
+  > & {
     sample_sent: number;
   };
   return { ...row, sample_sent: Boolean(row.sample_sent) };
 }
 
 /** Lấy customer_id của 1 dòng customer_product_samples (để check quyền truy cập trước khi tick). */
-export async function getCustomerProductSampleCustomerId(
-  id: number,
-): Promise<number | null> {
+export async function getCustomerProductSampleCustomerId(id: number): Promise<number | null> {
   const row = (await getDb()
     .prepare("SELECT customer_id FROM customer_product_samples WHERE id = ?")
     .get<{ customer_id: number }>(id)) as { customer_id: number } | undefined;
@@ -1030,14 +904,10 @@ export async function setCustomerProductSampleSent(
   sent: boolean,
 ): Promise<{ ok: true }> {
   const db = getDb();
-  const existing = await db
-    .prepare("SELECT id FROM customer_product_samples WHERE id = ?")
-    .get(id);
+  const existing = await db.prepare("SELECT id FROM customer_product_samples WHERE id = ?").get(id);
   if (!existing) throw new Error("Không tìm thấy dòng sản phẩm");
   await db
-    .prepare(
-      "UPDATE customer_product_samples SET sample_sent = ?, sample_sent_at = ? WHERE id = ?",
-    )
+    .prepare("UPDATE customer_product_samples SET sample_sent = ?, sample_sent_at = ? WHERE id = ?")
     .run(sent ? 1 : 0, sent ? nowLocal() : null, id);
   return { ok: true };
 }
@@ -1049,13 +919,9 @@ export async function setCustomerProductSampleSent(
  */
 export async function deleteCustomerProductSample(id: number): Promise<{ ok: true }> {
   const db = getDb();
-  const existing = await db
-    .prepare("SELECT id FROM customer_product_samples WHERE id = ?")
-    .get(id);
+  const existing = await db.prepare("SELECT id FROM customer_product_samples WHERE id = ?").get(id);
   if (!existing) throw new Error("Không tìm thấy dòng sản phẩm");
-  await db
-    .prepare("DELETE FROM customer_product_samples WHERE id = ?")
-    .run(id);
+  await db.prepare("DELETE FROM customer_product_samples WHERE id = ?").run(id);
   return { ok: true };
 }
 
@@ -1092,9 +958,7 @@ export type CustomerMapping = {
   items: CustomerMappingItem[];
 };
 
-export async function listCustomerMappings(
-  customerId: number,
-): Promise<CustomerMapping[]> {
+export async function listCustomerMappings(customerId: number): Promise<CustomerMapping[]> {
   const db = getDb();
   const maps = (await db
     .prepare(
@@ -1157,29 +1021,21 @@ export async function listCustomerMappings(
   }));
 }
 
-export async function getCustomerMappingCustomerId(
-  mappingId: number,
-): Promise<number | null> {
+export async function getCustomerMappingCustomerId(mappingId: number): Promise<number | null> {
   const row = (await getDb()
     .prepare("SELECT customer_id FROM customer_mappings WHERE id = ?")
     .get<{ customer_id: number }>(mappingId)) as { customer_id: number } | undefined;
   return row?.customer_id ?? null;
 }
 
-export async function createQuoteFromCustomerMapping(
-  mappingId: number,
-): Promise<Quote> {
+export async function createQuoteFromCustomerMapping(mappingId: number): Promise<Quote> {
   const db = getDb();
-  const mapping = (await db
-    .prepare("SELECT * FROM customer_mappings WHERE id = ?")
-    .get<{
-      id: number;
-      customer_id: number;
-      name: string;
-      note: string;
-    }>(mappingId)) as
-    | { id: number; customer_id: number; name: string; note: string }
-    | undefined;
+  const mapping = (await db.prepare("SELECT * FROM customer_mappings WHERE id = ?").get<{
+    id: number;
+    customer_id: number;
+    name: string;
+    note: string;
+  }>(mappingId)) as { id: number; customer_id: number; name: string; note: string } | undefined;
   if (!mapping) throw new Error("Không tìm thấy đề xuất vật liệu");
 
   const items = (await db
@@ -1217,10 +1073,7 @@ export async function createQuoteFromCustomerMapping(
     customer_id: mapping.customer_id,
     discount_type: "custom",
     prices_include_vat: true,
-    notes: [
-      mapping.name ? `Từ đề xuất vật liệu: ${mapping.name}` : "",
-      mapping.note,
-    ]
+    notes: [mapping.name ? `Từ đề xuất vật liệu: ${mapping.name}` : "", mapping.note]
       .filter(Boolean)
       .join("\n"),
     items: catalogItems.map((item) => ({
@@ -1263,11 +1116,7 @@ async function deleteOrphanMappingImages(oldPaths: string[]) {
     if (!isMappingUploadPath(p) || used.has(p)) continue;
     if (await isPublicImagePathReferenced(db, p)) continue;
     try {
-      const filePath = path.join(
-        process.cwd(),
-        "public",
-        p.replace(/^\//, ""),
-      );
+      const filePath = path.join(process.cwd(), "public", p.replace(/^\//, ""));
       if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
         fs.unlinkSync(filePath);
       }
@@ -1300,9 +1149,7 @@ export async function saveCustomerMapping(input: {
   }>;
 }): Promise<CustomerMapping> {
   const db = getDb();
-  const customer = await db
-    .prepare("SELECT id FROM customers WHERE id = ?")
-    .get(input.customer_id);
+  const customer = await db.prepare("SELECT id FROM customers WHERE id = ?").get(input.customer_id);
   if (!customer) throw new Error("Không tìm thấy khách hàng");
 
   const runTx = db.transaction(async () => {
@@ -1333,9 +1180,7 @@ export async function saveCustomerMapping(input: {
           `UPDATE customer_mappings SET name = ?, version = ?, note = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
         )
         .run(input.name ?? "", input.version?.trim() || "01", input.note ?? "", mappingId);
-      await db
-        .prepare("DELETE FROM customer_mapping_items WHERE mapping_id = ?")
-        .run(mappingId);
+      await db.prepare("DELETE FROM customer_mapping_items WHERE mapping_id = ?").run(mappingId);
     } else {
       const fullCustomer = (await db
         .prepare("SELECT name, company, short_name FROM customers WHERE id = ?")
@@ -1398,9 +1243,7 @@ export async function saveCustomerMapping(input: {
   return all.find((m) => m.id === id)!;
 }
 
-export async function deleteCustomerMapping(
-  mappingId: number,
-): Promise<{ ok: true }> {
+export async function deleteCustomerMapping(mappingId: number): Promise<{ ok: true }> {
   const db = getDb();
   const items = (await db
     .prepare(
@@ -1414,13 +1257,9 @@ export async function deleteCustomerMapping(
     image_path: string;
     custom_product_image_path: string;
   }>;
-  const existing = await db
-    .prepare("SELECT id FROM customer_mappings WHERE id = ?")
-    .get(mappingId);
+  const existing = await db.prepare("SELECT id FROM customer_mappings WHERE id = ?").get(mappingId);
   if (!existing) throw new Error("Không tìm thấy mapping");
-  await db
-    .prepare("DELETE FROM customer_mappings WHERE id = ?")
-    .run(mappingId);
+  await db.prepare("DELETE FROM customer_mappings WHERE id = ?").run(mappingId);
   for (const image_path of items.flatMap((item) => [
     item.image_path,
     item.custom_product_image_path,
@@ -1453,29 +1292,8 @@ export async function uploadMappingImageFile(input: {
     throw new Error("Ảnh quá lớn (tối đa 12MB)");
   }
 
-  const mimeIn = input.mimeType || dataUrlMatch?.[1] || "image/jpeg";
-  const extFromMime: Record<string, string> = {
-    "image/jpeg": ".jpg",
-    "image/jpg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-  };
-  let ext =
-    extFromMime[mimeIn] || path.extname(input.filename).toLowerCase();
-  if (!ext || ext === ".") ext = ".jpg";
-
-  let outBuf: Buffer;
-  try {
-    const normalized = await normalizeUploadImageBuffer(rawBuf, ext);
-    outBuf = normalized.buffer;
-    ext = normalized.ext;
-  } catch (err) {
-    console.warn("Mapping image normalize failed, saving original:", err);
-    outBuf = rawBuf;
-  }
-
-return { path: await saveManagedImage(outBuf, ext) };
+  const normalized = await normalizeUploadImageBuffer(rawBuf);
+  return { path: await saveManagedImage(normalized, ".webp") };
 }
 
 /**
@@ -1561,10 +1379,7 @@ export async function updateCustomer(
   const name = (input.name ?? existing.name).trim();
   if (!name) throw new Error("Tên khách hàng bắt buộc");
 
-  const phone =
-    input.phone !== undefined
-      ? input.phone.trim()
-      : (existing.phone ?? "").trim();
+  const phone = input.phone !== undefined ? input.phone.trim() : (existing.phone ?? "").trim();
   // Đổi SĐT → vẫn chặn trùng với KH khác; giữ SĐT cũ thì bỏ qua
   if (input.phone !== undefined) {
     await assertPhoneAvailable(phone, {
@@ -1578,14 +1393,10 @@ export async function updateCustomer(
       ? assertEmailOptional(input.email)
       : normalizeEmail(existing.email ?? "");
   const company =
-    input.company !== undefined
-      ? input.company.trim()
-      : (existing.company ?? "").trim();
+    input.company !== undefined ? input.company.trim() : (existing.company ?? "").trim();
 
   const shortName =
-    input.short_name !== undefined
-      ? input.short_name.trim()
-      : (existing.short_name ?? "").trim();
+    input.short_name !== undefined ? input.short_name.trim() : (existing.short_name ?? "").trim();
 
   await getDb()
     .prepare(
@@ -1646,9 +1457,7 @@ async function listQuotesForCustomer(
     .all<Quote>(...params)) as Quote[];
 }
 
-async function getQuoteItemsForQuotes(
-  quoteIds: number[],
-): Promise<Map<number, QuoteItem[]>> {
+async function getQuoteItemsForQuotes(quoteIds: number[]): Promise<Map<number, QuoteItem[]>> {
   const itemsByQuote = new Map<number, QuoteItem[]>();
   if (quoteIds.length === 0) return itemsByQuote;
   const placeholders = quoteIds.map(() => "?").join(", ");
@@ -1667,10 +1476,9 @@ async function getQuoteItemsForQuotes(
   return itemsByQuote;
 }
 
-
 export async function getQuote(id: number): Promise<Quote | null> {
   return (
-    (await getDb()
+    ((await getDb()
       .prepare(
         `SELECT q.*,
           c.name AS customer_name,
@@ -1682,7 +1490,7 @@ export async function getQuote(id: number): Promise<Quote | null> {
          JOIN customers c ON c.id = q.customer_id
          WHERE q.id = ?`,
       )
-      .get<Quote>(id) as Quote | undefined) ?? null
+      .get<Quote>(id)) as Quote | undefined) ?? null
   );
 }
 
@@ -1738,9 +1546,7 @@ async function upsertCustomerProductSampleFromQuote(
   productName: string,
 ) {
   const existing = (await db
-    .prepare(
-      "SELECT id FROM customer_product_samples WHERE customer_id = ? AND product_id = ?",
-    )
+    .prepare("SELECT id FROM customer_product_samples WHERE customer_id = ? AND product_id = ?")
     .get<{ id: number }>(customerId, productId)) as { id: number } | undefined;
   if (existing) {
     await db
@@ -1822,18 +1628,12 @@ export async function createQuote(input: {
       const product = await getProduct(item.product_id);
       if (!product) throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
 
-      const { unit, discountPct } = resolveQuoteItemPricing(
-        product,
-        discountType,
-        item,
-      );
+      const { unit, discountPct } = resolveQuoteItemPricing(product, discountType, item);
       const qty = Number(item.quantity_m2) || 0;
       const lineTotal = Math.round(unit * qty);
 
-      const productCode =
-        (item.product_code ?? "").trim() || product.code;
-      const productName =
-        (item.product_name ?? "").trim() || product.name;
+      const productCode = (item.product_code ?? "").trim() || product.code;
+      const productName = (item.product_name ?? "").trim() || product.name;
 
       await insertItem.run({
         quote_id: quoteId,
@@ -1861,9 +1661,7 @@ export async function createQuote(input: {
     // Auto-update customer status when quoted
     if (customer.status === "consulting") {
       await db
-        .prepare(
-          "UPDATE customers SET status = 'quoted', updated_at = ? WHERE id = ?",
-        )
+        .prepare("UPDATE customers SET status = 'quoted', updated_at = ? WHERE id = ?")
         .run(ts, input.customer_id);
     }
 
@@ -1897,9 +1695,7 @@ export async function deleteQuote(id: number): Promise<{
   let paymentsDeleted = 0;
   const runTx = db.transaction(async () => {
     for (const orderId of orderIds) {
-      const info = await db
-        .prepare("DELETE FROM payments WHERE order_id = ?")
-        .run(orderId);
+      const info = await db.prepare("DELETE FROM payments WHERE order_id = ?").run(orderId);
       paymentsDeleted += Number(info.changes) || 0;
       await db.prepare("DELETE FROM orders WHERE id = ?").run(orderId);
     }
@@ -1996,17 +1792,11 @@ export async function updateQuote(input: {
         throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
       }
 
-      const { unit, discountPct } = resolveQuoteItemPricing(
-        product,
-        discountType,
-        item,
-      );
+      const { unit, discountPct } = resolveQuoteItemPricing(product, discountType, item);
       const qty = Number(item.quantity_m2) || 0;
       const lineTotal = Math.round(unit * qty);
-      const productCode =
-        (item.product_code ?? "").trim() || product.code;
-      const productName =
-        (item.product_name ?? "").trim() || product.name;
+      const productCode = (item.product_code ?? "").trim() || product.code;
+      const productName = (item.product_name ?? "").trim() || product.name;
 
       await insertItem.run({
         quote_id: input.id,
@@ -2120,19 +1910,14 @@ export async function getOrder(id: number): Promise<Order | null> {
   return (orders.find((o) => o.id === id) as Order | undefined) ?? null;
 }
 
-export async function updateOrderStatus(
-  id: number,
-  status: OrderStatus,
-): Promise<Order> {
+export async function updateOrderStatus(id: number, status: OrderStatus): Promise<Order> {
   const existing = await getOrder(id);
   if (!existing) throw new Error("Không tìm thấy đơn hàng");
   if (!["preparing", "shipping", "delivered"].includes(status)) {
     throw new Error("Trạng thái đơn không hợp lệ");
   }
   await getDb()
-    .prepare(
-      "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
-    )
+    .prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?")
     .run(status, nowLocal(), id);
 
   return (await getOrder(id))!;
@@ -2151,9 +1936,7 @@ export async function deleteOrder(id: number): Promise<{
   const db = getDb();
   let paymentsDeleted = 0;
   const runTx = db.transaction(async () => {
-    const info = await db
-      .prepare("DELETE FROM payments WHERE order_id = ?")
-      .run(id);
+    const info = await db.prepare("DELETE FROM payments WHERE order_id = ?").run(id);
     paymentsDeleted = Number(info.changes) || 0;
     await db.prepare("DELETE FROM orders WHERE id = ?").run(id);
   });
@@ -2180,9 +1963,7 @@ export async function createOrderFromQuote(quoteId: number): Promise<Order> {
     notes: `Từ báo giá ${quote.code}`,
   });
   await db
-    .prepare(
-      "UPDATE quotes SET status = 'accepted', updated_at = ? WHERE id = ?",
-    )
+    .prepare("UPDATE quotes SET status = 'accepted', updated_at = ? WHERE id = ?")
     .run(nowLocal(), quoteId);
   return order;
 }
@@ -2193,9 +1974,7 @@ export async function listPayments(customerId?: number): Promise<Payment[]> {
   const db = getDb();
   if (customerId) {
     return (await db
-      .prepare(
-        "SELECT * FROM payments WHERE customer_id = ? ORDER BY paid_at DESC",
-      )
+      .prepare("SELECT * FROM payments WHERE customer_id = ? ORDER BY paid_at DESC")
       .all<Payment>(customerId)) as Payment[];
   }
   return (await db
@@ -2235,9 +2014,8 @@ export async function addPayment(input: {
 
 export async function getPayment(id: number): Promise<Payment | null> {
   return (
-    (await getDb()
-      .prepare("SELECT * FROM payments WHERE id = ?")
-      .get<Payment>(id) as Payment | undefined) ?? null
+    ((await getDb().prepare("SELECT * FROM payments WHERE id = ?").get<Payment>(id)) as
+      Payment | undefined) ?? null
   );
 }
 
@@ -2254,42 +2032,31 @@ export async function updatePayment(
   const existing = await getPayment(id);
   if (!existing) throw new Error("Không tìm thấy thanh toán");
 
-  const amount =
-    input.amount !== undefined ? Math.round(input.amount) : existing.amount;
+  const amount = input.amount !== undefined ? Math.round(input.amount) : existing.amount;
   if (!amount || amount <= 0) {
     throw new Error("Số tiền thanh toán phải > 0");
   }
-  const orderId =
-    input.order_id !== undefined ? input.order_id : existing.order_id;
+  const orderId = input.order_id !== undefined ? input.order_id : existing.order_id;
   const paidAt =
-    input.paid_at !== undefined && input.paid_at.trim()
-      ? input.paid_at
-      : existing.paid_at;
+    input.paid_at !== undefined && input.paid_at.trim() ? input.paid_at : existing.paid_at;
   const note = input.note !== undefined ? input.note : existing.note;
 
   await db
-    .prepare(
-      "UPDATE payments SET amount = ?, order_id = ?, paid_at = ?, note = ? WHERE id = ?",
-    )
+    .prepare("UPDATE payments SET amount = ?, order_id = ?, paid_at = ?, note = ? WHERE id = ?")
     .run(amount, orderId ?? null, paidAt, note, id);
 
   return (await getPayment(id))!;
 }
 
-export async function deletePayment(
-  id: number,
-): Promise<{ ok: true; customer_id: number }> {
+export async function deletePayment(id: number): Promise<{ ok: true; customer_id: number }> {
   const existing = await getPayment(id);
   if (!existing) throw new Error("Không tìm thấy thanh toán");
   await getDb().prepare("DELETE FROM payments WHERE id = ?").run(id);
   return { ok: true, customer_id: existing.customer_id };
 }
 
-export async function listCustomerDebts(
-  ownerId?: number | null,
-): Promise<CustomerDebt[]> {
-  const ownerClause =
-    ownerId != null ? "AND c.owner_id = ?" : "";
+export async function listCustomerDebts(ownerId?: number | null): Promise<CustomerDebt[]> {
+  const ownerClause = ownerId != null ? "AND c.owner_id = ?" : "";
   const params = ownerId != null ? [ownerId] : [];
   return (await getDb()
     .prepare(
@@ -2348,8 +2115,7 @@ export async function getCustomerDebtDetail(
        WHERE c.id = ?`,
     )
     .get<CustomerDebt & { total_paid: number; total_order_amount: number }>(customerId)) as
-    | (CustomerDebt & { total_paid: number; total_order_amount: number })
-    | undefined;
+    (CustomerDebt & { total_paid: number; total_order_amount: number }) | undefined;
 
   const summary: CustomerDebt = base
     ? {
@@ -2377,9 +2143,7 @@ export async function getCustomerDebtDetail(
        WHERE o.customer_id = ?
        ORDER BY o.created_at DESC`,
     )
-    .all<Order & { paid_amount: number }>(customerId)) as Array<
-    Order & { paid_amount: number }
-  >;
+    .all<Order & { paid_amount: number }>(customerId)) as Array<Order & { paid_amount: number }>;
 
   const payments = await listPayments(customerId);
 
@@ -2476,7 +2240,6 @@ export async function getDashboardStats(ownerId?: number | null) {
   };
 }
 
-
 // --- RECOVERED FUNCTIONS ---
 
 export type ProductUpdate = {
@@ -2506,10 +2269,7 @@ export type ProductUpdate = {
   image_path?: string;
 };
 
-export async function updateProduct(
-  id: number,
-  input: ProductUpdate,
-): Promise<Product> {
+export async function updateProduct(id: number, input: ProductUpdate): Promise<Product> {
   const existing = await getProduct(id);
   if (!existing) throw new Error("Không tìm thấy sản phẩm");
 
@@ -2524,9 +2284,7 @@ export async function updateProduct(
   }
 
   const retail =
-    input.retail_price != null
-      ? Math.round(Number(input.retail_price))
-      : existing.retail_price;
+    input.retail_price != null ? Math.round(Number(input.retail_price)) : existing.retail_price;
   if (!retail || retail < 0) throw new Error("Giá bán lẻ không hợp lệ");
 
   const tradePrice =
@@ -2545,14 +2303,10 @@ export async function updateProduct(
 
   // Tự động tính % CK TP & CK B2B từ Đơn giá
   const discountTp =
-    retail > 0 && tradePrice != null
-      ? Math.round(((retail - tradePrice) / retail) * 100)
-      : null;
+    retail > 0 && tradePrice != null ? Math.round(((retail - tradePrice) / retail) * 100) : null;
 
   const discountB2b =
-    retail > 0 && b2bPrice != null
-      ? Math.round(((retail - b2bPrice) / retail) * 100)
-      : null;
+    retail > 0 && b2bPrice != null ? Math.round(((retail - b2bPrice) / retail) * 100) : null;
 
   await getDb()
     .prepare(
@@ -2601,12 +2355,7 @@ export async function updateProduct(
       discount_tp: discountTp,
       discount_b2b: discountB2b,
       note: (input.note ?? existing.note).trim(),
-      is_hot:
-        input.is_hot !== undefined
-          ? input.is_hot
-            ? 1
-            : 0
-          : existing.is_hot,
+      is_hot: input.is_hot !== undefined ? (input.is_hot ? 1 : 0) : existing.is_hot,
       image_path: (input.image_path ?? existing.image_path).trim(),
     } as unknown as SqlValue);
 
@@ -2643,9 +2392,7 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
   const code = (input.code ?? "").trim();
   if (!code) throw new Error("Mã sản phẩm bắt buộc");
 
-  const clash = await getDb()
-    .prepare("SELECT id FROM products WHERE code = ?")
-    .get(code);
+  const clash = await getDb().prepare("SELECT id FROM products WHERE code = ?").get(code);
   if (clash) throw new Error(`Mã ${code} đã tồn tại`);
 
   const retail = Math.round(Number(input.retail_price) || 0);
@@ -2663,14 +2410,10 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
 
   // Tự động tính % CK TP & CK B2B từ Đơn giá
   const discountTp =
-    retail > 0 && tradePrice != null
-      ? Math.round(((retail - tradePrice) / retail) * 100)
-      : null;
+    retail > 0 && tradePrice != null ? Math.round(((retail - tradePrice) / retail) * 100) : null;
 
   const discountB2b =
-    retail > 0 && b2bPrice != null
-      ? Math.round(((retail - b2bPrice) / retail) * 100)
-      : null;
+    retail > 0 && b2bPrice != null ? Math.round(((retail - b2bPrice) / retail) * 100) : null;
 
   const info = await getDb()
     .prepare(
@@ -2824,9 +2567,7 @@ function buildCodeGroups(items: StockImportRow[]): Map<string, string[]> {
  * - Option 3: Quy cách / Packing
  * - Option 4: Tên sản phẩm
  */
-async function previewStockImport(
-  items: StockImportRow[],
-): Promise<StockImportPreview> {
+async function previewStockImport(items: StockImportRow[]): Promise<StockImportPreview> {
   const db = getDb();
   const byAlias = new Map<string, ProductStockRef>();
 
@@ -2913,9 +2654,7 @@ async function previewStockImport(
         seenCodes: new Set([codeKey]),
       });
     } else if (acc.seenCodes.has(codeKey)) {
-      const idx = acc.sources.findIndex(
-        (s) => s.code.toUpperCase() === codeKey,
-      );
+      const idx = acc.sources.findIndex((s) => s.code.toUpperCase() === codeKey);
       if (idx >= 0 && newStock > acc.sources[idx].stock) {
         acc.sumStock += newStock - acc.sources[idx].stock;
         acc.sources[idx] = {
@@ -2950,22 +2689,14 @@ async function previewStockImport(
 
     const resolved = resolveProductFromFileCode(code, byAlias, mo_ta);
     if (resolved) {
-      attachToProduct(
-        resolved.product,
-        code,
-        newStock,
-        product_name,
-        mo_ta,
-        resolved.matchRule,
-      );
+      attachToProduct(resolved.product, code, newStock, product_name, mo_ta, resolved.matchRule);
     } else {
       pending.push({ code, stock: newStock, product_name, mo_ta });
     }
   }
 
   for (const row of pending) {
-    const root =
-      codeToRoot.get(row.code.toUpperCase()) ?? row.code.toUpperCase();
+    const root = codeToRoot.get(row.code.toUpperCase()) ?? row.code.toUpperCase();
     const members = codeGroups.get(root) ?? [row.code.toUpperCase()];
     let resolved: { product: ProductStockRef; matchRule: string } | null = null;
     for (const m of members) {
@@ -3026,10 +2757,7 @@ async function previewStockImport(
         }
 
         if (!primaryParsedName) {
-          const { name: rawName, pack: packStr } = extractNameDimPack(
-            s.product_name,
-            s.code,
-          );
+          const { name: rawName, pack: packStr } = extractNameDimPack(s.product_name, s.code);
           if (rawName) {
             primaryParsedName = titleCaseVn(rawName);
           }
@@ -3041,8 +2769,7 @@ async function previewStockImport(
 
       const merged = mergePackingVariants(packRows);
       const packing_changed =
-        merged.primary.packing_pcs != null ||
-        merged.primary.packing_m2 != null
+        merged.primary.packing_pcs != null || merged.primary.packing_m2 != null
           ? merged.packingText !== (acc.product.packing || "") ||
             merged.primary.packing_pcs !== acc.product.packing_pcs ||
             merged.primary.packing_m2 !== acc.product.packing_m2
@@ -3053,8 +2780,7 @@ async function previewStockImport(
       // Check name change
       const name_changed =
         Boolean(primaryParsedName) &&
-        primaryParsedName.trim().toLowerCase() !==
-          acc.product.name.trim().toLowerCase();
+        primaryParsedName.trim().toLowerCase() !== acc.product.name.trim().toLowerCase();
       if (name_changed) name_update_count += 1;
 
       // Multi-codes
@@ -3074,18 +2800,13 @@ async function previewStockImport(
       const new_internal_codes = serializeInternalCodes(newMultiList);
       const old_internal_codes =
         serializeInternalCodes(
-          parseInternalCodesList(
-            acc.product.internal_codes,
-            acc.product.internal_code,
-          ),
+          parseInternalCodesList(acc.product.internal_codes, acc.product.internal_code),
         ) || "";
       const added = newMultiList.filter(
-        (c) =>
-          !oldMulti.some((o) => o.toUpperCase() === c.toUpperCase()),
+        (c) => !oldMulti.some((o) => o.toUpperCase() === c.toUpperCase()),
       );
       const multiChanged =
-        added.length > 0 ||
-        new_internal_codes.toUpperCase() !== old_internal_codes.toUpperCase();
+        added.length > 0 || new_internal_codes.toUpperCase() !== old_internal_codes.toUpperCase();
       if (multiChanged && (added.length > 0 || !old_internal_codes)) {
         multi_update_count += 1;
       }
@@ -3114,9 +2835,7 @@ async function previewStockImport(
         don_vi_tinh: primaryPackagingInfo.don_vi_tinh || undefined,
       } satisfies StockImportMatched;
     })
-    .sort((a, b) =>
-      a.code.localeCompare(b.code, "vi", { sensitivity: "base" }),
-    );
+    .sort((a, b) => a.code.localeCompare(b.code, "vi", { sensitivity: "base" }));
 
   return {
     matched,
@@ -3206,12 +2925,14 @@ async function applyStockImport(
           item.packing_m2 != null ||
           (item.packing && item.packing.length > 0))
       ) {
-        packing_count += (await updPack.run(
-          item.packing ?? "",
-          item.packing_pcs ?? null,
-          item.packing_m2 ?? null,
-          id,
-        )).changes;
+        packing_count += (
+          await updPack.run(
+            item.packing ?? "",
+            item.packing_pcs ?? null,
+            item.packing_m2 ?? null,
+            id,
+          )
+        ).changes;
       }
 
       if (
@@ -3220,18 +2941,11 @@ async function applyStockImport(
         item.internal_codes &&
         item.internal_codes.trim()
       ) {
-        const { multi, primary } = normalizeInternalCodesInput(
-          item.internal_codes,
-        );
+        const { multi, primary } = normalizeInternalCodesInput(item.internal_codes);
         multi_count += (await updMulti.run(multi, primary, id)).changes;
       }
 
-      if (
-        doName &&
-        item.update_name !== false &&
-        item.new_name &&
-        item.new_name.trim()
-      ) {
+      if (doName && item.update_name !== false && item.new_name && item.new_name.trim()) {
         name_count += (await updName.run(item.new_name.trim(), id)).changes;
       }
     }
@@ -3253,7 +2967,7 @@ async function bulkUpdateStockByProductId(
      ON CONFLICT(internal_code, stock_location)
      DO UPDATE SET quantity_stock = excluded.quantity_stock`,
   );
-  
+
   const runTx = db.transaction(async () => {
     for (const item of items) {
       updatedCount += (await updateStmt.run(item.stock_m2, item.product_id)).changes;

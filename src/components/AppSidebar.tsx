@@ -30,6 +30,7 @@ const mainNav = [
   { to: "/bao-gia", label: "Báo Giá & Đơn Hàng", icon: FileText },
   { to: "/cong-no", label: "Công Nợ", icon: Wallet },
   { to: "/ghi-chu", label: "Ghi Chú", icon: StickyNote },
+  { to: "/thu-vien", label: "Thư Viện", icon: Images },
 ] as const;
 
 const adminNav = [
@@ -52,11 +53,7 @@ type Props = {
   onMobileClose?: () => void;
 };
 
-export function AppSidebar({
-  user,
-  mobileOpen = false,
-  onMobileClose,
-}: Props) {
+export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const router = useRouter();
   const { pathname, search } = useRouterState({
     select: (s) => ({
@@ -101,9 +98,7 @@ export function AppSidebar({
           className="size-9 rounded-lg object-contain bg-white ring-1 ring-black/5 flex-shrink-0 p-0.5"
         />
         <div className="min-w-0 flex-1">
-          <p className="font-medium tracking-tight text-foreground text-sm">
-            Innomat CRM
-          </p>
+          <p className="font-medium tracking-tight text-foreground text-sm">Innomat CRM</p>
           <p className="text-[10px] text-muted-foreground">Showroom Manager</p>
         </div>
         {onMobileClose ? (
@@ -218,12 +213,8 @@ export function AppSidebar({
             {initialsFromName(user.display_name)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-foreground truncate">
-              {user.display_name}
-            </p>
-            <p className="text-[10px] text-muted-foreground truncate">
-              {ROLE_LABEL[user.role]}
-            </p>
+            <p className="text-xs font-medium text-foreground truncate">{user.display_name}</p>
+            <p className="text-[10px] text-muted-foreground truncate">{ROLE_LABEL[user.role]}</p>
           </div>
           <button
             type="button"

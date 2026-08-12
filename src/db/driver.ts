@@ -121,7 +121,7 @@ function transpile(
       const obj = rawArgs[0];
       const v =
         obj !== null && typeof obj === "object" && !Array.isArray(obj)
-          ? (obj as Record<string, unknown>)[name] ?? null
+          ? ((obj as Record<string, unknown>)[name] ?? null)
           : null;
       out += `$${push(v)}`;
       prev = c;
@@ -167,7 +167,9 @@ async function executeQuery(
     );
     return result;
   } catch (error) {
-    console.error(`[sql] failed after ${Date.now() - startedAt}ms ${text.replace(/\s+/g, " ").slice(0, 180)}`);
+    console.error(
+      `[sql] failed after ${Date.now() - startedAt}ms ${text.replace(/\s+/g, " ").slice(0, 180)}`,
+    );
     throw error;
   }
 }
@@ -190,13 +192,8 @@ function makeStmt(
     async run(...params: SqlValue[]): Promise<RunResult> {
       const { text, values, isIgnore, targetTable } = transpile(sql, params);
       let final = text;
-      let returning = " RETURNING id";
-      if (
-        isMainInsert(text) &&
-        targetTable &&
-        !isIgnore &&
-        !TABLES_WITHOUT_ID.has(targetTable)
-      ) {
+      const returning = " RETURNING id";
+      if (isMainInsert(text) && targetTable && !isIgnore && !TABLES_WITHOUT_ID.has(targetTable)) {
         if (ID_TABLES.has(targetTable) && !/\bRETURNING\b/i.test(text)) {
           final = text + returning;
         }
@@ -231,10 +228,7 @@ class PostgresDb implements AsyncDb {
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
       statement_timeout: Number(process.env.PG_STATEMENT_TIMEOUT_MS || 15_000),
-      ssl:
-        process.env.PG_SSL_DISABLE === "1"
-          ? false
-          : { rejectUnauthorized: false },
+      ssl: process.env.PG_SSL_DISABLE === "1" ? false : { rejectUnauthorized: false },
     });
   }
 

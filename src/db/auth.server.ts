@@ -134,14 +134,31 @@ export function getSessionIdFromCookie(): string | undefined {
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const sid = getSessionIdFromCookie();
   if (!sid) return null;
-  const userId = await getSessionUserId(sid);
-  if (!userId) return null;
-  const user = await getUserById(userId);
-  if (!user || !user.is_active) {
-    await deleteSession(sid);
-    return null;
-  }
-  return toSessionUser(user);
+  const now = nowLocal();
+  const touchBefore = new Date(Date.now() - 15 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+  const user = await getDb()
+    .prepare(
+      `WITH active_session AS (
+         SELECT u.id, u.username, u.display_name, u.role, u.is_active,
+                u.created_at, u.updated_at
+         FROM sessions s
+         JOIN users u ON u.id = s.user_id
+         WHERE s.id = ? AND s.expires_at >= ? AND u.is_active = 1
+       ), touched AS (
+         UPDATE sessions
+         SET last_seen_at = ?
+         WHERE id = ? AND last_seen_at < ?
+         RETURNING id
+       )
+       SELECT active_session.*
+       FROM active_session
+       LEFT JOIN touched ON true`,
+    )
+    .get<AppUser>(sid, now, now, sid, touchBefore);
+  return user ? toSessionUser(user) : null;
 }
 
 export class AuthError extends Error {
