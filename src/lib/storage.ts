@@ -85,14 +85,9 @@ export async function putImageBuffer(
   const storage = await loadStorage();
   if (storage) {
     const cfg = config()!;
-    try {
-      const { data, error } = await storage.from(cfg.bucket).info(objectPath);
-      if (!error && data) return publicUrl(cfg, objectPath);
-    } catch {
-      /* chưa tồn tại → upload mới */
-    }
     const { error } = await storage.from(cfg.bucket).upload(objectPath, buffer, {
       contentType: MIME_BY_EXT[filename.slice(filename.lastIndexOf("."))] ?? "application/octet-stream",
+      cacheControl: "31536000",
       upsert: true,
     });
     if (error) throw new Error(`Supabase Storage upload failed: ${error.message}`);

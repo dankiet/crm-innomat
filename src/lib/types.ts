@@ -23,6 +23,50 @@ export type ProductImageRow = {
   created_at: string;
 };
 
+export type GalleryCollection = {
+  id: number;
+  name: string;
+  description: string;
+  cover_path: string;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
+};
+
+export type GalleryCollectionItem = {
+  id: number;
+  collection_id: number;
+  path: string;
+  product_image_id: number | null;
+  product_id: number | null;
+  product_code: string;
+  product_name: string;
+  caption: string;
+  sort_order: number;
+  created_at: string;
+};
+
+export type GalleryImageCandidate = {
+  product_image_id: number;
+  product_id: number;
+  path: string;
+  caption: string;
+  is_primary: number;
+  sort_order: number;
+  code: string;
+  name: string;
+  internal_codes: string;
+  category: string;
+  collections: string;
+  color: string;
+  surface: string;
+  size: string;
+  shape: string;
+  finish_effect: string;
+  material: string;
+};
+
 export type Product = {
   stock_m2?: number | null;
   internal_codes?: string;

@@ -355,7 +355,7 @@ export async function deleteProduct(
 
 // ─── Product images (nhiều ảnh / SP) ─────────────────────────
 
-async function isPublicImagePathReferenced(
+export async function isPublicImagePathReferenced(
   db: ReturnType<typeof getDb>,
   publicPath: string,
 ): Promise<boolean> {
@@ -366,9 +366,10 @@ async function isPublicImagePathReferenced(
          UNION ALL SELECT 1 FROM products WHERE image_path = ?
          UNION ALL SELECT 1 FROM customer_mapping_items WHERE image_path = ?
          UNION ALL SELECT 1 FROM customer_mapping_items WHERE custom_product_image_path = ?
+         UNION ALL SELECT 1 FROM gallery_collection_items WHERE path = ?
          LIMIT 1`,
       )
-      .get(publicPath, publicPath, publicPath, publicPath),
+      .get(publicPath, publicPath, publicPath, publicPath, publicPath),
   );
 }
 

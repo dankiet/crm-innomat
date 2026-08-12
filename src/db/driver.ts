@@ -49,6 +49,8 @@ const ID_TABLES = new Set([
   "notes",
   "users",
   "product_images",
+  "gallery_collections",
+  "gallery_collection_items",
   "product_internal_codes",
   "inventory",
   "customer_product_samples",

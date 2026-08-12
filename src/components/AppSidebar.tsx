@@ -15,6 +15,7 @@ import {
   UserCog,
   ScrollText,
   LogOut,
+  Images,
 } from "lucide-react";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { useEffect } from "react";

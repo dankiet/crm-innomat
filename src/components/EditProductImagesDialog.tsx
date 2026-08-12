@@ -18,6 +18,7 @@ import {
 import type { Product, ProductImageRow } from "@/lib/types";
 import { toast } from "sonner";
 import { ImagePlus, Loader2, Star, Trash2, Upload, Link2 } from "lucide-react";
+import { readImageFileAsWebpDataUrl } from "@/lib/image-upload";
 
 type Props = {
   open: boolean;
@@ -74,13 +75,17 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
           toast.error(`Bỏ qua ${file.name}: không phải ảnh`);
           continue;
         }
-        const dataBase64 = await readFileAsDataUrl(file);
+        if (file.size > 30 * 1024 * 1024) {
+          toast.error(`B? qua ${file.name}: ?nh g?c qu? 30MB`);
+          continue;
+        }
+        const dataBase64 = await readImageFileAsWebpDataUrl(file);
         await uploadProductImageFn({
           data: {
             product_id: product.id,
-            filename: file.name,
+            filename: `${file.name.replace(/\.[^.]+$/, "")}.webp`,
             dataBase64,
-            mimeType: file.type,
+            mimeType: "image/webp",
             is_primary: images.length === 0 && first,
           },
         });
@@ -330,15 +335,6 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
       </DialogContent>
     </Dialog>
   );
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Không đọc được file"));
-    reader.readAsDataURL(file);
-  });
 }
 
 const inputCls =

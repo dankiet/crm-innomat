@@ -420,6 +420,175 @@ export const deleteProductImageFn = createServerFn({ method: "POST" })
     return result;
   });
 
+// ─── Gallery ───────────────────────────────────────────────────────────────
+
+export const fetchGalleryCollections = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser } = await import("@/db/auth.server");
+  await requireUser();
+  const { listGalleryCollections } = await import("@/db/gallery.server");
+  return await listGalleryCollections();
+});
+
+export const fetchGalleryCollection = createServerFn({ method: "GET" })
+  .inputValidator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { getGalleryCollection } = await import("@/db/gallery.server");
+    return await getGalleryCollection(data.id);
+  });
+
+export const fetchGalleryImageCandidates = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser } = await import("@/db/auth.server");
+  await requireUser();
+  const { listGalleryImageCandidates } = await import("@/db/gallery.server");
+  return await listGalleryImageCandidates();
+});
+
+export const createGalleryCollectionFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { name: string; description?: string }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { createGalleryCollection } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const collection = await createGalleryCollection({ ...data, createdBy: me.id });
+    await writeAudit({
+      user: me,
+      action: "gallery.create",
+      entity_type: "gallery_collection",
+      entity_id: collection.id,
+      summary: `Tạo bộ sưu tập ${collection.name}`,
+    });
+    return collection;
+  });
+
+export const updateGalleryCollectionFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: number; name: string; description?: string }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { updateGalleryCollection } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const collection = await updateGalleryCollection(data);
+    await writeAudit({
+      user: me,
+      action: "gallery.update",
+      entity_type: "gallery_collection",
+      entity_id: collection.id,
+      summary: `Cập nhật bộ sưu tập ${collection.name}`,
+    });
+    return collection;
+  });
+
+export const addGalleryProductImagesFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { collectionId: number; productImageIds: number[] }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { addGalleryProductImages } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const result = await addGalleryProductImages(data);
+    await writeAudit({
+      user: me,
+      action: "gallery.items.add",
+      entity_type: "gallery_collection",
+      entity_id: data.collectionId,
+      summary: `Thêm ${result.added} ảnh sản phẩm vào bộ sưu tập`,
+    });
+    return result;
+  });
+
+export const uploadGalleryImageFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { collectionId: number; dataBase64: string; caption?: string }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { uploadGalleryImage } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const item = await uploadGalleryImage(data);
+    await writeAudit({
+      user: me,
+      action: "gallery.image.upload",
+      entity_type: "gallery_collection",
+      entity_id: data.collectionId,
+      summary: "Upload ảnh riêng vào bộ sưu tập",
+    });
+    return item;
+  });
+
+export const setGalleryCoverFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { collectionId: number; itemId: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { setGalleryCover } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const collection = await setGalleryCover(data);
+    await writeAudit({
+      user: me,
+      action: "gallery.cover.set",
+      entity_type: "gallery_collection",
+      entity_id: data.collectionId,
+      summary: `Đặt ảnh đại diện cho ${collection.name}`,
+    });
+    return collection;
+  });
+
+export const reorderGalleryItemsFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { collectionId: number; itemIds: number[] }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { reorderGalleryItems } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const result = await reorderGalleryItems(data);
+    await writeAudit({
+      user: me,
+      action: "gallery.items.reorder",
+      entity_type: "gallery_collection",
+      entity_id: data.collectionId,
+      summary: `Sắp xếp ${data.itemIds.length} ảnh trong bộ sưu tập`,
+    });
+    return result;
+  });
+
+export const removeGalleryItemFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { itemId: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { removeGalleryItem } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const result = await removeGalleryItem(data.itemId);
+    await writeAudit({
+      user: me,
+      action: "gallery.item.remove",
+      entity_type: "gallery_collection",
+      entity_id: result.collectionId,
+      summary: "Gỡ ảnh khỏi bộ sưu tập",
+    });
+    return result;
+  });
+
+export const deleteGalleryCollectionFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { deleteGalleryCollection } = await import("@/db/gallery.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const result = await deleteGalleryCollection(data.id);
+    await writeAudit({
+      user: me,
+      action: "gallery.delete",
+      entity_type: "gallery_collection",
+      entity_id: data.id,
+      summary: `Xóa bộ sưu tập ${result.name}`,
+    });
+    return result;
+  });
+
 // ─── Customers ──────────────────────────────────────────────
 
 export const fetchCustomers = createServerFn({ method: "GET" })
