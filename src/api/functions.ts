@@ -1380,6 +1380,52 @@ export const importInternalCodeMappingFn = createServerFn({ method: "POST" })
     return { added };
   });
 
+export const syncProductInternalCodesFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { product_id: number; internal_codes: string[] }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    await requireAdmin();
+    const { getDb } = await import("@/db/index.server");
+    const { parseInternalCodesList } = await import("@/lib/product-internal-codes");
+    const codes = parseInternalCodesList(...data.internal_codes);
+    const db = getDb();
+    if (codes.length) {
+      const placeholders = codes.map(() => "?").join(", ");
+      const clash = await db
+        .prepare(
+          `SELECT pic.internal_code, p.code product_code FROM product_internal_codes pic
+         JOIN products p ON p.id = pic.product_id
+         WHERE UPPER(pic.internal_code) IN (${placeholders}) AND pic.product_id != ? LIMIT 1`,
+        )
+        .get<{ internal_code: string; product_code: string }>(
+          ...codes.map((code) => code.toUpperCase()),
+          data.product_id,
+        );
+      if (clash)
+        throw new Error(`Mã nội bộ ${clash.internal_code} đã thuộc sản phẩm ${clash.product_code}`);
+    }
+    await db.transaction(async (tx) => {
+      if (codes.length) {
+        const placeholders = codes.map(() => "?").join(", ");
+        await tx
+          .prepare(
+            `DELETE FROM product_internal_codes
+           WHERE product_id = ? AND UPPER(internal_code) NOT IN (${placeholders})`,
+          )
+          .run(data.product_id, ...codes.map((code) => code.toUpperCase()));
+      } else {
+        await tx
+          .prepare("DELETE FROM product_internal_codes WHERE product_id = ?")
+          .run(data.product_id);
+      }
+      const insert = tx.prepare(
+        "INSERT OR IGNORE INTO product_internal_codes (product_id, internal_code) VALUES (?, ?)",
+      );
+      for (const code of codes) await insert.run(data.product_id, code);
+    })();
+    return { internal_codes: codes };
+  });
+
 export const importStockUpdateFn = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {

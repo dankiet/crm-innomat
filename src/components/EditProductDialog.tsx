@@ -13,12 +13,14 @@ import {
   updateProductFn,
   fetchProductFieldValues,
   clearProductFieldValueFn,
+  syncProductInternalCodesFn,
 } from "@/api/functions";
 import type { Product } from "@/lib/types";
 import { PRODUCT_COLORS } from "@/lib/types";
 import { Combobox } from "@/components/ui/combobox";
 import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
+import { parseInternalCodesList } from "@/lib/product-internal-codes";
 
 const SUGGEST_FIELDS = [
   "color",
@@ -37,16 +39,14 @@ type Props = {
   onEditImages?: () => void;
 };
 
-export function EditProductDialog({
-  open,
-  onOpenChange,
-  product,
-  onEditImages,
-}: Props) {
+export function EditProductDialog({ open, onOpenChange, product, onEditImages }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [internalCodes, setInternalCodes] = useState<string[]>([]);
+  const [newInternalCode, setNewInternalCode] = useState("");
+  const [pendingInternalCodeDelete, setPendingInternalCodeDelete] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: "",
     name: "",
@@ -69,9 +69,7 @@ export function EditProductDialog({
     is_hot: false,
     image_path: "",
   });
-  const [fieldOptions, setFieldOptions] = useState<
-    Record<SuggestField, string[]>
-  >({
+  const [fieldOptions, setFieldOptions] = useState<Record<SuggestField, string[]>>({
     color: [],
     supplier: [],
     category: [],
@@ -87,9 +85,10 @@ export function EditProductDialog({
       ),
     ).then((results) => {
       setFieldOptions(
-        Object.fromEntries(
-          SUGGEST_FIELDS.map((field, i) => [field, results[i]]),
-        ) as Record<SuggestField, string[]>,
+        Object.fromEntries(SUGGEST_FIELDS.map((field, i) => [field, results[i]])) as Record<
+          SuggestField,
+          string[]
+        >,
       );
     });
   }
@@ -137,16 +136,27 @@ export function EditProductDialog({
         product.b2b_price != null && product.b2b_price !== undefined
           ? String(product.b2b_price)
           : "",
-      discount_tp:
-        product.discount_tp != null ? String(product.discount_tp) : "",
-      discount_b2b:
-        product.discount_b2b != null ? String(product.discount_b2b) : "",
+      discount_tp: product.discount_tp != null ? String(product.discount_tp) : "",
+      discount_b2b: product.discount_b2b != null ? String(product.discount_b2b) : "",
       note: product.note,
       is_hot: Boolean(product.is_hot),
       image_path: product.image_path || "",
     });
     setPendingDelete(false);
+    setInternalCodes(parseInternalCodesList(product.multi_codes_list));
+    setNewInternalCode("");
+    setPendingInternalCodeDelete(null);
   }, [product, open]);
+
+  function addInternalCode() {
+    const nextCodes = parseInternalCodesList(...internalCodes, newInternalCode);
+    if (nextCodes.length === internalCodes.length) {
+      if (newInternalCode.trim()) toast.error("Mã nội bộ đã có trong danh sách");
+      return;
+    }
+    setInternalCodes(nextCodes);
+    setNewInternalCode("");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -182,11 +192,14 @@ export function EditProductDialog({
     }
     setSaving(true);
     try {
+      await syncProductInternalCodesFn({
+        data: { product_id: product.id, internal_codes: internalCodes },
+      });
       await updateProductFn({
         data: {
           id: product.id,
           code: form.code.trim(),
-          
+
           name: form.name.trim(),
           size: form.size.trim(),
           material: form.material.trim(),
@@ -201,20 +214,14 @@ export function EditProductDialog({
           retail_price: price,
           trade_price,
           b2b_price,
-          discount_tp: form.discount_tp
-            ? Math.round(Number(form.discount_tp))
-            : null,
-          discount_b2b: form.discount_b2b
-            ? Math.round(Number(form.discount_b2b))
-            : null,
+          discount_tp: form.discount_tp ? Math.round(Number(form.discount_tp)) : null,
+          discount_b2b: form.discount_b2b ? Math.round(Number(form.discount_b2b)) : null,
           note: form.note.trim(),
           is_hot: form.is_hot ? 1 : 0,
           image_path: form.image_path.trim(),
         },
       });
       toast.success("Đã cập nhật sản phẩm");
-      onOpenChange(false);
-      await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
     } finally {
@@ -253,11 +260,7 @@ export function EditProductDialog({
             <div className="flex gap-3 items-start">
               <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
                 <div className="size-20 rounded-xl overflow-hidden ring-1 ring-black/5 bg-white">
-                  <ProductImage
-                    src={form.image_path}
-                    code={form.code}
-                    fit="contain"
-                  />
+                  <ProductImage src={form.image_path} code={form.code} fit="contain" />
                 </div>
                 {onEditImages ? (
                   <button
@@ -266,9 +269,7 @@ export function EditProductDialog({
                     className="text-[10px] font-medium text-terracotta hover:underline"
                   >
                     Sửa hình
-                    {product?.image_count
-                      ? ` (${product.image_count})`
-                      : ""}
+                    {product?.image_count ? ` (${product.image_count})` : ""}
                   </button>
                 ) : null}
               </div>
@@ -278,22 +279,82 @@ export function EditProductDialog({
                     <input
                       className={inputCls}
                       value={form.code}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, code: e.target.value }))
-                      }
+                      onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                     />
                   </Field>
                   <Field label="Mã nội bộ (HHDV)">
-                    <div className="min-h-[38px] px-3 py-1.5 rounded-md border border-border/80 bg-surface/50 text-sm flex flex-wrap gap-1.5 items-center">
-                      {product?.multi_codes_list ? (
-                        product.multi_codes_list.split(',').map((code, idx) => (
-                          <span key={idx} className="px-2 py-0.5 bg-card border border-border rounded-md text-xs font-semibold text-foreground shadow-xs">
-                            {code.trim()}
+                    <div className="space-y-2">
+                      <div className="min-h-[38px] px-2 py-1.5 rounded-md border border-border/80 bg-surface/50 text-sm flex flex-wrap gap-1.5 items-center">
+                        {internalCodes.length ? (
+                          internalCodes.map((code) => (
+                            <span
+                              key={code}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-card border border-border rounded-md text-xs font-semibold text-foreground shadow-xs"
+                            >
+                              {code}
+                              <button
+                                type="button"
+                                onClick={() => setPendingInternalCodeDelete(code)}
+                                className="text-muted-foreground hover:text-red-600"
+                                aria-label={`Xóa mã ${code}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground/50 text-[13px] italic">
+                            Chưa có liên kết mã nội bộ
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground/50 text-[13px] italic">Chưa có liên kết mã nội bộ</span>
-                      )}
+                        )}
+                      </div>
+                      {pendingInternalCodeDelete ? (
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="text-red-700">
+                            Xóa {pendingInternalCodeDelete} cũng xóa tồn kho liên quan.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInternalCodes((codes) =>
+                                codes.filter((code) => code !== pendingInternalCodeDelete),
+                              );
+                              setPendingInternalCodeDelete(null);
+                            }}
+                            className="rounded bg-red-600 px-2 py-1 text-white hover:bg-red-700"
+                          >
+                            Xóa vĩnh viễn
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingInternalCodeDelete(null)}
+                            className="rounded border border-border px-2 py-1 hover:bg-surface-strong"
+                          >
+                            Không xóa
+                          </button>
+                        </div>
+                      ) : null}
+                      <div className="flex gap-1.5">
+                        <input
+                          className={inputCls}
+                          value={newInternalCode}
+                          onChange={(event) => setNewInternalCode(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              addInternalCode();
+                            }
+                          }}
+                          placeholder="Nhập mã rồi nhấn Enter"
+                        />
+                        <button
+                          type="button"
+                          onClick={addInternalCode}
+                          className="shrink-0 rounded-md border border-border px-3 text-xs font-semibold hover:bg-surface-strong"
+                        >
+                          Thêm
+                        </button>
+                      </div>
                     </div>
                   </Field>
                 </div>
@@ -301,9 +362,7 @@ export function EditProductDialog({
                   <input
                     className={inputCls}
                     value={form.name}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, name: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   />
                 </Field>
               </div>
@@ -317,9 +376,7 @@ export function EditProductDialog({
                 <input
                   className={inputCls}
                   value={form.size}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, size: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
                   placeholder="vd. 600x600"
                 />
               </Field>
@@ -327,9 +384,7 @@ export function EditProductDialog({
                 <input
                   className={inputCls}
                   value={form.material}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, material: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, material: e.target.value }))}
                 />
               </Field>
               <Field label="Bề mặt">
@@ -379,9 +434,7 @@ export function EditProductDialog({
                 <Combobox
                   value={form.color}
                   onChange={(v) => setForm((f) => ({ ...f, color: v }))}
-                  options={Array.from(
-                    new Set([...PRODUCT_COLORS, ...fieldOptions.color]),
-                  )}
+                  options={Array.from(new Set([...PRODUCT_COLORS, ...fieldOptions.color]))}
                   placeholder="Trắng, Xanh mint..."
                   onDeleteOption={(v) => handleDeleteOption("color", v)}
                   nonDeletableOptions={PRODUCT_COLORS}
@@ -392,9 +445,7 @@ export function EditProductDialog({
                   className={inputCls}
                   inputMode="decimal"
                   value={form.packing_m2}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, packing_m2: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, packing_m2: e.target.value }))}
                   placeholder="vd. 1.44"
                 />
               </Field>
@@ -403,9 +454,7 @@ export function EditProductDialog({
                   className={inputCls}
                   inputMode="numeric"
                   value={form.packing_pcs}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, packing_pcs: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, packing_pcs: e.target.value }))}
                   placeholder="vd. 4"
                 />
               </Field>
@@ -419,18 +468,14 @@ export function EditProductDialog({
                 <input
                   className={inputCls}
                   value={form.retail_price}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, retail_price: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, retail_price: e.target.value }))}
                 />
               </Field>
               <Field label="Giá Thương mại (+VAT)">
                 <input
                   className={inputCls}
                   value={form.trade_price}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, trade_price: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, trade_price: e.target.value }))}
                   placeholder="Trade Price"
                 />
               </Field>
@@ -438,9 +483,7 @@ export function EditProductDialog({
                 <input
                   className={inputCls}
                   value={form.b2b_price}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, b2b_price: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, b2b_price: e.target.value }))}
                   placeholder="Partner Price"
                 />
               </Field>
@@ -452,9 +495,7 @@ export function EditProductDialog({
                   step="1"
                   className={inputCls}
                   value={form.discount_tp}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, discount_tp: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, discount_tp: e.target.value }))}
                 />
               </Field>
               <Field label="CK B2B (%)">
@@ -463,9 +504,7 @@ export function EditProductDialog({
                   step="1"
                   className={inputCls}
                   value={form.discount_b2b}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, discount_b2b: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, discount_b2b: e.target.value }))}
                 />
               </Field>
             </div>
@@ -490,9 +529,7 @@ export function EditProductDialog({
                   type="button"
                   role="checkbox"
                   aria-checked={form.is_hot}
-                  onClick={() =>
-                    setForm((f) => ({ ...f, is_hot: !f.is_hot }))
-                  }
+                  onClick={() => setForm((f) => ({ ...f, is_hot: !f.is_hot }))}
                   className={
                     form.is_hot
                       ? "inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-medium bg-terracotta/10 text-terracotta ring-1 ring-terracotta/25 transition-colors"
@@ -528,9 +565,7 @@ export function EditProductDialog({
                 <textarea
                   className={`${inputCls} min-h-[72px] resize-y`}
                   value={form.note}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, note: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
                   placeholder="Ghi chú nội bộ…"
                 />
               </Field>
@@ -591,13 +626,7 @@ export function EditProductDialog({
   );
 }
 
-function FormSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-border/70 bg-surface-strong/25 px-3.5 py-3">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">
@@ -619,9 +648,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className ?? ""}`}>
-      <span className="text-[11px] font-medium text-muted-foreground">
-        {label}
-      </span>
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
   );

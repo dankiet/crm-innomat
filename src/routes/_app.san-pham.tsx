@@ -461,15 +461,22 @@ function ProductsPage() {
 
   // Input search dùng local state + debounce vào URL để đỡ giật
   const [searchDraft, setSearchDraft] = useState(qParam);
-  useEffect(() => setSearchDraft(qParam), [qParam]);
+  const committedSearchRef = useRef(qParam);
+  useEffect(() => {
+    if (qParam === committedSearchRef.current) return;
+    committedSearchRef.current = qParam;
+    setSearchDraft(qParam);
+  }, [qParam]);
 
   useEffect(() => {
     if (searchDraft === (qParam ?? "")) return;
     const t = setTimeout(() => {
+      const committedSearch = searchDraft.trim();
+      committedSearchRef.current = committedSearch;
       navigate({
         search: (prev: SanPhamSearch) => ({
           ...prev,
-          q: searchDraft.trim() ? searchDraft : undefined,
+          q: committedSearch || undefined,
         }),
         replace: true,
       });
