@@ -6,13 +6,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  bulkUpdateProductFieldFn,
-  clearProductFieldValueFn,
-  fetchProductFieldValues,
-} from "@/api/functions";
+import { bulkUpdateProductFieldFn, fetchProductFieldValues } from "@/api/functions";
 import { PRODUCT_COLORS } from "@/lib/types";
-import { Combobox } from "@/components/ui/combobox";
 import { toast } from "sonner";
 
 const FIELD_OPTIONS = [
@@ -34,12 +29,7 @@ type Props = {
   onDone: () => void;
 };
 
-export function BulkEditFieldDialog({
-  open,
-  onOpenChange,
-  productIds,
-  onDone,
-}: Props) {
+export function BulkEditFieldDialog({ open, onOpenChange, productIds, onDone }: Props) {
   const [field, setField] = useState<BulkField>("supplier");
   const [value, setValue] = useState("");
   const [options, setOptions] = useState<string[]>([]);
@@ -53,11 +43,7 @@ export function BulkEditFieldDialog({
   function loadOptions() {
     return fetchProductFieldValues({ data: { field } })
       .then((vals) => {
-        setOptions(
-          field === "color"
-            ? Array.from(new Set([...PRODUCT_COLORS, ...vals]))
-            : vals,
-        );
+        setOptions(field === "color" ? Array.from(new Set([...PRODUCT_COLORS, ...vals])) : vals);
       })
       .catch(() => {
         setOptions([]);
@@ -69,17 +55,6 @@ export function BulkEditFieldDialog({
     loadOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, field]);
-
-  async function handleDeleteOption(v: string) {
-    try {
-      const result = await clearProductFieldValueFn({ data: { field, value: v } });
-      toast.success(`Đã xóa "${v}" khỏi ${result.updated} sản phẩm`);
-      if (value === v) setValue("");
-      await loadOptions();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể xóa giá trị");
-    }
-  }
 
   async function handleApply(clear = false) {
     const trimmed = clear ? "" : value.trim();
@@ -117,49 +92,51 @@ export function BulkEditFieldDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Gán giá trị hàng loạt</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 py-1">
+        <div className="space-y-4 py-1">
           <p className="text-sm text-muted-foreground">
-            Áp dụng cho <b className="text-foreground">{productIds.length}</b>{" "}
-            sản phẩm đã chọn.
+            Áp dụng cho <b className="text-foreground">{productIds.length}</b> sản phẩm đã chọn.
           </p>
 
-          <label className="block">
-            <span className="text-[11px] font-medium text-muted-foreground">
-              Trường dữ liệu
-            </span>
-            <select
-              className="mt-1 w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground"
-              value={field}
-              onChange={(e) => setField(e.target.value as BulkField)}
-            >
-              {FIELD_OPTIONS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="grid gap-4">
+            <label className="block">
+              <span className="text-[11px] font-medium text-muted-foreground">Trường dữ liệu</span>
+              <select
+                className="mt-1 w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground"
+                value={field}
+                onChange={(e) => setField(e.target.value as BulkField)}
+              >
+                {FIELD_OPTIONS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="block">
-            <span className="text-[11px] font-medium text-muted-foreground">
-              Giá trị mới cho {fieldLabel}
-            </span>
-            <div className="mt-1">
-              <Combobox
-                options={options}
+            <label className="block">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Giá trị mới cho {fieldLabel}
+              </span>
+              <input
+                list={`bulk-field-options-${field}`}
                 value={value}
-                onChange={setValue}
-                placeholder="Chọn hoặc gõ giá trị mới…"
-                onDeleteOption={handleDeleteOption}
-                nonDeletableOptions={field === "color" ? PRODUCT_COLORS : undefined}
+                onChange={(event) => setValue(event.target.value)}
+                placeholder="Gõ để tìm hoặc nhập giá trị mới…"
+                autoComplete="off"
+                className="mt-1 h-10 w-full rounded-md bg-background px-3 text-sm text-foreground ring-1 ring-black/10 outline-none placeholder:text-muted-foreground focus:ring-terracotta/40"
               />
-            </div>
-          </label>
+              <datalist id={`bulk-field-options-${field}`}>
+                {options.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </label>
+          </div>
         </div>
 
         <DialogFooter className="flex-wrap gap-2">

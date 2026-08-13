@@ -187,6 +187,17 @@ export async function addGalleryProductImages(input: {
         )
         .run(input.collectionId, nextSort, nowLocal(), ...(chunk as SqlValue[]));
       added += result.changes;
+      await tx
+        .prepare(
+          `UPDATE products
+           SET collections = ?
+           WHERE id IN (
+             SELECT DISTINCT product_id
+             FROM product_images
+             WHERE id IN (${placeholders})
+           )`,
+        )
+        .run(collection.name, ...(chunk as SqlValue[]));
       nextSort += chunk.length;
     }
 

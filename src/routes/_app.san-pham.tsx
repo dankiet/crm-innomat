@@ -144,6 +144,22 @@ function parsePriceKind(v: unknown): PriceKind | undefined {
 
 /** Nhóm facet — dùng khi tính options: loại facet của chính nhóm đó ra khỏi bộ lọc. */
 type FacetKey = "color" | "surface" | "size" | "shape" | "effect" | "collection" | "material";
+const BLANK_FILTER_VALUE = "__blank__";
+
+function matchesFacet(values: Set<string>, value: string | null | undefined): boolean {
+  if (!values.size) return true;
+  const normalized = (value || "").trim();
+  return normalized ? values.has(normalized) : values.has(BLANK_FILTER_VALUE);
+}
+
+function addFacetCount(map: Map<string, number>, value: string | null | undefined): void {
+  const key = (value || "").trim() || BLANK_FILTER_VALUE;
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function toFacetOption([value, count]: [string, number]) {
+  return { value, count, label: value === BLANK_FILTER_VALUE ? "Blank" : value };
+}
 
 type ProductSort =
   | "default"
@@ -525,13 +541,13 @@ function ProductsPage() {
           if (minParam && price < minParam) return false;
           if (maxParam && price > maxParam) return false;
         }
-        if (exclude !== "color" && colorSet.size && !colorSet.has((p.color || "").trim())) return false;
-        if (exclude !== "surface" && surfaceSet.size && !surfaceSet.has((p.surface || "").trim())) return false;
-        if (exclude !== "size" && sizeSet.size && !sizeSet.has((p.size || "").trim())) return false;
-        if (exclude !== "shape" && shapeSet.size && !shapeSet.has((p.shape || "").trim())) return false;
-        if (exclude !== "effect" && effectSet.size && !effectSet.has((p.collections || "").trim())) return false;
-        if (exclude !== "collection" && collectionSet.size && !collectionSet.has((p.supplier || "").trim())) return false;
-        if (exclude !== "material" && materialSet.size && !materialSet.has((p.material || "").trim())) return false;
+        if (exclude !== "color" && !matchesFacet(colorSet, p.color)) return false;
+        if (exclude !== "surface" && !matchesFacet(surfaceSet, p.surface)) return false;
+        if (exclude !== "size" && !matchesFacet(sizeSet, p.size)) return false;
+        if (exclude !== "shape" && !matchesFacet(shapeSet, p.shape)) return false;
+        if (exclude !== "effect" && !matchesFacet(effectSet, p.collections)) return false;
+        if (exclude !== "collection" && !matchesFacet(collectionSet, p.supplier)) return false;
+        if (exclude !== "material" && !matchesFacet(materialSet, p.material)) return false;
         if (hotParam && !p.is_hot) return false;
         if (!q) return true;
         if (isSizeQuery) return false;
@@ -570,85 +586,71 @@ function ProductsPage() {
   const colorOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("color")) {
-      const c = (p.color || "").trim();
-      if (!c) continue;
-      map.set(c, (map.get(c) ?? 0) + 1);
+      addFacetCount(map, p.color);
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0], "vi"))
-      .map(([value, count]) => ({ value, count }));
+      .map(toFacetOption);
   }, [matchIndexed]);
 
   const surfaceOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("surface")) {
-      const s = (p.surface || "").trim();
-      if (!s) continue;
-      map.set(s, (map.get(s) ?? 0) + 1);
+      addFacetCount(map, p.surface);
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([value, count]) => ({ value, count }));
+      .map(toFacetOption);
   }, [matchIndexed]);
 
   const sizeOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("size")) {
-      const s = (p.size || "").trim();
-      if (!s) continue;
-      map.set(s, (map.get(s) ?? 0) + 1);
+      addFacetCount(map, p.size);
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0], "vi", { numeric: true }))
-      .map(([value, count]) => ({ value, count }));
+      .map(toFacetOption);
   }, [matchIndexed]);
 
   const shapeOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("shape")) {
-      const s = (p.shape || "").trim();
-      if (!s) continue;
-      map.set(s, (map.get(s) ?? 0) + 1);
+      addFacetCount(map, p.shape);
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0], "vi"))
-      .map(([value, count]) => ({ value, count }));
+      .map(toFacetOption);
   }, [matchIndexed]);
 
   const effectOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("effect")) {
-      const e = (p.collections || "").trim();
-      if (!e) continue;
-      map.set(e, (map.get(e) ?? 0) + 1);
+      addFacetCount(map, p.collections);
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([value, count]) => ({ value, count }));
+      .map(toFacetOption);
   }, [matchIndexed]);
 
   const collectionOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("collection")) {
-      const c = (p.supplier || "").trim();
-      if (!c) continue;
-      map.set(c, (map.get(c) ?? 0) + 1);
+      addFacetCount(map, p.supplier);
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0], "vi"))
-      .map(([value, count]) => ({ value, count }));
+      .map(toFacetOption);
   }, [matchIndexed]);
 
   const materialOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("material")) {
-      const m = (p.material || "").trim();
-      if (!m) continue;
-      map.set(m, (map.get(m) ?? 0) + 1);
+      addFacetCount(map, p.material);
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0], "vi"))
-      .map(([value, count]) => ({ value, count }));
+      .map(toFacetOption);
   }, [matchIndexed]);
 
   const hotInScope = useMemo(
@@ -924,7 +926,7 @@ function ProductsPage() {
 
   async function bulkCopyCodes() {
     if (!selectedProducts.length) return;
-    const text = selectedProducts.map((p) => p.code).join("\n");
+    const text = [...new Set(selectedProducts.map((product) => product.code.trim()).filter(Boolean))].join(" ");
     try {
       await navigator.clipboard.writeText(text);
       toast.success(`Đã copy ${selectedProducts.length} mã`);

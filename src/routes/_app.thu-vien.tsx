@@ -19,9 +19,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowUpDown,
   Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
   GripVertical,
   FolderPlus,
   ImagePlus,
@@ -81,14 +83,7 @@ type CollectionDetail = {
 };
 
 type FacetKey =
-  | "category"
-  | "supplier"
-  | "color"
-  | "surface"
-  | "size"
-  | "shape"
-  | "collections"
-  | "material";
+  "category" | "supplier" | "color" | "surface" | "size" | "shape" | "collections" | "material";
 
 const FACETS: Array<{ key: FacetKey; label: string }> = [
   { key: "category", label: "Nhóm" },
@@ -114,6 +109,20 @@ function normalizeSearchText(value: string): string {
     .trim();
 }
 
+async function copyProductCodes(codes: string[], successMessage: string): Promise<void> {
+  const text = [...new Set(codes.map((code) => code.trim()).filter(Boolean))].join(" ");
+  if (!text) {
+    toast.error("Không có mã sản phẩm để copy");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(successMessage);
+  } catch {
+    toast.error("Không copy được mã sản phẩm");
+  }
+}
+
 function GalleryPage() {
   const router = useRouter();
   const loaderData = Route.useLoaderData() as {
@@ -132,7 +141,32 @@ function GalleryPage() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "created_at">("name");
+  const deferredSearch = useDeferredValue(search);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const sortedCollections = useMemo(() => {
+    const needle = normalizeSearchText(deferredSearch);
+    const matchingCollectionNames = needle
+      ? new Set(
+          loaderData.candidates
+            .filter((candidate) => normalizeSearchText(candidate.code).includes(needle))
+            .map((candidate) => candidate.collections),
+        )
+      : null;
+    return collections
+      .filter(
+        (collection) =>
+          !needle ||
+          normalizeSearchText(collection.name).includes(needle) ||
+          matchingCollectionNames?.has(collection.name),
+      )
+      .sort((left, right) =>
+        sortBy === "name"
+          ? left.name.localeCompare(right.name, "vi", { sensitivity: "base" })
+          : new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+      );
+  }, [collections, deferredSearch, loaderData.candidates, sortBy]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
@@ -156,6 +190,19 @@ function GalleryPage() {
       setSelectedId(null);
     } finally {
       setLoadingDetail(false);
+    }
+  }
+
+  async function copyCollectionCodes(collection: GalleryCollection) {
+    setBusy(true);
+    try {
+      const result = await fetchGalleryCollection({ data: { id: collection.id } });
+      const codes = result.items.map((item) => item.product_code);
+      await copyProductCodes(codes, `Đã copy mã sản phẩm của ${collection.name}`);
+    } catch (error) {
+      toast.error(errorMessage(error, "Không tải được mã sản phẩm"));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -298,33 +345,48 @@ function GalleryPage() {
                 detail.collection.description || `${detail.items.length} ảnh trong bộ sưu tập`
               }
               actions={
-                isAdmin ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setPickerOpen(true)}
-                      className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-terracotta px-3 text-xs font-medium text-primary-foreground sm:h-9 sm:flex-none"
-                    >
-                      <ImagePlus className="size-4" /> Chọn ảnh sản phẩm
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => uploadRef.current?.click()}
-                      className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-strong disabled:opacity-50 sm:h-9 sm:flex-none"
-                    >
-                      <Upload className="size-4" /> Upload ảnh
-                    </button>
-                    <input
-                      ref={uploadRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      hidden
-                      onChange={(event) => void uploadFiles(event.target.files)}
-                    />
-                  </>
-                ) : null
+                <>
+                  <button
+                    type="button"
+                    disabled={!detail.items.some((item) => item.product_code)}
+                    onClick={() =>
+                      void copyProductCodes(
+                        detail.items.map((item) => item.product_code),
+                        `Đã copy toàn bộ mã trong ${detail.collection.name}`,
+                      )
+                    }
+                    className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-strong disabled:opacity-40 sm:h-9 sm:flex-none"
+                  >
+                    <Copy className="size-4" /> Copy toàn bộ mã
+                  </button>
+                  {isAdmin ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setPickerOpen(true)}
+                        className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-terracotta px-3 text-xs font-medium text-primary-foreground sm:h-9 sm:flex-none"
+                      >
+                        <ImagePlus className="size-4" /> Chọn ảnh sản phẩm
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => uploadRef.current?.click()}
+                        className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-medium hover:bg-surface-strong disabled:opacity-50 sm:h-9 sm:flex-none"
+                      >
+                        <Upload className="size-4" /> Upload ảnh
+                      </button>
+                      <input
+                        ref={uploadRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        hidden
+                        onChange={(event) => void uploadFiles(event.target.files)}
+                      />
+                    </>
+                  ) : null}
+                </>
               }
             />
             {detail.items.length ? (
@@ -393,7 +455,7 @@ function GalleryPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Thư viện"
         description="Tạo bộ sưu tập từ ảnh sản phẩm hoặc upload ảnh riêng. Ảnh được chuẩn hóa WebP và chỉ xóa khỏi Storage khi hết mọi tham chiếu."
@@ -413,8 +475,33 @@ function GalleryPage() {
         }
       />
       {collections.length ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-          {collections.map((collection) => (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <label className="relative inline-flex items-center">
+            <ArrowUpDown className="pointer-events-none absolute left-3 size-3.5 text-muted-foreground" />
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value as "name" | "created_at")}
+              className="h-9 rounded-lg border border-border bg-card pl-9 pr-3 text-xs font-medium outline-none"
+              aria-label="Sắp xếp bộ sưu tập"
+            >
+              <option value="name">Theo tên</option>
+              <option value="created_at">Theo ngày tạo</option>
+            </select>
+          </label>
+          <label className="relative min-w-56 flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Tìm tên thư viện hoặc mã sản phẩm..."
+              className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/10"
+            />
+          </label>
+        </div>
+      ) : null}
+      {sortedCollections.length ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          {sortedCollections.map((collection) => (
             <article
               key={collection.id}
               className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
@@ -424,7 +511,7 @@ function GalleryPage() {
                 onClick={() => void openCollection(collection.id)}
                 className="block w-full text-left"
               >
-                <div className="aspect-[4/3] bg-white">
+                <div className="aspect-[16/10] bg-white">
                   <ProductImage
                     src={collection.cover_path}
                     alt={collection.name}
@@ -432,20 +519,30 @@ function GalleryPage() {
                     placeholderClassName="bg-surface-strong/40"
                   />
                 </div>
-                <div className="space-y-1 p-4">
+                <div className="min-w-0 space-y-1 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="truncate text-sm font-medium">{collection.name}</h2>
                     <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[10px] text-muted-foreground">
                       {collection.item_count} ảnh
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-8 text-xs text-muted-foreground">
+                  <p className="line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">
                     {collection.description || "Chưa có mô tả"}
                   </p>
                 </div>
               </button>
               {isAdmin ? (
                 <div className="flex justify-end gap-1 border-t border-border px-3 py-2">
+                  <button
+                    type="button"
+                    disabled={busy || collection.item_count === 0}
+                    onClick={() => void copyCollectionCodes(collection)}
+                    className="grid size-10 place-items-center rounded-lg text-muted-foreground hover:bg-surface-strong hover:text-foreground disabled:opacity-40"
+                    aria-label={`Copy toàn bộ mã sản phẩm của ${collection.name}`}
+                    title="Copy toàn bộ mã sản phẩm"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
                   <button
                     type="button"
                     disabled={busy}
@@ -468,7 +565,20 @@ function GalleryPage() {
                     <Trash2 className="size-3.5" />
                   </button>
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex justify-end border-t border-border px-3 py-2">
+                  <button
+                    type="button"
+                    disabled={busy || collection.item_count === 0}
+                    onClick={() => void copyCollectionCodes(collection)}
+                    className="grid size-10 place-items-center rounded-lg text-muted-foreground hover:bg-surface-strong hover:text-foreground disabled:opacity-40"
+                    aria-label={`Copy toàn bộ mã sản phẩm của ${collection.name}`}
+                    title="Copy toàn bộ mã sản phẩm"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              )}
             </article>
           ))}
         </div>
@@ -553,9 +663,24 @@ function SortableGalleryCard({
       </button>
       <div className="space-y-2 p-2.5 sm:p-3">
         <div className="min-h-9">
-          <p className="truncate text-xs font-medium">
-            {item.product_code || item.caption || "Ảnh tải lên"}
-          </p>
+          <div className="flex items-center gap-1">
+            <p className="min-w-0 flex-1 truncate text-xs font-medium">
+              {item.product_code || item.caption || "Ảnh tải lên"}
+            </p>
+            {item.product_code ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void copyProductCodes([item.product_code], `Đã copy ${item.product_code}`)
+                }
+                className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-strong hover:text-foreground"
+                aria-label={`Copy mã ${item.product_code}`}
+                title="Copy mã sản phẩm"
+              >
+                <Copy className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
           <p className="truncate text-[11px] text-muted-foreground">
             {item.product_name || item.caption || "Không gắn sản phẩm"}
           </p>
@@ -861,15 +986,19 @@ function ImagePickerDialog({
       const productsByValue = new Map<string, Set<number>>();
       for (const row of available) {
         const searchable = normalizeSearchText(
-          [row.code, row.name, row.internal_codes, row.caption, ...FACETS.map(({ key }) => row[key])]
+          [
+            row.code,
+            row.name,
+            row.internal_codes,
+            row.caption,
+            ...FACETS.map(({ key }) => row[key]),
+          ]
             .filter(Boolean)
             .join(" "),
         );
         if (needle && !searchable.includes(needle)) continue;
         if (
-          FACETS.some(
-            ({ key }) => key !== facet.key && filters[key] && row[key] !== filters[key],
-          )
+          FACETS.some(({ key }) => key !== facet.key && filters[key] && row[key] !== filters[key])
         ) {
           continue;
         }
