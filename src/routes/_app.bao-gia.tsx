@@ -451,7 +451,10 @@ function QuotesPage() {
         open={editQuoteId != null}
         quoteId={editQuoteId}
         onOpenChange={(o) => {
-          if (!o) setEditQuoteId(null);
+          if (!o) {
+            setEditQuoteId(null);
+            void router.invalidate();
+          }
         }}
       />
 

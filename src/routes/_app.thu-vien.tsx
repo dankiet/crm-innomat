@@ -82,22 +82,22 @@ type CollectionDetail = {
 
 type FacetKey =
   | "category"
-  | "collections"
+  | "supplier"
   | "color"
   | "surface"
   | "size"
   | "shape"
-  | "finish_effect"
+  | "collections"
   | "material";
 
 const FACETS: Array<{ key: FacetKey; label: string }> = [
   { key: "category", label: "Nhóm" },
-  { key: "collections", label: "Dòng SP" },
+  { key: "supplier", label: "Nh\u00e0 cung c\u1ea5p" },
   { key: "color", label: "Màu" },
   { key: "surface", label: "Bề mặt" },
   { key: "size", label: "Kích thước" },
   { key: "shape", label: "Kiểu dáng" },
-  { key: "finish_effect", label: "Hiệu ứng" },
+  { key: "collections", label: "B\u1ed9 s\u01b0u t\u1eadp" },
   { key: "material", label: "Chất liệu" },
 ];
 
@@ -855,14 +855,36 @@ function ImagePickerDialog({
     [candidates, existingPaths],
   );
   const options = useMemo(() => {
-    const result = {} as Record<FacetKey, string[]>;
+    const needle = normalizeSearchText(deferredQuery);
+    const result = {} as Record<FacetKey, Array<{ value: string; count: number }>>;
     for (const facet of FACETS) {
-      result[facet.key] = [...new Set(available.map((row) => row[facet.key]).filter(Boolean))].sort(
-        (a, b) => a.localeCompare(b, "vi"),
-      );
+      const productsByValue = new Map<string, Set<number>>();
+      for (const row of available) {
+        const searchable = normalizeSearchText(
+          [row.code, row.name, row.internal_codes, row.caption, ...FACETS.map(({ key }) => row[key])]
+            .filter(Boolean)
+            .join(" "),
+        );
+        if (needle && !searchable.includes(needle)) continue;
+        if (
+          FACETS.some(
+            ({ key }) => key !== facet.key && filters[key] && row[key] !== filters[key],
+          )
+        ) {
+          continue;
+        }
+        const value = row[facet.key]?.trim();
+        if (!value) continue;
+        const productIds = productsByValue.get(value) ?? new Set<number>();
+        productIds.add(row.product_id);
+        productsByValue.set(value, productIds);
+      }
+      result[facet.key] = [...productsByValue.entries()]
+        .map(([value, productIds]) => ({ value, count: productIds.size }))
+        .sort((a, b) => a.value.localeCompare(b.value, "vi"));
     }
     return result;
-  }, [available]);
+  }, [available, deferredQuery, filters]);
   const filtered = useMemo(() => {
     const needle = normalizeSearchText(deferredQuery);
     const matches = available.filter((row) => {
@@ -973,7 +995,9 @@ function ImagePickerDialog({
               >
                 <option value="">{facet.label}</option>
                 {options[facet.key].map((option) => (
-                  <option key={option}>{option}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.value} ({option.count})
+                  </option>
                 ))}
               </select>
             ))}

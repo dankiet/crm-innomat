@@ -625,10 +625,12 @@ function PipelinePage() {
       <NewQuoteDialog
         open={quoteCustomerId != null}
         onOpenChange={(o) => {
-          if (!o) setQuoteCustomerId(null);
+          if (!o) {
+            setQuoteCustomerId(null);
+            void router.invalidate();
+          }
         }}
         defaultCustomerId={quoteCustomerId ?? undefined}
-        onCreated={refresh}
       />
     </>
   );

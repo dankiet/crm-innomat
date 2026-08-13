@@ -1090,17 +1090,21 @@ function CustomerDetailPage() {
       />
       <NewQuoteDialog
         open={quoteOpen}
-        onOpenChange={setQuoteOpen}
+        onOpenChange={(o) => {
+          setQuoteOpen(o);
+          if (!o) void router.invalidate();
+        }}
         defaultCustomerId={c.id}
-        onCreated={refresh}
       />
       <NewQuoteDialog
         open={editQuoteId != null}
         quoteId={editQuoteId}
         onOpenChange={(o) => {
-          if (!o) setEditQuoteId(null);
+          if (!o) {
+            setEditQuoteId(null);
+            void router.invalidate();
+          }
         }}
-        onCreated={refresh}
       />
       <ExportQuoteDialog
         open={exportQuote != null}

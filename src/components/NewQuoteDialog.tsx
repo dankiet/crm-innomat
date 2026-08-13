@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
   Dialog,
@@ -13,6 +13,8 @@ import {
   saveQuote,
   updateQuoteFn,
   convertQuoteToOrder,
+  deleteQuoteFn,
+  exportQuotePrintFn,
 } from "@/api/functions";
 import type {
   Customer,
@@ -29,7 +31,7 @@ import {
   unitPriceForProduct,
 } from "@/lib/pricing";
 import { toast } from "sonner";
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Thumbnail gọn cho form BG — có ảnh thì hiện; lỗi/không có thì ô xám (không icon vỡ layout). */
@@ -101,7 +103,10 @@ function calcUnit(
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated?: () => void;
+  /** Được gọi sau khi lưu thành công — kèm bản ghi vừa tạo/cập nhật */
+  onCreated?: (quote: Quote) => void;
+  /** Được gọi sau khi xóa báo giá thành công */
+  onDeleted?: () => void;
   defaultCustomerId?: number;
   /** Prefill dòng SP (vd. chọn nhanh từ catalog) */
   defaultProductIds?: number[];
@@ -113,12 +118,18 @@ export function NewQuoteDialog({
   open,
   onOpenChange,
   onCreated,
+  onDeleted,
   defaultCustomerId,
   defaultProductIds,
   quoteId = null,
 }: Props) {
   const router = useRouter();
-  const isEdit = Boolean(quoteId);
+  /** Bản ghi vừa tạo khi giữ popup mở — sau lần lưu đầu, các lần lưu sau update bản ghi này */
+  const [savedQuote, setSavedQuote] = useState<Quote | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const activeQuoteId = quoteId ?? savedQuote?.id ?? null;
+  const isEdit = Boolean(activeQuoteId);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customerId, setCustomerId] = useState<number | "">("");
@@ -144,21 +155,27 @@ export function NewQuoteDialog({
   const [locked, setLocked] = useState(false);
   /** Hiện ô sửa mã/tên trên BG (mặc định ẩn — dùng giá trị tự điền từ catalog) */
   const [editQuoteLabels, setEditQuoteLabels] = useState(false);
+  /** Xác nhận xóa 2 bước inline (thay window.confirm) */
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Hiện check V trong nút Lưu sau khi lưu xong (thay toast) */
+  const [justSaved, setJustSaved] = useState(false);
+  const savedTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setConfirmDelete(false);
     void (async () => {
       setLoadingEdit(true);
       try {
-        const [cs, ps] = await Promise.all([
+        const [cs, ps, detail] = await Promise.all([
           fetchCustomers(),
           fetchProducts({ data: { limit: 2000 } }),
+          quoteId ? fetchQuote({ data: { id: quoteId } }) : Promise.resolve(null),
         ]);
         setCustomers(cs);
         setProducts(ps);
 
         if (quoteId) {
-          const detail = await fetchQuote({ data: { id: quoteId } });
           if (!detail) {
             toast.error("Không tìm thấy báo giá");
             onOpenChange(false);
@@ -190,7 +207,7 @@ export function NewQuoteDialog({
                 size: item.size,
                 material: "",
                 category: "",
-                collections: "",
+                supplier: "",
 
                 color: "",
                 retail_price: item.retail_price,
@@ -223,6 +240,7 @@ export function NewQuoteDialog({
           );
           setEditQuoteLabels(customized);
         } else {
+          setSavedQuote(null);
           setSourceMapping(null);
           setQuoteCode("");
           setCustomerId(defaultCustomerId ?? "");
@@ -355,15 +373,14 @@ export function NewQuoteDialog({
     return hasData ? sum : null;
   }, [lines, pricesIncludeVat]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveCurrentQuote(): Promise<Quote | null> {
     if (locked) {
       toast.error("Báo giá đã chốt/hết hạn — không thể sửa");
-      return;
+      return null;
     }
     if (!customerId) {
       toast.error("Chọn khách hàng");
-      return;
+      return null;
     }
     const items = lines
       .filter((l) => l.product && l.quantity_m2 > 0)
@@ -378,14 +395,15 @@ export function NewQuoteDialog({
       }));
     if (!items.length) {
       toast.error("Thêm ít nhất 1 sản phẩm với số lượng m²");
-      return;
+      return null;
     }
     setSaving(true);
     try {
-      if (isEdit && quoteId) {
-        const quote = await updateQuoteFn({
+      let quote: Quote;
+      if (activeQuoteId) {
+        quote = await updateQuoteFn({
           data: {
-            id: quoteId,
+            id: activeQuoteId,
             customer_id: Number(customerId),
             discount_type: discountType,
             status,
@@ -395,14 +413,8 @@ export function NewQuoteDialog({
             items,
           },
         });
-        if (alsoCreateOrder) {
-          await convertQuoteToOrder({ data: { quoteId: quote.id } });
-          toast.success(`Đã cập nhật ${quote.code} và tạo đơn hàng`);
-        } else {
-          toast.success(`Đã cập nhật báo giá ${quote.code}`);
-        }
       } else {
-        const quote = await saveQuote({
+        quote = await saveQuote({
           data: {
             customer_id: Number(customerId),
             discount_type: discountType,
@@ -412,36 +424,144 @@ export function NewQuoteDialog({
             items,
           },
         });
-        if (alsoCreateOrder) {
-          await convertQuoteToOrder({ data: { quoteId: quote.id } });
-          toast.success(`Đã tạo báo giá ${quote.code} và đơn hàng`);
-        } else {
-          toast.success(`Đã tạo báo giá ${quote.code}`);
-        }
+        // Chuyển sang trạng thái sửa bản ghi vừa tạo — popup vẫn mở
+        setSavedQuote(quote);
+        setQuoteCode(quote.code);
       }
-      setLines([emptyLine()]);
-      setNotes("");
-      setShippingFee(0);
+      if (alsoCreateOrder) {
+        await convertQuoteToOrder({ data: { quoteId: quote.id } });
+      }
       setAlsoCreateOrder(false);
-      onOpenChange(false);
-      onCreated?.();
-      await router.invalidate();
+      return quote;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi lưu báo giá");
+      return null;
     } finally {
       setSaving(false);
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const quote = await saveCurrentQuote();
+    if (!quote) return;
+    onCreated?.(quote);
+    setJustSaved(true);
+    if (savedTimer.current) window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setJustSaved(false), 1500);
+  }
+
+  async function handleExportPdf() {
+    if (!activeQuoteId) return;
+    setExporting(true);
+    try {
+      const file = await exportQuotePrintFn({
+        data: { quoteId: activeQuoteId },
+      });
+      const binary = atob(file.base64);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(
+        new Blob([bytes], { type: file.mimeType }),
+      );
+      if (!window.open(url, "_blank"))
+        toast.error("Trình duyệt đang chặn cửa sổ xuất tài liệu");
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Xuất PDF thất bại");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!activeQuoteId) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteQuoteFn({ data: { id: activeQuoteId } });
+      toast.success("Đã xóa báo giá");
+    setConfirmDelete(false);
+    setJustSaved(false);
+      onDeleted?.();
+      onOpenChange(false);
+      await router.invalidate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Xóa báo giá thất bại");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function closeDialog(nextOpen: boolean) {
+    if (!nextOpen && (saving || exporting || deleting)) return;
+    onOpenChange(nextOpen);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+    <Dialog open={open} onOpenChange={closeDialog}>
+      <DialogContent
+        className="sm:max-w-3xl max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 flex-shrink-0">
-          <DialogTitle>
-            {isEdit
-              ? `Sửa báo giá${quoteCode ? ` ${quoteCode}` : ""}`
-              : "Tạo báo giá"}
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-3 pr-8">
+            <DialogTitle>
+              {isEdit
+                ? `Sửa báo giá${quoteCode ? ` ${quoteCode}` : ""}`
+                : "Tạo báo giá"}
+            </DialogTitle>
+            {activeQuoteId ? (
+              <div className="relative flex items-center rounded-lg border border-border/70 bg-card p-0.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => void handleExportPdf()}
+                  disabled={saving || exporting || deleting}
+                  className="h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 hover:bg-surface-strong disabled:opacity-50"
+                >
+                  {exporting ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <FileDown className="size-3.5" />
+                  )}
+                  <span className="hidden sm:inline">Xuất PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  disabled={saving || exporting || deleting}
+                  aria-label="Xóa báo giá"
+                  className={
+                    confirmDelete
+                      ? "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                      : "size-8 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  }
+                >
+                  {deleting ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
+                  {confirmDelete ? (
+                    <span className="hidden sm:inline">Xóa vĩnh viễn</span>
+                  ) : null}
+                </button>
+                {confirmDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={deleting}
+                    className="h-8 px-2.5 rounded-md text-xs font-medium bg-card hover:bg-surface-strong disabled:opacity-50"
+                  >
+                    Không xóa
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </DialogHeader>
 
         {/* ── Product picker overlay ── render as sibling INSIDE DialogContent
@@ -523,9 +643,14 @@ export function NewQuoteDialog({
         })()}
 
         {loadingEdit ? (
-          <p className="text-sm text-muted-foreground py-8 text-center px-4">
-            Đang tải...
-          </p>
+          <div className="flex-1 min-h-0 animate-in fade-in duration-150 px-4 sm:px-6 py-4 space-y-4" aria-label="Đang tải báo giá">
+            <div className="h-10 rounded-lg bg-surface-strong/70 animate-pulse" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-16 rounded-lg bg-surface-strong/60 animate-pulse" />
+              <div className="h-16 rounded-lg bg-surface-strong/60 animate-pulse" />
+            </div>
+            <div className="h-44 rounded-xl bg-surface-strong/50 animate-pulse" />
+          </div>
         ) : (
         <form
           onSubmit={handleSubmit}
@@ -1142,22 +1267,34 @@ export function NewQuoteDialog({
               <div className="flex items-center gap-1.5 ml-auto">
                 <button
                   type="button"
-                  onClick={() => onOpenChange(false)}
-                  className="h-8 px-3 rounded-lg text-xs font-medium ring-1 ring-black/5 bg-card hover:bg-surface-strong"
+                  onClick={() => closeDialog(false)}
+                  disabled={saving || exporting || deleting}
+                  className="h-8 px-3 rounded-lg text-xs font-medium ring-1 ring-black/5 bg-card hover:bg-surface-strong disabled:opacity-50"
                 >
-                  {locked ? "Đóng" : "Huỷ"}
+                  Đóng
                 </button>
                 {!locked ? (
                   <button
                     type="submit"
-                    disabled={saving}
-                    className="h-8 px-3 rounded-lg text-xs font-medium text-primary-foreground bg-terracotta hover:opacity-90 disabled:opacity-50"
+                    disabled={saving || exporting || deleting}
+                    className={
+                      "h-8 px-3 rounded-lg text-xs font-medium text-primary-foreground " +
+                      (justSaved
+                        ? "bg-green-600 hover:bg-green-600"
+                        : "bg-terracotta hover:opacity-90") +
+                      " disabled:opacity-50 inline-flex items-center justify-center relative"
+                    }
                   >
-                    {saving
-                      ? "Đang lưu..."
-                      : isEdit
-                        ? "Lưu"
-                        : "Lưu báo giá"}
+                    <span className={saving || justSaved ? "opacity-0" : ""}>
+                      {isEdit ? "Lưu" : "Lưu báo giá"}
+                    </span>
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      {saving ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : justSaved ? (
+                        <Check className="size-4" />
+                      ) : null}
+                    </span>
                   </button>
                 ) : null}
               </div>

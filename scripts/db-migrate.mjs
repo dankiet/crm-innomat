@@ -21,9 +21,16 @@ const sql = fs.readFileSync(schemaPath, "utf-8");
 const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 try {
   await client.connect();
+  await client.query("BEGIN");
   await client.query(sql);
+  await client.query("COMMIT");
   console.log(`[db:migrate] Schema applied (${schemaPath})`);
 } catch (err) {
+  try {
+    await client.query("ROLLBACK");
+  } catch {
+    // Connection may already be closed or unusable.
+  }
   console.error("[db:migrate] FAILED:", err.message);
   process.exitCode = 1;
 } finally {

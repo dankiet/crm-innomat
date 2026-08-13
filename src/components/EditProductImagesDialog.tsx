@@ -24,9 +24,15 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
+  readOnly?: boolean;
 };
 
-export function EditProductImagesDialog({ open, onOpenChange, product }: Props) {
+export function EditProductImagesDialog({
+  open,
+  onOpenChange,
+  product,
+  readOnly = false,
+}: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<ProductImageRow[]>([]);
@@ -182,7 +188,8 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
           </p>
 
           {/* Add controls */}
-          <div className="rounded-lg ring-1 ring-black/5 bg-surface-strong/30 p-3 space-y-3">
+          {!readOnly ? (
+            <div className="rounded-lg ring-1 ring-black/5 bg-surface-strong/30 p-3 space-y-3">
             <div className="flex flex-wrap items-end gap-2">
               <button
                 type="button"
@@ -233,7 +240,8 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
                 </button>
               </div>
             )}
-          </div>
+            </div>
+          ) : null}
 
           {/* Gallery */}
           {loading ? (
@@ -260,7 +268,8 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
                       </span>
                     ) : null}
                   </div>
-                  <div className="p-2 space-y-1.5">
+                  {!readOnly ? (
+                    <div className="p-2 space-y-1.5">
                     {pendingDeleteId === img.id ? (
                       <div className="space-y-1.5 rounded-md bg-destructive/5 p-1.5 ring-1 ring-destructive/15">
                         <p className="text-[10px] text-destructive">
@@ -310,7 +319,8 @@ export function EditProductImagesDialog({ open, onOpenChange, product }: Props) 
                         </button>
                       </div>
                     )}
-                  </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

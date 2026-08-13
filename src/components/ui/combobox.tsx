@@ -115,14 +115,18 @@ export function Combobox({
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+        portalled={false}
+      >
         <Command shouldFilter>
           <CommandInput
             value={query}
             onValueChange={setQuery}
             placeholder="Gõ để tìm hoặc tạo mới…"
           />
-          <CommandList>
+          <CommandList className="overscroll-contain touch-pan-y">
             {showCreate ? (
               <CommandGroup>
                 <CommandItem value={`__create__${trimmedQuery}`} onSelect={() => selectValue(trimmedQuery)}>

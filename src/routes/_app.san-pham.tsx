@@ -257,9 +257,9 @@ type SanPhamSearch = {
   /** Kiểu dáng */
   shapes?: string[];
   /** Hiệu ứng vân/mặt gạch */
-  effects?: string[];
-  /** Bộ sưu tập */
   collections?: string[];
+  /** Bộ sưu tập */
+  supplier?: string[];
   /** Chất liệu */
   materials?: string[];
   hot?: boolean;
@@ -287,12 +287,12 @@ export const Route = createFileRoute("/_app/san-pham")({
     shapes: Array.isArray(search.shapes)
       ? (search.shapes as string[])
       : parseCsv(search.shapes),
-    effects: Array.isArray(search.effects)
-      ? (search.effects as string[])
-      : parseCsv(search.effects),
     collections: Array.isArray(search.collections)
       ? (search.collections as string[])
       : parseCsv(search.collections),
+    supplier: Array.isArray(search.supplier)
+      ? (search.supplier as string[])
+      : parseCsv(search.supplier),
     materials: Array.isArray(search.materials)
       ? (search.materials as string[])
       : parseCsv(search.materials),
@@ -429,8 +429,8 @@ function ProductsPage() {
     surfaces: surfacesParam = [],
     sizes: sizesParam = [],
     shapes: shapesParam = [],
-    effects: effectsParam = [],
-    collections: collectionsParam = [],
+    collections: effectsParam = [],
+    supplier: collectionsParam = [],
     materials: materialsParam = [],
     hot: hotParam = false,
     view: viewParam = "grid",
@@ -484,7 +484,7 @@ function ProductsPage() {
         p,
         codeHay: [p.code, p.multi_codes_list || ""].join(" ").toLowerCase(),
         nameHay: (p.name || "").toLowerCase(),
-        collectionHay: (p.collections || "").toLowerCase(),
+        collectionHay: (p.supplier || "").toLowerCase(),
       })),
     [scoped],
   );
@@ -529,8 +529,8 @@ function ProductsPage() {
         if (exclude !== "surface" && surfaceSet.size && !surfaceSet.has((p.surface || "").trim())) return false;
         if (exclude !== "size" && sizeSet.size && !sizeSet.has((p.size || "").trim())) return false;
         if (exclude !== "shape" && shapeSet.size && !shapeSet.has((p.shape || "").trim())) return false;
-        if (exclude !== "effect" && effectSet.size && !effectSet.has((p.finish_effect || "").trim())) return false;
-        if (exclude !== "collection" && collectionSet.size && !collectionSet.has((p.collections || "").trim())) return false;
+        if (exclude !== "effect" && effectSet.size && !effectSet.has((p.collections || "").trim())) return false;
+        if (exclude !== "collection" && collectionSet.size && !collectionSet.has((p.supplier || "").trim())) return false;
         if (exclude !== "material" && materialSet.size && !materialSet.has((p.material || "").trim())) return false;
         if (hotParam && !p.is_hot) return false;
         if (!q) return true;
@@ -618,7 +618,7 @@ function ProductsPage() {
   const effectOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("effect")) {
-      const e = (p.finish_effect || "").trim();
+      const e = (p.collections || "").trim();
       if (!e) continue;
       map.set(e, (map.get(e) ?? 0) + 1);
     }
@@ -630,7 +630,7 @@ function ProductsPage() {
   const collectionOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("collection")) {
-      const c = (p.collections || "").trim();
+      const c = (p.supplier || "").trim();
       if (!c) continue;
       map.set(c, (map.get(c) ?? 0) + 1);
     }
@@ -818,9 +818,9 @@ function ProductsPage() {
           delete next.surfaces;
         if (!next.sizes || next.sizes.length === 0) delete next.sizes;
         if (!next.shapes || next.shapes.length === 0) delete next.shapes;
-        if (!next.effects || next.effects.length === 0) delete next.effects;
-        if (!next.collections || next.collections.length === 0)
-          delete next.collections;
+        if (!next.collections || next.collections.length === 0) delete next.collections;
+        if (!next.supplier || next.supplier.length === 0)
+          delete next.supplier;
         if (!next.materials || next.materials.length === 0) delete next.materials;
         if (!next.hot) delete next.hot;
         if (!next.view || next.view === "grid") delete next.view;
@@ -847,8 +847,8 @@ function ProductsPage() {
       surfaces: undefined,
       sizes: undefined,
       shapes: undefined,
-      effects: undefined,
       collections: undefined,
+      supplier: undefined,
       materials: undefined,
       hot: undefined,
       stockLocation: undefined,
@@ -1213,25 +1213,25 @@ function ProductsPage() {
                 searchable
               />
             </FilterChip>
-            <FilterChip label="Hiệu ứng" count={effectsParam.length}>
+            <FilterChip label={"B\u1ed9 s\u01b0u t\u1eadp"} count={effectsParam.length}>
               <MultiSelectFilter
-                title="Chọn hiệu ứng"
+                title={"Ch\u1ecdn b\u1ed9 s\u01b0u t\u1eadp"}
                 options={effectOptions}
                 selected={effectsParam}
                 onChange={(next) =>
-                  setSearch({ effects: next.length ? next : undefined })
+                  setSearch({ collections: next.length ? next : undefined })
                 }
                 searchable
               />
             </FilterChip>
             {collectionOptions.length > 0 ? (
-              <FilterChip label="Bộ sưu tập" count={collectionsParam.length}>
+              <FilterChip label={"Nh\u00e0 cung c\u1ea5p"} count={collectionsParam.length}>
                 <MultiSelectFilter
-                  title="Chọn bộ sưu tập"
+                  title={"Ch\u1ecdn nh\u00e0 cung c\u1ea5p"}
                   options={collectionOptions}
                   selected={collectionsParam}
                   onChange={(next) =>
-                    setSearch({ collections: next.length ? next : undefined })
+                    setSearch({ supplier: next.length ? next : undefined })
                   }
                   searchable
                 />
@@ -1367,29 +1367,29 @@ function ProductsPage() {
                   searchable
                 />
               </FilterSection>
-              <FilterSection title="Hiệu ứng" count={effectsParam.length}>
+              <FilterSection title={"B\u1ed9 s\u01b0u t\u1eadp"} count={effectsParam.length}>
                 <MultiSelectFilter
-                  title="Chọn hiệu ứng"
+                  title={"Ch\u1ecdn b\u1ed9 s\u01b0u t\u1eadp"}
                   options={effectOptions}
                   selected={effectsParam}
                   onChange={(next) =>
-                    setSearch({ effects: next.length ? next : undefined })
+                    setSearch({ collections: next.length ? next : undefined })
                   }
                   searchable
                 />
               </FilterSection>
               {collectionOptions.length > 0 ? (
                 <FilterSection
-                  title="Bộ sưu tập"
+                  title={"Nh\u00e0 cung c\u1ea5p"}
                   count={collectionsParam.length}
                 >
                   <MultiSelectFilter
-                    title="Chọn bộ sưu tập"
+                    title={"Ch\u1ecdn nh\u00e0 cung c\u1ea5p"}
                     options={collectionOptions}
                     selected={collectionsParam}
                     onChange={(next) =>
                       setSearch({
-                        collections: next.length ? next : undefined,
+                        supplier: next.length ? next : undefined,
                       })
                     }
                     searchable
@@ -1493,11 +1493,11 @@ function ProductsPage() {
                 key={`effect-${e}`}
                 onClear={() =>
                   setSearch({
-                    effects: effectsParam.filter((x: string) => x !== e),
+                    collections: effectsParam.filter((x: string) => x !== e),
                   })
                 }
               >
-                Hiệu ứng: {e}
+                {"B\u1ed9 s\u01b0u t\u1eadp"}: {e}
               </ActiveTag>
             ))}
             {materialsParam.map((m: string) => (
@@ -1517,13 +1517,13 @@ function ProductsPage() {
                 key={`bst-${c}`}
                 onClear={() =>
                   setSearch({
-                    collections: collectionsParam.filter(
+                    supplier: collectionsParam.filter(
                       (x: string) => x !== c,
                     ),
                   })
                 }
               >
-                BST: {c}
+                {"Nh\u00e0 cung c\u1ea5p"}: {c}
               </ActiveTag>
             ))}
             {stockLocParam === "KHOVP" && (
@@ -1634,7 +1634,7 @@ function ProductsPage() {
               selected={selectedIds.has(t.id)}
               onToggleSelect={toggleSelect}
               onEdit={canEditProducts ? onEditProduct : undefined}
-              onImages={canEditProducts ? onImagesProduct : undefined}
+              onImages={onImagesProduct}
             />
           ))}
         </div>
@@ -1661,7 +1661,7 @@ function ProductsPage() {
               selected={selectedIds.has(t.id)}
               onToggleSelect={toggleSelect}
               onEdit={canEditProducts ? onEditProduct : undefined}
-              onImages={canEditProducts ? onImagesProduct : undefined}
+              onImages={onImagesProduct}
             />
           ))}
         </div>
@@ -1838,6 +1838,7 @@ function ProductsPage() {
           if (!o) setImagesProduct(null);
         }}
         product={imagesProduct}
+        readOnly={!canEditProducts}
       />
 
       <NewQuoteDialog
@@ -1847,7 +1848,6 @@ function ProductsPage() {
         }}
         defaultProductIds={Array.from(selectedIds)}
         onCreated={() => {
-          setQuoteFromSelection(false);
           clearSelection();
         }}
       />
@@ -1911,7 +1911,7 @@ function productMetaTags(p: Product): { kind: MetaKind; value: string }[] {
       { kind: "shape", value: p.shape },
       { kind: "material", value: p.material },
       { kind: "color", value: p.color },
-      { kind: "finish", value: p.finish_effect },
+      { kind: "finish", value: p.collections },
     ] as { kind: MetaKind; value?: string | null }[]
   )
     .map(({ kind, value }) => ({ kind, value: (value || "").trim() }))

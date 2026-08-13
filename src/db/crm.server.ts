@@ -177,7 +177,7 @@ export async function listProducts(opts?: {
   }
   if (opts?.search?.trim()) {
     where.push(
-      "(p.code LIKE ? OR pic.multi_codes_list LIKE ? OR p.name LIKE ? OR p.size LIKE ? OR p.collections LIKE ?)",
+      "(p.code LIKE ? OR pic.multi_codes_list LIKE ? OR p.name LIKE ? OR p.size LIKE ? OR p.supplier LIKE ?)",
     );
     const q = `%${opts.search.trim()}%`;
     params.push(q, q, q, q, q);
@@ -209,7 +209,7 @@ export async function listProducts(opts?: {
       GROUP BY pic.product_id
     ) pic ON pic.product_id = p.id
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-    ORDER BY p.category, p.collections, p.code
+    ORDER BY p.category, p.supplier, p.code
     ${hasLimit ? "LIMIT ?" : ""}
   `;
   return (await db
@@ -244,11 +244,11 @@ export async function getProduct(id: number): Promise<Product | null> {
 /** Field cho phép gợi ý (datalist) & bulk apply — whitelist để tránh SQL injection */
 export const PRODUCT_SUGGEST_FIELDS = [
   "color",
-  "collections",
+  "supplier",
   "category",
   "surface",
   "shape",
-  "finish_effect",
+  "collections",
   "material",
   "size",
 ] as const;
@@ -2251,10 +2251,10 @@ export type ProductUpdate = {
   material?: string;
   surface?: string;
   shape?: string;
-  finish_effect?: string;
+  collections?: string;
   unit?: string;
   category?: string;
-  collections?: string;
+  supplier?: string;
   color?: string;
   packing?: string;
   packing_m2?: number | null;
@@ -2317,9 +2317,9 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
         material = @material,
         surface = @surface,
         shape = @shape,
-        finish_effect = @finish_effect,
-        category = @category,
         collections = @collections,
+        category = @category,
+        supplier = @supplier,
         color = @color,
         packing = @packing,
         packing_m2 = @packing_m2,
@@ -2342,9 +2342,9 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       material: (input.material ?? existing.material).trim(),
       surface: (input.surface ?? existing.surface ?? "").trim(),
       shape: (input.shape ?? existing.shape ?? "").trim(),
-      finish_effect: (input.finish_effect ?? existing.finish_effect ?? "").trim(),
+      collections: (input.collections ?? existing.collections ?? "").trim(),
       category: (input.category ?? existing.category).trim(),
-      collections: (input.collections ?? existing.collections).trim(),
+      supplier: (input.supplier ?? existing.supplier).trim(),
       color: (input.color ?? existing.color ?? "").trim(),
       packing: (input.packing ?? existing.packing ?? "").trim(),
       packing_m2: input.packing_m2 !== undefined ? input.packing_m2 : existing.packing_m2,
@@ -2370,10 +2370,10 @@ export type ProductCreateInput = {
   material?: string;
   surface?: string;
   shape?: string;
-  finish_effect?: string;
+  collections?: string;
   unit?: string;
   category?: string;
-  collections?: string;
+  supplier?: string;
   color?: string;
   packing?: string;
   packing_m2?: number | null;
@@ -2418,12 +2418,12 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
   const info = await getDb()
     .prepare(
       `INSERT INTO products (
-        code, name, size, material, surface, shape, finish_effect, category, collections,
+        code, name, size, material, surface, shape, collections, category, supplier,
         color, packing, packing_m2, packing_pcs,
         retail_price, trade_price, b2b_price, discount_tp, discount_b2b,
         note, is_hot, image_path
       ) VALUES (
-        @code, @name, @size, @material, @surface, @shape, @finish_effect, @category, @collections,
+        @code, @name, @size, @material, @surface, @shape, @collections, @category, @supplier,
         @color, @packing, @packing_m2, @packing_pcs,
         @retail_price, @trade_price, @b2b_price, @discount_tp, @discount_b2b,
         @note, @is_hot, @image_path
@@ -2436,9 +2436,9 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
       material: (input.material ?? "").trim(),
       surface: (input.surface ?? "").trim(),
       shape: (input.shape ?? "").trim(),
-      finish_effect: (input.finish_effect ?? "").trim(),
-      category: (input.category ?? "").trim(),
       collections: (input.collections ?? "").trim(),
+      category: (input.category ?? "").trim(),
+      supplier: (input.supplier ?? "").trim(),
       color: (input.color ?? "").trim(),
       packing: (input.packing ?? "").trim(),
       packing_m2:

@@ -22,11 +22,11 @@ import { toast } from "sonner";
 
 const SUGGEST_FIELDS = [
   "color",
-  "collections",
+  "supplier",
   "category",
   "surface",
   "shape",
-  "finish_effect",
+  "collections",
 ] as const;
 type SuggestField = (typeof SUGGEST_FIELDS)[number];
 
@@ -54,9 +54,9 @@ export function EditProductDialog({
     material: "",
     surface: "",
     shape: "",
-    finish_effect: "",
-    category: "",
     collections: "",
+    category: "",
+    supplier: "",
     color: "",
     packing_m2: "",
     packing_pcs: "",
@@ -73,11 +73,11 @@ export function EditProductDialog({
     Record<SuggestField, string[]>
   >({
     color: [],
-    collections: [],
+    supplier: [],
     category: [],
     surface: [],
     shape: [],
-    finish_effect: [],
+    collections: [],
   });
 
   function loadFieldOptions() {
@@ -122,9 +122,9 @@ export function EditProductDialog({
       material: product.material,
       surface: product.surface || "",
       shape: product.shape || "",
-      finish_effect: product.finish_effect || "",
-      category: product.category,
       collections: product.collections || "",
+      category: product.category,
+      supplier: product.supplier || "",
       color: product.color || "",
       packing_m2: product.packing_m2 != null ? String(product.packing_m2) : "",
       packing_pcs: product.packing_pcs != null ? String(product.packing_pcs) : "",
@@ -193,8 +193,8 @@ export function EditProductDialog({
           surface: form.surface.trim(),
           shape: form.shape.trim(),
           category: form.category.trim(),
+          supplier: form.supplier.trim(),
           collections: form.collections.trim(),
-          finish_effect: form.finish_effect.trim(),
           color: form.color.trim(),
           packing_m2,
           packing_pcs,
@@ -358,21 +358,21 @@ export function EditProductDialog({
                   onDeleteOption={(v) => handleDeleteOption("category", v)}
                 />
               </Field>
-              <Field label="Bộ sưu tập">
+              <Field label={"Nh\u00e0 cung c\u1ea5p"}>
+                <Combobox
+                  value={form.supplier}
+                  onChange={(v) => setForm((f) => ({ ...f, supplier: v }))}
+                  options={fieldOptions.supplier}
+                  onDeleteOption={(v) => handleDeleteOption("supplier", v)}
+                />
+              </Field>
+              <Field label={"B\u1ed9 s\u01b0u t\u1eadp"}>
                 <Combobox
                   value={form.collections}
                   onChange={(v) => setForm((f) => ({ ...f, collections: v }))}
                   options={fieldOptions.collections}
-                  onDeleteOption={(v) => handleDeleteOption("collections", v)}
-                />
-              </Field>
-              <Field label="Hiệu ứng vân/mặt gạch">
-                <Combobox
-                  value={form.finish_effect}
-                  onChange={(v) => setForm((f) => ({ ...f, finish_effect: v }))}
-                  options={fieldOptions.finish_effect}
                   placeholder="vd. Giả vân gỗ, giả đá, nhũ..."
-                  onDeleteOption={(v) => handleDeleteOption("finish_effect", v)}
+                  onDeleteOption={(v) => handleDeleteOption("collections", v)}
                 />
               </Field>
               <Field label="Màu sắc">

@@ -17,11 +17,11 @@ import { toast } from "sonner";
 
 const FIELD_OPTIONS = [
   { value: "color", label: "Màu sắc" },
-  { value: "collections", label: "Bộ sưu tập" },
+  { value: "supplier", label: "Nh\u00e0 cung c\u1ea5p" },
   { value: "category", label: "Danh mục" },
   { value: "surface", label: "Bề mặt" },
   { value: "shape", label: "Kiểu dáng" },
-  { value: "finish_effect", label: "Hiệu ứng vân/mặt gạch" },
+  { value: "collections", label: "B\u1ed9 s\u01b0u t\u1eadp" },
   { value: "material", label: "Chất liệu" },
   { value: "size", label: "Kích thước" },
 ] as const;
@@ -40,7 +40,7 @@ export function BulkEditFieldDialog({
   productIds,
   onDone,
 }: Props) {
-  const [field, setField] = useState<BulkField>("collections");
+  const [field, setField] = useState<BulkField>("supplier");
   const [value, setValue] = useState("");
   const [options, setOptions] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);

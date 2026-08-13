@@ -21,7 +21,7 @@ export const PRODUCT_XLSX_COLUMNS = [
   { key: "size", header: "size" },
   { key: "material", header: "material" },
   { key: "category", header: "category" },
-  { key: "collections", header: "collections" },
+  { key: "supplier", header: "supplier" },
   { key: "color", header: "color" },
   { key: "packing", header: "packing" },
   { key: "packing_m2", header: "packing_m2" },
@@ -33,7 +33,7 @@ export const PRODUCT_XLSX_COLUMNS = [
   { key: "discount_b2b", header: "discount_b2b" },
   { key: "surface", header: "surface" },
   { key: "shape", header: "shape" },
-  { key: "finish_effect", header: "finish_effect" },
+  { key: "collections", header: "collections" },
   { key: "unit", header: "unit" },
   { key: "image_path", header: "image_path" },
   { key: "created_at", header: "created_at" },
@@ -50,7 +50,7 @@ export type ProductImportRow = {
   size?: string;
   material?: string;
   category?: string;
-  collections?: string;
+  supplier?: string;
   color?: string;
   packing?: string;
   packing_m2?: number | null;
@@ -62,7 +62,7 @@ export type ProductImportRow = {
   discount_b2b?: number | null;
   surface?: string;
   shape?: string;
-  finish_effect?: string;
+  collections?: string;
   unit?: string;
   image_path?: string;
   created_at?: string;
@@ -123,7 +123,7 @@ function productToRow(p: Product): Record<string, string | number | null> {
     size: p.size || "",
     material: p.material || "",
     category: p.category || "",
-    collections: p.collections || "",
+    supplier: p.supplier || "",
     color: p.color || "",
     packing: p.packing || "",
     packing_m2: p.packing_m2 ?? "",
@@ -135,7 +135,7 @@ function productToRow(p: Product): Record<string, string | number | null> {
     discount_b2b: p.discount_b2b ?? "",
     surface: p.surface || "",
     shape: p.shape || "",
-    finish_effect: p.finish_effect || "",
+    collections: p.collections || "",
     unit: p.unit || "",
     image_path: p.image_path || "",
     created_at: p.created_at || "",
@@ -168,7 +168,7 @@ export async function exportProductsXlsx(opts?: {
             size: "300x600",
             material: "",
             category: "",
-            collections: "",
+            supplier: "",
             color: "",
             packing: "",
             packing_m2: "",
@@ -180,7 +180,7 @@ export async function exportProductsXlsx(opts?: {
             discount_b2b: "",
             surface: "",
             shape: "",
-            finish_effect: "",
+            collections: "",
             unit: "",
             image_path: "",
             created_at: "",
@@ -257,10 +257,7 @@ function mapHeaders(headers: string[]): Map<string, ProductXlsxKey> {
     "chat lieu": "material",
     category: "category",
     "danh muc": "category",
-    collections: "collections",
-    section: "collections",
-    nhom: "collections",
-    "bo suu tap": "collections",
+    supplier: "supplier",
     color: "color",
     mau: "color",
     packing: "packing",
@@ -294,9 +291,7 @@ function mapHeaders(headers: string[]): Map<string, ProductXlsxKey> {
     is_hot: "is_hot",
     "ban chay": "is_hot",
     hot: "is_hot",
-    finish_effect: "finish_effect",
-    "hieu ung": "finish_effect",
-    "hieu ung van/mat gach": "finish_effect",
+    collections: "collections",
     shape: "shape",
     "kieu dang": "shape",
     "kiểu dáng": "shape",
@@ -453,13 +448,13 @@ export function parseProductImportRows(
         case "size":
         case "material":
         case "category":
-        case "collections":
+        case "supplier":
         case "color":
         case "packing":
         case "note":
         case "surface":
         case "shape":
-        case "finish_effect":
+        case "collections":
         case "unit":
         case "image_path":
         case "created_at":
@@ -573,12 +568,12 @@ export async function previewProductImport(
     pushStr("Size", existing.size, row.size);
     pushStr("Chất liệu", existing.material, row.material);
     pushStr("Danh mục", existing.category, row.category);
-    pushStr("Bộ sưu tập", existing.collections, row.collections);
+    pushStr("Bộ sưu tập", existing.supplier, row.supplier);
     pushStr("Màu", existing.color, row.color);
     pushStr("Quy cách", existing.packing, row.packing);
     pushStr("Bề mặt", existing.surface, row.surface);
     pushStr("Kiểu dáng", existing.shape, row.shape);
-    pushStr("Hiệu ứng vân/mặt gạch", existing.finish_effect, row.finish_effect);
+    pushStr("Hiệu ứng vân/mặt gạch", existing.collections, row.collections);
     pushNum("m²/thùng", existing.packing_m2, row.packing_m2);
     pushNum("Viên/thùng", existing.packing_pcs, row.packing_pcs);
     pushNumRequired("Giá lẻ", existing.retail_price, row.retail_price);
@@ -629,7 +624,7 @@ function rowToUpdate(row: ProductImportRow): ProductUpdate {
   if (row.size !== undefined) u.size = row.size;
   if (row.material !== undefined) u.material = row.material;
   if (row.category !== undefined) u.category = row.category;
-  if (row.collections !== undefined) u.collections = row.collections;
+  if (row.supplier !== undefined) u.supplier = row.supplier;
   if (row.color !== undefined) u.color = row.color;
   if (row.packing !== undefined) u.packing = row.packing;
   if (row.packing_m2 !== undefined) u.packing_m2 = row.packing_m2;
@@ -641,7 +636,7 @@ function rowToUpdate(row: ProductImportRow): ProductUpdate {
   if (row.discount_b2b !== undefined) u.discount_b2b = row.discount_b2b;
   if (row.surface !== undefined) u.surface = row.surface;
   if (row.shape !== undefined) u.shape = row.shape;
-  if (row.finish_effect !== undefined) u.finish_effect = row.finish_effect;
+  if (row.collections !== undefined) u.collections = row.collections;
   if (row.unit !== undefined) u.unit = row.unit;
   if (row.image_path !== undefined) u.image_path = row.image_path;
   if (row.note !== undefined) u.note = row.note;
@@ -656,7 +651,7 @@ function rowToCreate(row: ProductImportRow): ProductCreateInput {
     size: row.size ?? "",
     material: row.material ?? "",
     category: row.category ?? "",
-    collections: row.collections ?? "",
+    supplier: row.supplier ?? "",
     color: row.color ?? "",
     packing: row.packing ?? "",
     packing_m2: row.packing_m2 ?? null,
@@ -668,7 +663,7 @@ function rowToCreate(row: ProductImportRow): ProductCreateInput {
     discount_b2b: row.discount_b2b ?? null,
     surface: row.surface ?? "",
     shape: row.shape ?? "",
-    finish_effect: row.finish_effect ?? "",
+    collections: row.collections ?? "",
     unit: row.unit ?? "",
     image_path: row.image_path ?? "",
     note: row.note ?? "",

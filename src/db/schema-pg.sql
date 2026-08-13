@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS products (
   size TEXT NOT NULL DEFAULT '',
   material TEXT NOT NULL DEFAULT '',
   category TEXT NOT NULL DEFAULT '',
-  collections TEXT NOT NULL DEFAULT '',
+  supplier TEXT NOT NULL DEFAULT '',
   retail_price BIGINT NOT NULL,
   discount_tp DOUBLE PRECISION,
   discount_b2b DOUBLE PRECISION,
@@ -26,9 +26,19 @@ CREATE TABLE IF NOT EXISTS products (
   unit TEXT NOT NULL DEFAULT 'm²',
   internal_code TEXT NOT NULL DEFAULT '',
   internal_codes TEXT NOT NULL DEFAULT '',
-  finish_effect TEXT NOT NULL DEFAULT '',
+  collections TEXT NOT NULL DEFAULT '',
   shape TEXT NOT NULL DEFAULT ''
 );
+
+-- Atomically migrate legacy product meanings; gallery_collections stays unchanged.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND column_name = 'finish_effect')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND column_name = 'supplier') THEN
+    ALTER TABLE products RENAME COLUMN collections TO supplier;
+    ALTER TABLE products RENAME COLUMN finish_effect TO collections;
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_products_code ON products(code);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);

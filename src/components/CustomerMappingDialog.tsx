@@ -5,6 +5,7 @@ import {
   ChevronUp,
   ChevronsDownUp,
   ChevronsUpDown,
+  Check,
   Crop,
   FileDown,
   FileImage,
@@ -154,7 +155,8 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   defaultCustomerId?: number;
   mapping?: CustomerMapping | null;
-  onSaved?: () => void;
+  /** Được gọi sau khi lưu/xóa — kèm bản ghi vừa lưu (nếu lưu) */
+  onSaved?: (mapping?: CustomerMapping) => void;
 };
 
 export function CustomerMappingDialog({
@@ -169,6 +171,8 @@ export function CustomerMappingDialog({
   const [customerId, setCustomerId] = useState<number | "">("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  /** Bản ghi vừa tạo khi giữ popup mở — sau lần lưu đầu, các lần lưu sau update bản ghi này */
+  const [savedMapping, setSavedMapping] = useState<CustomerMapping | null>(null);
   const [name, setName] = useState("");
   const [version, setVersion] = useState("01");
   const [note, setNote] = useState("");
@@ -177,6 +181,11 @@ export function CustomerMappingDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  /** Xác nhận xóa 2 bước inline (thay window.confirm) */
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Hiện check V trong nút Lưu sau khi lưu xong (thay toast) */
+  const [justSaved, setJustSaved] = useState(false);
+  const savedTimer = useRef<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [activePickerKey, setActivePickerKey] = useState<string | null>(null);
   const [manualProductKey, setManualProductKey] = useState<string | null>(null);
@@ -187,12 +196,17 @@ export function CustomerMappingDialog({
   const [importProgress, setImportProgress] = useState("");
   const [cropIndex, setCropIndex] = useState<number | null>(null);
 
+  /** Mapping hiệu lực: prop khi sửa, hoặc bản ghi vừa tạo khi đang tạo mới */
+  const effectiveMapping = mapping ?? savedMapping;
+
   useEffect(() => {
     if (!open) return;
+    setConfirmDelete(false);
     setLoaded(false);
     setView("editor");
     setImports([]);
     setActivePickerKey(null);
+    setSavedMapping(null);
     setName(mapping?.name || "");
     setVersion(mapping?.version || "01");
     setNote(mapping?.note ?? "");
@@ -479,9 +493,9 @@ export function CustomerMappingDialog({
           custom_product_image_path: customProductImagePath,
         });
       }
-      await saveCustomerMappingFn({
+      const saved = await saveCustomerMappingFn({
         data: {
-          id: mapping?.id,
+          id: effectiveMapping?.id,
           customer_id: Number(customerId),
           name: name.trim(),
           version: version.trim() || "01",
@@ -489,11 +503,12 @@ export function CustomerMappingDialog({
           items: output,
         },
       });
-      toast.success(
-        mapping ? "Đã cập nhật đề xuất vật liệu" : "Đã tạo đề xuất vật liệu",
-      );
-      onOpenChange(false);
-      onSaved?.();
+      // Giữ popup mở, chuyển sang trạng thái sửa bản ghi vừa tạo
+      setSavedMapping(saved);
+      onSaved?.(saved);
+      setJustSaved(true);
+      if (savedTimer.current) window.clearTimeout(savedTimer.current);
+      savedTimer.current = window.setTimeout(() => setJustSaved(false), 1500);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Lưu thất bại");
     } finally {
@@ -502,17 +517,17 @@ export function CustomerMappingDialog({
   }
 
   async function handleDelete() {
-    if (
-      !mapping ||
-      !window.confirm(
-        `Xóa đề xuất vật liệu "${mapping.name || "Chưa đặt tên"}"?`,
-      )
-    )
+    if (!effectiveMapping) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
       return;
+    }
     setDeleting(true);
     try {
-      await deleteCustomerMappingFn({ data: { id: mapping.id } });
+      await deleteCustomerMappingFn({ data: { id: effectiveMapping.id } });
       toast.success("Đã xóa đề xuất vật liệu");
+    setConfirmDelete(false);
+    setJustSaved(false);
       onOpenChange(false);
       onSaved?.();
     } catch (error) {
@@ -523,11 +538,11 @@ export function CustomerMappingDialog({
   }
 
   async function handleExport() {
-    if (!mapping) return;
+    if (!effectiveMapping) return;
     setExporting(true);
     try {
       const file = await exportMappingPrintFn({
-        data: { mappingId: mapping.id },
+        data: { mappingId: effectiveMapping.id },
       });
       const binary = atob(file.base64);
       const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
@@ -543,7 +558,7 @@ export function CustomerMappingDialog({
   }
 
   function closeDialog(nextOpen: boolean) {
-    if (!nextOpen && (saving || importing)) return;
+    if (!nextOpen && (saving || importing || exporting || deleting)) return;
     onOpenChange(nextOpen);
   }
 
@@ -554,15 +569,21 @@ export function CustomerMappingDialog({
 
   return (
     <Dialog open={open} onOpenChange={closeDialog}>
-      <DialogContent className="sm:max-w-5xl h-[94dvh] sm:h-[90dvh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent
+        className="sm:max-w-5xl h-[94dvh] sm:h-[90dvh] overflow-hidden flex flex-col p-0 gap-0"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         {view === "editor" ? (
           <EditorHeader
-            mapping={mapping}
+            mapping={effectiveMapping}
             exporting={exporting}
             deleting={deleting}
-            busy={saving || importing}
+            busy={saving || importing || exporting || deleting}
+            confirmDelete={confirmDelete}
             onExport={() => void handleExport()}
             onDelete={handleDelete}
+            onCancelDelete={() => setConfirmDelete(false)}
           />
         ) : (
           <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border flex-shrink-0">
@@ -588,10 +609,13 @@ export function CustomerMappingDialog({
         )}
 
         {loading || !loaded ? (
-          <div className="flex-1 grid place-items-center">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Đang tải dữ liệu…
+          <div className="flex-1 min-h-0 animate-in fade-in duration-150 px-4 sm:px-6 py-4 space-y-4" aria-label="Đang tải đề xuất vật liệu">
+            <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-3">
+              <div className="h-14 rounded-lg bg-surface-strong/70 animate-pulse" />
+              <div className="h-14 rounded-lg bg-surface-strong/70 animate-pulse" />
             </div>
+            <div className="h-12 rounded-lg bg-surface-strong/60 animate-pulse" />
+            <div className="h-56 rounded-xl bg-surface-strong/50 animate-pulse" />
           </div>
         ) : view === "crop" && activeCrop ? (
           <CropWorkspace
@@ -830,18 +854,32 @@ export function CustomerMappingDialog({
               <button
                 type="button"
                 onClick={() => closeDialog(false)}
-                disabled={saving}
+                disabled={saving || importing || exporting || deleting}
                 className="h-10 px-4 rounded-lg text-xs font-medium ring-1 ring-black/8 hover:bg-surface-strong disabled:opacity-50"
               >
-                Hủy
+                Đóng
               </button>
               <button
                 type="submit"
-                disabled={saving}
-                className="h-10 px-5 rounded-lg text-xs font-medium bg-terracotta text-primary-foreground hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                disabled={saving || importing || exporting || deleting}
+                className={
+                  "h-10 px-5 rounded-lg text-xs font-medium text-primary-foreground " +
+                  (justSaved
+                    ? "bg-green-600 hover:bg-green-600"
+                    : "bg-terracotta hover:opacity-90") +
+                  " disabled:opacity-50 inline-flex items-center justify-center relative"
+                }
               >
-                {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                {saving ? "Đang tải ảnh và lưu…" : "Lưu đề xuất"}
+                <span className={saving || justSaved ? "opacity-0" : ""}>
+                  Lưu đề xuất
+                </span>
+                <span className="absolute inset-0 flex items-center justify-center">
+                  {saving ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : justSaved ? (
+                    <Check className="size-4" />
+                  ) : null}
+                </span>
               </button>
             </DialogFooter>
           </form>
@@ -909,15 +947,19 @@ function EditorHeader({
   exporting,
   deleting,
   busy,
+  confirmDelete,
   onExport,
   onDelete,
+  onCancelDelete,
 }: {
   mapping: CustomerMapping | null;
   exporting: boolean;
   deleting: boolean;
   busy: boolean;
+  confirmDelete: boolean;
   onExport: () => void;
   onDelete: () => void;
+  onCancelDelete: () => void;
 }) {
   return (
     <DialogHeader className="px-4 sm:px-6 py-4 border-b border-border flex-shrink-0">
@@ -927,12 +969,12 @@ function EditorHeader({
           {mapping ? "Sửa đề xuất vật liệu" : "Tạo đề xuất vật liệu"}
         </DialogTitle>
         {mapping ? (
-          <div className="flex items-center gap-1">
+          <div className="relative flex items-center rounded-lg border border-border/70 bg-card p-0.5 shadow-sm">
             <button
               type="button"
               onClick={onExport}
               disabled={busy || exporting || deleting}
-              className="h-9 px-2.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 hover:bg-surface-strong disabled:opacity-50"
+              className="h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 hover:bg-surface-strong disabled:opacity-50"
             >
               {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <FileDown className="size-3.5" />}
               <span className="hidden sm:inline">Xuất PDF</span>
@@ -941,11 +983,26 @@ function EditorHeader({
               type="button"
               onClick={onDelete}
               disabled={busy || exporting || deleting}
-              className="size-9 grid place-items-center rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
               aria-label="Xóa đề xuất vật liệu"
+              className={
+                confirmDelete
+                  ? "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                  : "size-8 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+              }
             >
               {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+              {confirmDelete ? <span className="hidden sm:inline">Xóa vĩnh viễn</span> : null}
             </button>
+            {confirmDelete ? (
+              <button
+                type="button"
+                onClick={onCancelDelete}
+                disabled={deleting}
+                className="h-8 px-2.5 rounded-md text-xs font-medium bg-card hover:bg-surface-strong disabled:opacity-50"
+              >
+                Không xóa
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

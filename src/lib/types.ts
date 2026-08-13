@@ -58,12 +58,12 @@ export type GalleryImageCandidate = {
   name: string;
   internal_codes: string;
   category: string;
-  collections: string;
+  supplier: string;
   color: string;
   surface: string;
   size: string;
   shape: string;
-  finish_effect: string;
+  collections: string;
   material: string;
 };
 
@@ -82,7 +82,7 @@ export type Product = {
   material: string;
   category: string;
   /** Bộ sưu tập */
-  collections: string;
+  supplier: string;
   /** Màu sắc (lọc) */
   color: string;
   /** Quy cách đóng gói hiển thị: "100 viên/1m2" */
@@ -101,7 +101,7 @@ export type Product = {
   /** Kiểu dáng (vd: hình vuông, vảy cá, dạng thanh KitKat...) */
   shape?: string;
   /** Hiệu ứng vân/mặt gạch (vd: giả vân gỗ, giả đá, nhũ...) */
-  finish_effect?: string;
+  collections?: string;
   unit?: string;
   is_hot: number;
   /** Ảnh đại diện (primary) — đồng bộ từ product_images */

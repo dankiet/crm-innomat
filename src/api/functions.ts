@@ -202,10 +202,10 @@ export const fetchProductFieldValues = createServerFn({ method: "GET" })
     (data: {
       field:
         | "color"
-        | "collections"
+        | "supplier"
         | "category"
         | "surface"
-        | "finish_effect"
+        | "collections"
         | "shape"
         | "material"
         | "size";
@@ -224,10 +224,10 @@ export const bulkUpdateProductFieldFn = createServerFn({ method: "POST" })
       ids: number[];
       field:
         | "color"
-        | "collections"
+        | "supplier"
         | "category"
         | "surface"
-        | "finish_effect"
+        | "collections"
         | "shape"
         | "material"
         | "size";
@@ -255,10 +255,10 @@ export const clearProductFieldValueFn = createServerFn({ method: "POST" })
     (data: {
       field:
         | "color"
-        | "collections"
+        | "supplier"
         | "category"
         | "surface"
-        | "finish_effect"
+        | "collections"
         | "shape"
         | "material"
         | "size";
@@ -290,9 +290,9 @@ export const updateProductFn = createServerFn({ method: "POST" })
       material?: string;
       surface?: string;
       shape?: string;
-      finish_effect?: string;
-      category?: string;
       collections?: string;
+      category?: string;
+      supplier?: string;
       color?: string;
       packing?: string;
       packing_m2?: number | null;

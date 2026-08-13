@@ -130,8 +130,8 @@ export async function listGalleryImageCandidates(): Promise<GalleryImageCandidat
       `SELECT i.id AS product_image_id, i.product_id, i.path, i.caption,
         i.is_primary, i.sort_order, p.code, p.name,
         CONCAT_WS(', ', NULLIF(p.internal_code, ''), NULLIF(p.internal_codes, ''), codes.internal_codes) AS internal_codes,
-        p.category, p.collections, p.color, p.surface, p.size, p.shape,
-        p.finish_effect, p.material
+        p.category, p.supplier, p.color, p.surface, p.size, p.shape,
+        p.collections, p.material
        FROM product_images i
        JOIN products p ON p.id = i.product_id
        LEFT JOIN (
