@@ -1036,7 +1036,9 @@ function ImagePickerDialog({
         (candidate) =>
           !existingPaths.has(candidate.path) &&
           (candidate.gallery_collection_ids.length === 0 ||
-            candidate.gallery_collection_ids.includes(collection.collection.id)),
+            candidate.gallery_collection_ids.some(
+              (collectionId) => Number(collectionId) === collection.collection.id,
+            )),
       ),
     [candidates, collection.collection.id, existingPaths],
   );
@@ -1045,23 +1047,22 @@ function ImagePickerDialog({
       available.map((row) => ({
         row,
         index: codeRowFromProduct(row.code, row.internal_codes, normalizeSearchText),
-        searchable: normalizeSearchText(
-          [
-            row.code,
-            row.name,
-            row.internal_codes,
-            row.caption,
-            ...FACETS.map(({ key }) => row[key]),
-          ]
-            .filter(Boolean)
-            .join(" "),
-        ),
+          searchable: normalizeSearchText(
+            [row.code, row.internal_codes, row.name, row.supplier]
+              .filter(Boolean)
+              .join(" "),
+          ),
       })),
     [available],
   );
   const exactSet = useMemo(
-    () => buildExactCodeSet(searchRows.map((entry) => entry.index)),
-    [searchRows],
+    () =>
+      buildExactCodeSet(
+        candidates.map((row) =>
+          codeRowFromProduct(row.code, row.internal_codes, normalizeSearchText),
+        ),
+      ),
+    [candidates],
   );
   const tokens = useMemo(() => searchTokens(deferredQuery), [deferredQuery]);
   const options = useMemo(() => {

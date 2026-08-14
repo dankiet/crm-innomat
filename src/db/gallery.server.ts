@@ -146,7 +146,7 @@ export async function listGalleryImageCandidates(): Promise<GalleryImageCandidat
       `SELECT i.id AS product_image_id, i.product_id, i.path, i.caption,
         COALESCE(gallery_links.collection_ids, ARRAY[]::BIGINT[]) AS gallery_collection_ids,
         i.is_primary, i.sort_order, p.code, p.name,
-        CONCAT_WS(', ', NULLIF(p.internal_code, ''), NULLIF(p.internal_codes, ''), codes.internal_codes) AS internal_codes,
+        COALESCE(codes.internal_codes, '') AS internal_codes,
         p.category, p.supplier, p.color, p.surface, p.size, p.shape,
         p.collections, p.material
        FROM product_images i
