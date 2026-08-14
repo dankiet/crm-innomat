@@ -16,6 +16,12 @@ type Props = {
    * cover: fill crop — only for tight thumbs if needed
    */
   fit?: Fit;
+  /**
+   * Browser load strategy. `"lazy"` (default) defers off-screen images —
+   * good for large catalogs. Use `"eager"` for small bounded grids/dialogs
+   * where images must appear immediately (e.g. gallery/library views).
+   */
+  loading?: "lazy" | "eager";
 };
 
 /**
@@ -30,6 +36,7 @@ export function ProductImage({
   placeholderClassName,
   code,
   fit = "contain",
+  loading = "lazy",
 }: Props) {
   const hasImage = Boolean(src && src.trim());
 
@@ -38,7 +45,7 @@ export function ProductImage({
       <img
         src={src!}
         alt={alt}
-        loading="lazy"
+        loading={loading}
         decoding="async"
         className={cn(
           "w-full h-full",

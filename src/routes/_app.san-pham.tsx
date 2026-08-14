@@ -40,6 +40,12 @@ import { deleteProductFn, fetchProducts } from "@/api/functions";
 import type { Product } from "@/lib/types";
 import { formatVND } from "@/lib/format";
 import {
+  buildExactCodeSet,
+  codeRowFromProduct,
+  matchSearchTokens,
+  splitSearchTokens,
+} from "@/lib/product-search";
+import {
   ALL_PRODUCTS_SLUG,
   categoryFromSlug,
   labelFromSlug,
@@ -500,7 +506,7 @@ function ProductsPage() {
     return products.filter((p) => p.category.trim().toLowerCase() === cat);
   }, [products, category]);
 
-  /** Search text: mã + tên + bộ sưu tập */
+/** Search text: mã + tên + bộ sưu tập */
   const indexed = useMemo(
     () =>
       scoped.map((p) => ({
@@ -508,8 +514,13 @@ function ProductsPage() {
         codeHay: [p.code, p.multi_codes_list || ""].join(" ").toLowerCase(),
         nameHay: (p.name || "").toLowerCase(),
         collectionHay: (p.supplier || "").toLowerCase(),
+        searchRow: codeRowFromProduct(p.code, p.multi_codes_list, (v) => v.trim().toLowerCase()),
       })),
     [scoped],
+  );
+  const exactCodeSet = useMemo(
+    () => buildExactCodeSet(indexed.map((entry) => entry.searchRow)),
+    [indexed],
   );
 
   const colorSet = useMemo(() => new Set(colorsParam), [colorsParam]);
@@ -535,14 +546,13 @@ function ProductsPage() {
   const matchIndexed = useCallback(
     (exclude?: FacetKey) => {
       const q = deferredSearch.trim().toLowerCase();
-      const searchTokens = q.split(/[\s,;|]+/).filter(Boolean);
-      const isMultiCodeQuery = searchTokens.length > 1;
+      const tokens = splitSearchTokens(deferredSearch, (v) => v.trim().toLowerCase());
       const isSizeQuery =
         /^\d{2,4}\s*[x×X*]\s*\d{2,4}(\s*[x×X*]\s*\d{2,4})?(\s*mm)?$/i.test(
           deferredSearch.trim(),
         ) || /^\d{3,4}\s*x\s*\d{3,4}/i.test(deferredSearch.trim());
 
-      return indexed.filter(({ p, codeHay, nameHay, collectionHay }) => {
+      return indexed.filter(({ p, codeHay, nameHay, collectionHay, searchRow }) => {
         if (minParam || maxParam) {
           const price = priceOf(p, priceKindParam);
           if (minParam && price < minParam) return false;
@@ -558,23 +568,13 @@ function ProductsPage() {
         if (hotParam && !p.is_hot) return false;
         if (!q) return true;
         if (isSizeQuery) return false;
-        if (isMultiCodeQuery) {
-          return searchTokens.some(
-            (token) =>
-              codeHay.includes(token) ||
-              nameHay.includes(token) ||
-              collectionHay.includes(token),
-          );
-        }
-        return (
-          codeHay.includes(q) ||
-          nameHay.includes(q) ||
-          collectionHay.includes(q)
-        );
+        const searchable = [codeHay, nameHay, collectionHay].filter(Boolean).join(" ");
+        return matchSearchTokens(searchRow, tokens, searchable, exactCodeSet);
       });
     },
     [
       indexed,
+      exactCodeSet,
       deferredSearch,
       minParam,
       maxParam,

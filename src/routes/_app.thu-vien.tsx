@@ -60,6 +60,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { readImageFileAsWebpDataUrl } from "@/lib/image-upload";
+import {
+  buildExactCodeSet,
+  codeRowFromProduct,
+  matchSearchTokens,
+  splitSearchTokens,
+} from "@/lib/product-search";
 import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +115,10 @@ function normalizeSearchText(value: string): string {
     .trim();
 }
 
+function searchTokens(query: string): string[] {
+  return splitSearchTokens(query, normalizeSearchText);
+}
+
 async function copyProductCodes(codes: string[], successMessage: string): Promise<void> {
   const text = [...new Set(codes.map((code) => code.trim()).filter(Boolean))].join(" ");
   if (!text) {
@@ -140,6 +150,7 @@ function GalleryPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "created_at">("name");
@@ -214,12 +225,10 @@ function GalleryPage() {
   }
 
   async function deleteCollection(collection: GalleryCollection) {
-    if (
-      !confirm(
-        `Xóa bộ sưu tập “${collection.name}”? Ảnh còn được sản phẩm/bộ khác dùng sẽ được giữ lại.`,
-      )
-    )
+    if (confirmDeleteId !== collection.id) {
+      setConfirmDeleteId(collection.id);
       return;
+    }
     setBusy(true);
     try {
       await deleteGalleryCollectionFn({ data: { id: collection.id } });
@@ -232,6 +241,7 @@ function GalleryPage() {
     } catch (error) {
       toast.error(errorMessage(error, "Không xóa được bộ sưu tập"));
     } finally {
+      setConfirmDeleteId(null);
       setBusy(false);
     }
   }
@@ -263,10 +273,6 @@ function GalleryPage() {
   }
 
   async function removeItem(item: GalleryCollectionItem) {
-    if (
-      !confirm("Gỡ ảnh khỏi bộ sưu tập? File chỉ bị xóa vĩnh viễn khi không còn nơi nào sử dụng.")
-    )
-      return;
     setBusy(true);
     try {
       await removeGalleryItemFn({ data: { itemId: item.id } });
@@ -516,6 +522,7 @@ function GalleryPage() {
                     src={collection.cover_path}
                     alt={collection.name}
                     fit="cover"
+                    loading="eager"
                     placeholderClassName="bg-surface-strong/40"
                   />
                 </div>
@@ -555,15 +562,36 @@ function GalleryPage() {
                   >
                     <Pencil className="size-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void deleteCollection(collection)}
-                    className="grid size-10 place-items-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Xóa bộ sưu tập"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  {confirmDeleteId === collection.id ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void deleteCollection(collection)}
+                        className="h-8 shrink-0 rounded-md bg-red-600 px-2.5 text-[11px] font-medium text-white hover:bg-red-700 disabled:opacity-40"
+                      >
+                        Xóa vĩnh viễn
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="h-8 shrink-0 rounded-md px-2.5 text-[11px] font-medium ring-1 ring-black/5 hover:bg-surface-strong disabled:opacity-40"
+                      >
+                        Không xóa
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setConfirmDeleteId(collection.id)}
+                      className="grid size-10 place-items-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Xóa bộ sưu tập"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex justify-end border-t border-border px-3 py-2">
@@ -633,6 +661,7 @@ function SortableGalleryCard({
     id: item.id,
     disabled: disabled || !canEdit,
   });
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <article
@@ -653,6 +682,7 @@ function SortableGalleryCard({
           src={item.path}
           alt={item.caption || item.product_name}
           fit="contain"
+          loading="eager"
           className="p-2"
         />
         {isCover ? (
@@ -697,27 +727,50 @@ function SortableGalleryCard({
             >
               <GripVertical className="size-4" />
             </button>
-            {!isCover ? (
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={onSetCover}
-                className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border border-border px-1.5 text-[10px] hover:bg-surface-strong disabled:opacity-50"
-              >
-                <Star className="size-3.5" /> <span className="truncate">Đại diện</span>
-              </button>
+            {confirming ? (
+              <>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={onRemove}
+                  className="flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg bg-red-600 px-1.5 text-[10px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  Xóa vĩnh viễn
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setConfirming(false)}
+                  className="flex h-10 shrink-0 items-center justify-center rounded-lg border border-border px-2 text-[10px] hover:bg-surface-strong disabled:opacity-50"
+                >
+                  Không xóa
+                </button>
+              </>
             ) : (
-              <span className="flex-1" />
+              <>
+                {!isCover ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={onSetCover}
+                    className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border border-border px-1.5 text-[10px] hover:bg-surface-strong disabled:opacity-50"
+                  >
+                    <Star className="size-3.5" /> <span className="truncate">Đại diện</span>
+                  </button>
+                ) : (
+                  <span className="flex-1" />
+                )}
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setConfirming(true)}
+                  className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  aria-label="Gỡ ảnh"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={onRemove}
-              className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-              aria-label="Gỡ ảnh"
-            >
-              <Trash2 className="size-4" />
-            </button>
           </div>
         ) : null}
       </div>
@@ -795,6 +848,7 @@ function GalleryViewerDialog({
                 src={item.path}
                 alt={item.caption || item.product_name}
                 fit="contain"
+                loading="eager"
                 className="p-3 pb-20 pt-[max(3.5rem,env(safe-area-inset-top))] sm:p-8 sm:pb-24"
               />
               {hasMultiple ? (
@@ -852,6 +906,7 @@ function GalleryViewerDialog({
                       <ProductImage
                         src={thumbnail.path}
                         alt={thumbnail.caption || thumbnail.product_name}
+                        loading="eager"
                         className="p-0.5"
                       />
                     </button>
@@ -976,16 +1031,21 @@ function ImagePickerDialog({
     [collection.items],
   );
   const available = useMemo(
-    () => candidates.filter((candidate) => !existingPaths.has(candidate.path)),
-    [candidates, existingPaths],
+    () =>
+      candidates.filter(
+        (candidate) =>
+          !existingPaths.has(candidate.path) &&
+          (candidate.gallery_collection_ids.length === 0 ||
+            candidate.gallery_collection_ids.includes(collection.collection.id)),
+      ),
+    [candidates, collection.collection.id, existingPaths],
   );
-  const options = useMemo(() => {
-    const needle = normalizeSearchText(deferredQuery);
-    const result = {} as Record<FacetKey, Array<{ value: string; count: number }>>;
-    for (const facet of FACETS) {
-      const productsByValue = new Map<string, Set<number>>();
-      for (const row of available) {
-        const searchable = normalizeSearchText(
+  const searchRows = useMemo(
+    () =>
+      available.map((row) => ({
+        row,
+        index: codeRowFromProduct(row.code, row.internal_codes, normalizeSearchText),
+        searchable: normalizeSearchText(
           [
             row.code,
             row.name,
@@ -995,8 +1055,21 @@ function ImagePickerDialog({
           ]
             .filter(Boolean)
             .join(" "),
-        );
-        if (needle && !searchable.includes(needle)) continue;
+        ),
+      })),
+    [available],
+  );
+  const exactSet = useMemo(
+    () => buildExactCodeSet(searchRows.map((entry) => entry.index)),
+    [searchRows],
+  );
+  const tokens = useMemo(() => searchTokens(deferredQuery), [deferredQuery]);
+  const options = useMemo(() => {
+    const result = {} as Record<FacetKey, Array<{ value: string; count: number }>>;
+    for (const facet of FACETS) {
+      const productsByValue = new Map<string, Set<number>>();
+      for (const { row, index, searchable } of searchRows) {
+        if (!matchSearchTokens(index, tokens, searchable, exactSet)) continue;
         if (
           FACETS.some(({ key }) => key !== facet.key && filters[key] && row[key] !== filters[key])
         ) {
@@ -1013,24 +1086,20 @@ function ImagePickerDialog({
         .sort((a, b) => a.value.localeCompare(b.value, "vi"));
     }
     return result;
-  }, [available, deferredQuery, filters]);
+  }, [searchRows, tokens, exactSet, filters]);
   const filtered = useMemo(() => {
-    const needle = normalizeSearchText(deferredQuery);
-    const matches = available.filter((row) => {
-      const searchable = normalizeSearchText(
-        [row.code, row.name, row.internal_codes, row.caption, ...FACETS.map(({ key }) => row[key])]
-          .filter(Boolean)
-          .join(" "),
-      );
-      if (needle && !searchable.includes(needle)) return false;
-      return FACETS.every(({ key }) => !filters[key] || row[key] === filters[key]);
-    });
+    const matches = searchRows
+      .filter(({ row, index, searchable }) => {
+        if (!matchSearchTokens(index, tokens, searchable, exactSet)) return false;
+        return FACETS.every(({ key }) => !filters[key] || row[key] === filters[key]);
+      })
+      .map(({ row }) => row);
     const uniqueByPath = new Map<string, GalleryImageCandidate>();
     for (const candidate of matches) {
       if (!uniqueByPath.has(candidate.path)) uniqueByPath.set(candidate.path, candidate);
     }
     return [...uniqueByPath.values()];
-  }, [available, deferredQuery, filters]);
+  }, [searchRows, tokens, exactSet, filters]);
   const groups = useMemo(() => {
     const map = new Map<number, GalleryImageCandidate[]>();
     for (const image of filtered) {
@@ -1040,7 +1109,6 @@ function ImagePickerDialog({
     }
     return [...map.values()];
   }, [filtered]);
-
   useEffect(() => {
     if (!open) {
       setQuery("");

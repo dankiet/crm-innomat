@@ -59,6 +59,12 @@ import {
   type QuoteItem,
 } from "@/lib/types";
 import { formatVND } from "@/lib/format";
+import {
+  buildExactCodeSet,
+  codeRowFromProduct,
+  matchSearchTokens,
+  splitSearchTokens,
+} from "@/lib/product-search";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -172,12 +178,16 @@ function CustomerDetailPage() {
     const q = productSearch.trim().toLowerCase();
     const notAdded = list.filter((p) => !existingProductIds.has(p.id));
     if (!q) return notAdded.slice(0, 50);
-    return notAdded
-      .filter(
-        (p) =>
-          p.code.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q),
-      )
+    const tokens = splitSearchTokens(productSearch, (v) => v.trim().toLowerCase());
+    const rows = notAdded.map((p) => ({
+      p,
+      index: codeRowFromProduct(p.code, p.multi_codes_list, (v) => v.trim().toLowerCase()),
+      searchable: [p.code, p.name].filter(Boolean).join(" ").toLowerCase(),
+    }));
+    const exactSet = buildExactCodeSet(rows.map((entry) => entry.index));
+    return rows
+      .filter(({ index, searchable }) => matchSearchTokens(index, tokens, searchable, exactSet))
+      .map(({ p }) => p)
       .slice(0, 50);
   }, [allProducts, productSearch, existingProductIds]);
 

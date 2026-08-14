@@ -16,6 +16,7 @@ export type DiscountType = "none" | "tp" | "b2b" | "custom";
 export type ProductImageRow = {
   id: number;
   product_id: number;
+  gallery_collection_ids: number[];
   path: string;
   sort_order: number;
   is_primary: number;

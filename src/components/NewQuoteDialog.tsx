@@ -26,6 +26,12 @@ import type {
 import { quoteStatusMeta } from "@/lib/types";
 import { formatVND } from "@/lib/format";
 import {
+  buildExactCodeSet,
+  codeRowFromProduct,
+  matchSearchTokens,
+  splitSearchTokens,
+} from "@/lib/product-search";
+import {
   effectiveDiscountPct,
   estimateLineProfitInfo,
   unitPriceForProduct,
@@ -332,14 +338,19 @@ export function NewQuoteDialog({
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
     if (!q) return products.slice(0, 40);
-    return products
-      .filter(
-        (p) =>
-          p.code.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q) ||
-          p.size.toLowerCase().includes(q) ||
-          (p.category || "").toLowerCase().includes(q),
-      )
+    const tokens = splitSearchTokens(productSearch, (v) => v.trim().toLowerCase());
+    const rows = products.map((p) => ({
+      p,
+      index: codeRowFromProduct(p.code, p.multi_codes_list, (v) => v.trim().toLowerCase()),
+      searchable: [p.code, p.name, p.size, p.category || ""]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    }));
+    const exactSet = buildExactCodeSet(rows.map((entry) => entry.index));
+    return rows
+      .filter(({ index, searchable }) => matchSearchTokens(index, tokens, searchable, exactSet))
+      .map(({ p }) => p)
       .slice(0, 40);
   }, [products, productSearch]);
 

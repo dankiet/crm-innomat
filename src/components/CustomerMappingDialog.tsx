@@ -38,6 +38,12 @@ import {
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format";
 import type { Customer, Product } from "@/lib/types";
+import {
+  buildExactCodeSet,
+  codeRowFromProduct,
+  matchSearchTokens,
+  splitSearchTokens,
+} from "@/lib/product-search";
 import { cn } from "@/lib/utils";
 
 export type CustomerMappingItem = {
@@ -260,16 +266,25 @@ export function CustomerMappingDialog({
   }, [open, mapping?.id, defaultCustomerId]);
 
   const filteredProducts = useMemo(() => {
-    const query = productSearch.trim().toLowerCase();
-    if (!query) return products.slice(0, 50);
-    return products
-      .filter(
-        (product) =>
-          product.code.toLowerCase().includes(query) ||
-          product.name.toLowerCase().includes(query) ||
-          product.size.toLowerCase().includes(query) ||
-          (product.surface || "").toLowerCase().includes(query),
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return products.slice(0, 50);
+    const tokens = splitSearchTokens(productSearch, (v) => v.trim().toLowerCase());
+    const rows = products.map((product) => ({
+      product,
+      index: codeRowFromProduct(product.code, product.multi_codes_list, (v) =>
+        v.trim().toLowerCase(),
+      ),
+      searchable: [product.code, product.name, product.size, product.surface || ""]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    }));
+    const exactSet = buildExactCodeSet(rows.map((entry) => entry.index));
+    return rows
+      .filter(({ index, searchable }) =>
+        matchSearchTokens(index, tokens, searchable, exactSet),
       )
+      .map(({ product }) => product)
       .slice(0, 80);
   }, [products, productSearch]);
 

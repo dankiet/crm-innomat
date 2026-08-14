@@ -59,7 +59,7 @@ export function Combobox({
   function selectValue(v: string) {
     onChange(v);
     setQuery("");
-    setOpen(false);
+    window.setTimeout(() => setOpen(false), 0);
   }
 
   return (

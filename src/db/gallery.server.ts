@@ -113,6 +113,7 @@ export async function updateGalleryCollection(input: {
   description?: string;
 }): Promise<GalleryCollection> {
   const db = getDb();
+  const oldCollection = await getCollectionRow(db, input.id);
   const result = await db
     .prepare(
       `UPDATE gallery_collections
@@ -121,13 +122,29 @@ export async function updateGalleryCollection(input: {
     )
     .run(cleanName(input.name), input.description?.trim() ?? "", nowLocal(), input.id);
   if (!result.changes) throw new Error("Không tìm thấy bộ sưu tập");
-  return (await getCollectionRow(db, input.id))!;
+  const updatedCollection = (await getCollectionRow(db, input.id))!;
+  if (oldCollection && updatedCollection.name !== oldCollection.name) {
+    await db
+      .prepare(
+        `UPDATE products
+         SET collections = ?
+         WHERE collections = ?
+           AND id IN (
+             SELECT DISTINCT product_id
+             FROM gallery_collection_items
+             WHERE collection_id = ? AND product_id IS NOT NULL
+           )`,
+      )
+      .run(updatedCollection.name, oldCollection.name, input.id);
+  }
+  return updatedCollection;
 }
 
 export async function listGalleryImageCandidates(): Promise<GalleryImageCandidate[]> {
   return await getDb()
     .prepare(
       `SELECT i.id AS product_image_id, i.product_id, i.path, i.caption,
+        COALESCE(gallery_links.collection_ids, ARRAY[]::BIGINT[]) AS gallery_collection_ids,
         i.is_primary, i.sort_order, p.code, p.name,
         CONCAT_WS(', ', NULLIF(p.internal_code, ''), NULLIF(p.internal_codes, ''), codes.internal_codes) AS internal_codes,
         p.category, p.supplier, p.color, p.surface, p.size, p.shape,
@@ -139,6 +156,12 @@ export async function listGalleryImageCandidates(): Promise<GalleryImageCandidat
          FROM product_internal_codes
          GROUP BY product_id
        ) codes ON codes.product_id = p.id
+       LEFT JOIN (
+         SELECT product_id, ARRAY_AGG(DISTINCT collection_id) AS collection_ids
+         FROM gallery_collection_items
+         WHERE product_id IS NOT NULL
+         GROUP BY product_id
+       ) gallery_links ON gallery_links.product_id = p.id
        WHERE i.path <> ''
        ORDER BY p.code, i.is_primary DESC, i.sort_order, i.id`,
     )
