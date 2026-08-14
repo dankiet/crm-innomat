@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
   Dialog,
@@ -45,8 +45,10 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages }:
   const [deleting, setDeleting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [internalCodes, setInternalCodes] = useState<string[]>([]);
+  const [savedInternalCodes, setSavedInternalCodes] = useState<string[]>([]);
   const [newInternalCode, setNewInternalCode] = useState("");
   const [pendingInternalCodeDelete, setPendingInternalCodeDelete] = useState<string | null>(null);
+  const savedSinceOpenRef = useRef(false);
   const [form, setForm] = useState({
     code: "",
     name: "",
@@ -143,10 +145,20 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages }:
       image_path: product.image_path || "",
     });
     setPendingDelete(false);
-    setInternalCodes(parseInternalCodesList(product.multi_codes_list));
+    const productInternalCodes = parseInternalCodesList(product.multi_codes_list);
+    setInternalCodes(productInternalCodes);
+    setSavedInternalCodes(productInternalCodes);
     setNewInternalCode("");
     setPendingInternalCodeDelete(null);
+    savedSinceOpenRef.current = false;
   }, [product, open]);
+
+  async function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && savedSinceOpenRef.current) {
+      await router.invalidate();
+    }
+    onOpenChange(nextOpen);
+  }
 
   function addInternalCode() {
     const nextCodes = parseInternalCodesList(...internalCodes, newInternalCode);
@@ -192,7 +204,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages }:
     }
     setSaving(true);
     try {
-      await syncProductInternalCodesFn({
+      const syncedCodes = await syncProductInternalCodesFn({
         data: { product_id: product.id, internal_codes: internalCodes },
       });
       await updateProductFn({
@@ -221,6 +233,9 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages }:
           image_path: form.image_path.trim(),
         },
       });
+      setInternalCodes(syncedCodes.internal_codes);
+      setSavedInternalCodes(syncedCodes.internal_codes);
+      savedSinceOpenRef.current = true;
       toast.success("Đã cập nhật sản phẩm");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
@@ -249,7 +264,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages }:
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => void handleOpenChange(nextOpen)}>
       <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Sửa sản phẩm</DialogTitle>
@@ -291,7 +306,12 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages }:
                               key={code}
                               className="inline-flex items-center gap-1 px-2 py-0.5 bg-card border border-border rounded-md text-xs font-semibold text-foreground shadow-xs"
                             >
-                              {code}
+                            {code}
+                            {!savedInternalCodes.some(
+                              (savedCode) => savedCode.toUpperCase() === code.toUpperCase(),
+                            ) ? (
+                              <span className="font-normal text-amber-600">Chưa lưu</span>
+                            ) : null}
                               <button
                                 type="button"
                                 onClick={() => setPendingInternalCodeDelete(code)}
