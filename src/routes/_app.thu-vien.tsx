@@ -60,6 +60,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { readImageFileAsWebpDataUrl } from "@/lib/image-upload";
+import { formatVND } from "@/lib/format";
 import {
   buildExactCodeSet,
   codeRowFromProduct,
@@ -714,6 +715,27 @@ function SortableGalleryCard({
           <p className="truncate text-[11px] text-muted-foreground">
             {item.product_name || item.caption || "Không gắn sản phẩm"}
           </p>
+          {item.product_code ? (
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-1">
+              <p className="text-xs font-semibold tabular-nums tracking-tight text-foreground">
+                {formatVND(Number(item.retail_price) || 0)}
+              </p>
+              <p
+                className={
+                  Number(item.total_stock) > 0
+                    ? "text-[11px] font-medium tabular-nums text-emerald-700"
+                    : "text-[11px] tabular-nums text-muted-foreground"
+                }
+              >
+                Stock:{" "}
+                {item.total_stock != null
+                  ? `${Number(item.total_stock).toLocaleString("vi-VN", {
+                      maximumFractionDigits: 3,
+                    })} m²`
+                  : "—"}
+              </p>
+            </div>
+          ) : null}
         </div>
         {canEdit ? (
           <div className="flex items-center gap-1">

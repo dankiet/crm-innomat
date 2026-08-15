@@ -82,9 +82,18 @@ export async function getGalleryCollection(id: number): Promise<{
   if (!collection) throw new Error("Không tìm thấy bộ sưu tập");
   const items = await db
     .prepare(
-      `SELECT * FROM gallery_collection_items
-       WHERE collection_id = ?
-       ORDER BY sort_order, id`,
+      `SELECT i.*, p.retail_price,
+        COALESCE(stk.total_stock, 0) AS total_stock
+       FROM gallery_collection_items i
+       LEFT JOIN products p ON p.id = i.product_id
+       LEFT JOIN (
+         SELECT pic.product_id, SUM(inv.quantity_stock) AS total_stock
+         FROM product_internal_codes pic
+         LEFT JOIN inventory inv ON inv.internal_code = pic.internal_code AND inv.stock_location = 'KHOQ9'
+         GROUP BY pic.product_id
+       ) stk ON stk.product_id = i.product_id
+       WHERE i.collection_id = ?
+       ORDER BY i.sort_order, i.id`,
     )
     .all<GalleryCollectionItem>(id);
   return { collection, items };

@@ -46,6 +46,10 @@ export type GalleryCollectionItem = {
   caption: string;
   sort_order: number;
   created_at: string;
+  /** Giá lẻ (m²) — từ sản phẩm liên kết */
+  retail_price?: number | null;
+  /** Tồn kho kho Q9 (m²) */
+  total_stock?: number | null;
 };
 
 export type GalleryImageCandidate = {
