@@ -36,6 +36,11 @@ import {
   type PriceKind,
 } from "@/components/product-filter/PriceFilter";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
+import {
+  SortMenu,
+  type SortDir,
+  type SortFieldOption,
+} from "@/components/SortMenu";
 import { deleteProductFn, fetchProducts } from "@/api/functions";
 import type { Product } from "@/lib/types";
 import { formatVND } from "@/lib/format";
@@ -52,7 +57,6 @@ import {
   PRODUCT_GROUPS,
 } from "@/lib/product-categories";
 import {
-  ArrowUpDown,
   Check,
   Copy,
   FilePlus2,
@@ -170,17 +174,125 @@ function toFacetOption([value, count]: [string, number]) {
 type ProductSort =
   | "default"
   | "code_asc"
+  | "code_desc"
+  | "name_asc"
+  | "name_desc"
   | "price_asc"
   | "price_desc"
-  | "stock_desc";
+  | "stock_desc"
+  | "stock_asc"
+  | "hot_first";
 
-const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
-  { value: "default", label: "Mặc định" },
-  { value: "code_asc", label: "Mã SP A-Z" },
-  { value: "price_asc", label: "Giá tăng" },
-  { value: "price_desc", label: "Giá giảm" },
-  { value: "stock_desc", label: "Tồn kho nhiều nhất" },
+type ProductSortField =
+  | "default"
+  | "code"
+  | "name"
+  | "price"
+  | "stock"
+  | "hot";
+
+const PRODUCT_SORT_FIELDS: SortFieldOption<ProductSortField>[] = [
+  {
+    field: "default",
+    label: "Nhóm · BST · Mã",
+    shortLabel: "Nhóm · BST · Mã",
+    bidirectional: false,
+    defaultDir: "asc",
+  },
+  {
+    field: "code",
+    label: "Mã sản phẩm",
+    shortLabel: "Mã",
+    defaultDir: "asc",
+    ascHint: "A → Z",
+    descHint: "Z → A",
+  },
+  {
+    field: "name",
+    label: "Tên sản phẩm",
+    shortLabel: "Tên",
+    defaultDir: "asc",
+    ascHint: "A → Z",
+    descHint: "Z → A",
+  },
+  {
+    field: "price",
+    label: "Giá",
+    shortLabel: "Giá",
+    defaultDir: "asc",
+    ascHint: "Thấp → cao",
+    descHint: "Cao → thấp",
+  },
+  {
+    field: "stock",
+    label: "Tồn kho",
+    shortLabel: "Tồn",
+    defaultDir: "desc",
+    ascHint: "Ít → nhiều",
+    descHint: "Nhiều → ít",
+  },
+  {
+    field: "hot",
+    label: "Hot trước",
+    shortLabel: "Hot",
+    bidirectional: false,
+    defaultDir: "desc",
+  },
 ];
+
+function decodeProductSort(value: ProductSort): {
+  field: ProductSortField;
+  dir?: SortDir;
+} {
+  switch (value) {
+    case "code_asc":
+      return { field: "code", dir: "asc" };
+    case "code_desc":
+      return { field: "code", dir: "desc" };
+    case "name_asc":
+      return { field: "name", dir: "asc" };
+    case "name_desc":
+      return { field: "name", dir: "desc" };
+    case "price_asc":
+      return { field: "price", dir: "asc" };
+    case "price_desc":
+      return { field: "price", dir: "desc" };
+    case "stock_asc":
+      return { field: "stock", dir: "asc" };
+    case "stock_desc":
+      return { field: "stock", dir: "desc" };
+    case "hot_first":
+      return { field: "hot", dir: "desc" };
+    default:
+      return { field: "default", dir: "asc" };
+  }
+}
+
+function encodeProductSort(field: ProductSortField, dir: SortDir): ProductSort {
+  switch (field) {
+    case "code":
+      return dir === "desc" ? "code_desc" : "code_asc";
+    case "name":
+      return dir === "desc" ? "name_desc" : "name_asc";
+    case "price":
+      return dir === "desc" ? "price_desc" : "price_asc";
+    case "stock":
+      return dir === "desc" ? "stock_desc" : "stock_asc";
+    case "hot":
+      return "hot_first";
+    default:
+      return "default";
+  }
+}
+
+function compareProductCode(a: Product, b: Product): number {
+  const byCode = (a.code || "").localeCompare(b.code || "", "vi", {
+    numeric: true,
+    sensitivity: "base",
+  });
+  if (byCode !== 0) return byCode;
+  return a.id - b.id;
+}
 
 /** Section filter gập/mở — giữ panel «Bộ lọc» gọn: mở sẵn khi mục đã có lựa chọn. */
 function FilterSection({
@@ -235,9 +347,14 @@ function parseSort(v: unknown): ProductSort | undefined {
   if (
     v === "default" ||
     v === "code_asc" ||
+    v === "code_desc" ||
+    v === "name_asc" ||
+    v === "name_desc" ||
     v === "price_asc" ||
     v === "price_desc" ||
-    v === "stock_desc"
+    v === "stock_desc" ||
+    v === "stock_asc" ||
+    v === "hot_first"
   )
     return v;
   return undefined;
@@ -670,24 +787,50 @@ function ProductsPage() {
 
     switch (sortParam) {
       case "code_asc":
-        return list.sort((a, b) =>
-          (a.code || "").localeCompare(b.code || "", "vi", {
-            numeric: true,
+        return list.sort(compareProductCode);
+      case "code_desc":
+        return list.sort((a, b) => compareProductCode(b, a));
+      case "name_asc":
+        return list.sort((a, b) => {
+          const byName = (a.name || "").localeCompare(b.name || "", "vi", {
             sensitivity: "base",
-          }),
-        );
+          });
+          if (byName !== 0) return byName;
+          return compareProductCode(a, b);
+        });
+      case "name_desc":
+        return list.sort((a, b) => {
+          const byName = (b.name || "").localeCompare(a.name || "", "vi", {
+            sensitivity: "base",
+          });
+          if (byName !== 0) return byName;
+          return compareProductCode(a, b);
+        });
       case "price_asc":
-        return list.sort(
-          (a, b) => priceOf(a, priceKindParam) - priceOf(b, priceKindParam),
-        );
+        return list.sort((a, b) => {
+          const d = priceOf(a, priceKindParam) - priceOf(b, priceKindParam);
+          return d !== 0 ? d : compareProductCode(a, b);
+        });
       case "price_desc":
-        return list.sort(
-          (a, b) => priceOf(b, priceKindParam) - priceOf(a, priceKindParam),
-        );
+        return list.sort((a, b) => {
+          const d = priceOf(b, priceKindParam) - priceOf(a, priceKindParam);
+          return d !== 0 ? d : compareProductCode(a, b);
+        });
       case "stock_desc":
-        return list.sort(
-          (a, b) => (Number(b.total_stock) || 0) - (Number(a.total_stock) || 0),
-        );
+        return list.sort((a, b) => {
+          const d = (Number(b.total_stock) || 0) - (Number(a.total_stock) || 0);
+          return d !== 0 ? d : compareProductCode(a, b);
+        });
+      case "stock_asc":
+        return list.sort((a, b) => {
+          const d = (Number(a.total_stock) || 0) - (Number(b.total_stock) || 0);
+          return d !== 0 ? d : compareProductCode(a, b);
+        });
+      case "hot_first":
+        return list.sort((a, b) => {
+          const d = (b.is_hot ? 1 : 0) - (a.is_hot ? 1 : 0);
+          return d !== 0 ? d : compareProductCode(a, b);
+        });
       default:
         return list;
     }
@@ -701,7 +844,7 @@ function ProductsPage() {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Reset khi filter / nhóm / search đổi
+  // Reset khi filter / nhóm / search / sort đổi
   const filterKey = useMemo(
     () =>
       [
@@ -719,6 +862,7 @@ function ProductsPage() {
         materialsParam.join(","),
         hotParam ? "1" : "0",
         stockLocParam,
+        sortParam,
       ].join("|"),
     [
       nhom,
@@ -734,6 +878,8 @@ function ProductsPage() {
       collectionsParam,
       materialsParam,
       hotParam,
+      stockLocParam,
+      sortParam,
     ],
   );
 
@@ -809,8 +955,21 @@ function ProductsPage() {
         ? priceKindLabel
         : null;
 
-  const sortLabel =
-    SORT_OPTIONS.find((o) => o.value === sortParam)?.label ?? "Mặc định";
+  const priceKindShort =
+    PRICE_KIND_OPTIONS.find((o) => o.value === priceKindParam)?.short ?? "Lẻ";
+  const productSortFields = useMemo(
+    (): SortFieldOption<ProductSortField>[] =>
+      PRODUCT_SORT_FIELDS.map((f) =>
+        f.field === "price"
+          ? {
+              ...f,
+              label: `Giá ${priceKindShort}`,
+              shortLabel: `Giá ${priceKindShort}`,
+            }
+          : f,
+      ),
+    [priceKindShort],
+  );
 
   function setSearch(patch: Partial<SanPhamSearch>) {
     navigate({
@@ -1087,62 +1246,14 @@ function ProductsPage() {
             </button>
           </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "h-8 shrink-0 px-2.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 ring-1 ring-black/5 transition-colors",
-                  sortParam !== "default"
-                    ? "bg-surface-strong text-foreground"
-                    : "bg-card text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <ArrowUpDown className="size-3.5 opacity-70" />
-                <span className="max-w-[9rem] truncate">
-                  {sortParam === "default" ? "Sắp xếp" : sortLabel}
-                </span>
-                <ChevronDown className="size-3.5 opacity-60" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-2">
-              <p className="text-xs font-medium text-foreground px-2 pb-1.5">
-                Sắp xếp theo
-              </p>
-              <div className="space-y-0.5">
-                {SORT_OPTIONS.map((opt) => {
-                  const on = sortParam === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() =>
-                        setSearch({ sort: opt.value as ProductSort })
-                      }
-                      className={cn(
-                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors",
-                        on
-                          ? "bg-terracotta-soft text-foreground"
-                          : "hover:bg-surface-strong/70 text-foreground",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "size-4 rounded-full border grid place-items-center flex-shrink-0",
-                          on
-                            ? "bg-terracotta border-terracotta text-primary-foreground"
-                            : "border-border",
-                        )}
-                      >
-                        {on && <Check className="size-3" strokeWidth={3} />}
-                      </span>
-                      <span className="flex-1 truncate">{opt.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </PopoverContent>
-          </Popover>
+          <SortMenu
+            value={sortParam}
+            defaultValue="default"
+            fields={productSortFields}
+            decode={decodeProductSort}
+            encode={encodeProductSort}
+            onChange={(sort) => setSearch({ sort })}
+          />
         </div>
 
         {/* Hàng 3: facets — desktop primary chips; mobile gọn + sheet */}
@@ -1974,12 +2085,28 @@ const ProductCard = memo(function ProductCard({
       }
     >
       <div className="relative aspect-[4/5] bg-[#f7f6f4] overflow-hidden">
-        <ProductImage
-          src={t.image_path}
-          alt={t.name}
-          code={t.code}
-          fit="contain"
-        />
+        {onImages ? (
+          <button
+            type="button"
+            onClick={() => onImages(t)}
+            className="absolute inset-0 z-0 block size-full cursor-pointer text-left"
+            aria-label={`Xem hình ${t.code}`}
+          >
+            <ProductImage
+              src={t.image_path}
+              alt={t.name}
+              code={t.code}
+              fit="contain"
+            />
+          </button>
+        ) : (
+          <ProductImage
+            src={t.image_path}
+            alt={t.name}
+            code={t.code}
+            fit="contain"
+          />
+        )}
         <ProductCheck
           checked={selected}
           onChange={() => onToggleSelect(t.id)}
@@ -1987,23 +2114,27 @@ const ProductCard = memo(function ProductCard({
           className="absolute top-2 left-2 z-10"
         />
         {t.is_hot ? (
-          <span className="absolute top-2.5 left-10 text-[10px] font-semibold tracking-wide uppercase bg-terracotta text-primary-foreground px-2 py-0.5 rounded-full">
+          <span className="absolute top-2.5 left-10 z-[1] text-[10px] font-semibold tracking-wide uppercase bg-terracotta text-primary-foreground px-2 py-0.5 rounded-full pointer-events-none">
             Hot
           </span>
         ) : null}
         {(t.image_count ?? 0) > 1 ? (
-          <span className="absolute top-2.5 right-2.5 text-[10px] font-medium tabular-nums bg-black/50 backdrop-blur-sm text-white px-1.5 py-0.5 rounded-md">
+          <span className="absolute top-2.5 right-2.5 z-[1] text-[10px] font-medium tabular-nums bg-black/50 backdrop-blur-sm text-white px-1.5 py-0.5 rounded-md pointer-events-none">
             {t.image_count}
           </span>
         ) : null}
         {onEdit || onImages ? (
-          <div className="absolute inset-x-0 bottom-0 p-2.5 flex justify-end gap-1.5 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 bg-gradient-to-t from-black/25 to-transparent pt-8">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] hidden justify-end gap-1.5 bg-gradient-to-t from-black/25 to-transparent p-2.5 pt-8 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 translate-y-1 md:flex">
             {onImages ? (
               <button
                 type="button"
-                onClick={() => onImages(t)}
-                className="size-8 grid place-items-center rounded-full bg-white/95 text-foreground shadow-sm hover:bg-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImages(t);
+                }}
+                className="pointer-events-auto size-8 grid place-items-center rounded-full bg-white/95 text-foreground shadow-sm hover:bg-white"
                 title="Hình"
+                aria-label={`Xem hình ${t.code}`}
               >
                 <Images className="size-3.5" />
               </button>
@@ -2011,9 +2142,13 @@ const ProductCard = memo(function ProductCard({
             {onEdit ? (
               <button
                 type="button"
-                onClick={() => onEdit(t)}
-                className="size-8 grid place-items-center rounded-full bg-white/95 text-foreground shadow-sm hover:bg-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(t);
+                }}
+                className="pointer-events-auto size-8 grid place-items-center rounded-full bg-white/95 text-foreground shadow-sm hover:bg-white"
                 title="Sửa"
+                aria-label={`Sửa ${t.code}`}
               >
                 <Pencil className="size-3.5" />
               </button>

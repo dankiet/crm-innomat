@@ -19,7 +19,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowUpDown,
+  ArrowLeft,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -53,6 +53,11 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import {
+  SortMenu,
+  type SortDir,
+  type SortFieldOption,
+} from "@/components/SortMenu";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -61,6 +66,7 @@ import {
 } from "@/components/ui/dialog";
 import { readImageFileAsWebpDataUrl } from "@/lib/image-upload";
 import { formatVND } from "@/lib/format";
+import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import {
   buildExactCodeSet,
   codeRowFromProduct,
@@ -70,7 +76,181 @@ import {
 import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** Chip lọc danh mục trên list Thư viện (3 nhóm chính) — thứ tự: Thẻ, Bông, Mosaic. */
+const LIBRARY_CATEGORY_SLUGS = ["gach-the", "gach-bong", "gach-mosaic"] as const;
+type LibraryCategorySlug = (typeof LIBRARY_CATEGORY_SLUGS)[number];
+
+const LIBRARY_CATEGORY_CHIPS = LIBRARY_CATEGORY_SLUGS.map((slug) => {
+  const group = PRODUCT_GROUPS.find((g) => g.slug === slug);
+  if (!group || group.category === "all") {
+    throw new Error(`Missing PRODUCT_GROUPS entry for ${slug}`);
+  }
+  return { slug, category: group.category, label: group.label };
+});
+
+type GallerySort =
+  | "created_desc"
+  | "created_asc"
+  | "updated_desc"
+  | "updated_asc"
+  | "name_asc"
+  | "name_desc"
+  | "items_desc"
+  | "items_asc";
+
+type GallerySortField = "created" | "updated" | "name" | "items";
+
+const GALLERY_SORT_FIELDS: SortFieldOption<GallerySortField>[] = [
+  {
+    field: "created",
+    label: "Ngày tạo",
+    shortLabel: "Mới tạo",
+    defaultDir: "desc",
+    ascHint: "Cũ → mới",
+    descHint: "Mới → cũ",
+  },
+  {
+    field: "updated",
+    label: "Cập nhật",
+    shortLabel: "Cập nhật",
+    defaultDir: "desc",
+    ascHint: "Cũ → mới",
+    descHint: "Mới → cũ",
+  },
+  {
+    field: "name",
+    label: "Tên",
+    shortLabel: "Tên",
+    defaultDir: "asc",
+    ascHint: "A → Z",
+    descHint: "Z → A",
+  },
+  {
+    field: "items",
+    label: "Số ảnh",
+    shortLabel: "Số ảnh",
+    defaultDir: "desc",
+    ascHint: "Ít → nhiều",
+    descHint: "Nhiều → ít",
+  },
+];
+
+function decodeGallerySort(value: GallerySort): {
+  field: GallerySortField;
+  dir?: SortDir;
+} {
+  switch (value) {
+    case "created_asc":
+      return { field: "created", dir: "asc" };
+    case "created_desc":
+      return { field: "created", dir: "desc" };
+    case "updated_asc":
+      return { field: "updated", dir: "asc" };
+    case "updated_desc":
+      return { field: "updated", dir: "desc" };
+    case "name_asc":
+      return { field: "name", dir: "asc" };
+    case "name_desc":
+      return { field: "name", dir: "desc" };
+    case "items_asc":
+      return { field: "items", dir: "asc" };
+    case "items_desc":
+      return { field: "items", dir: "desc" };
+    default:
+      return { field: "created", dir: "desc" };
+  }
+}
+
+function encodeGallerySort(field: GallerySortField, dir: SortDir): GallerySort {
+  switch (field) {
+    case "created":
+      return dir === "asc" ? "created_asc" : "created_desc";
+    case "updated":
+      return dir === "asc" ? "updated_asc" : "updated_desc";
+    case "name":
+      return dir === "asc" ? "name_asc" : "name_desc";
+    case "items":
+      return dir === "asc" ? "items_asc" : "items_desc";
+  }
+}
+
+type ThuVienSearch = {
+  sort?: GallerySort;
+  /** Lọc BST theo danh mục SP liên kết (slug PRODUCT_GROUPS) */
+  cat?: LibraryCategorySlug;
+  /** Collection đang mở — back trình duyệt / máy đóng được */
+  c?: number;
+  /** Index ảnh trong viewer (cần kèm c) */
+  v?: number;
+};
+
+function parseGallerySort(v: unknown): GallerySort | undefined {
+  if (
+    v === "created_desc" ||
+    v === "created_asc" ||
+    v === "updated_desc" ||
+    v === "updated_asc" ||
+    v === "name_asc" ||
+    v === "name_desc" ||
+    v === "items_desc" ||
+    v === "items_asc"
+  )
+    return v;
+  return undefined;
+}
+
+function parseLibraryCategory(v: unknown): LibraryCategorySlug | undefined {
+  if (typeof v !== "string") return undefined;
+  return LIBRARY_CATEGORY_CHIPS.some((chip) => chip.slug === v)
+    ? (v as LibraryCategorySlug)
+    : undefined;
+}
+
+function parsePositiveInt(v: unknown): number | undefined {
+  const n =
+    typeof v === "number"
+      ? v
+      : typeof v === "string" && v.trim() !== ""
+        ? Number(v)
+        : NaN;
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.floor(n);
+}
+
+function compareCollectionName(a: GalleryCollection, b: GalleryCollection): number {
+  const byName = a.name.localeCompare(b.name, "vi", { sensitivity: "base" });
+  if (byName !== 0) return byName;
+  return a.id - b.id;
+}
+
+function timeMs(value: string | undefined): number {
+  if (!value) return 0;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function parseViewerIndex(v: unknown): number | undefined {
+  const n =
+    typeof v === "number"
+      ? v
+      : typeof v === "string" && v.trim() !== ""
+        ? Number(v)
+        : NaN;
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.floor(n);
+}
+
 export const Route = createFileRoute("/_app/thu-vien")({
+  validateSearch: (search: Record<string, unknown>): ThuVienSearch => {
+    const c = parsePositiveInt(search.c);
+    return {
+      sort: parseGallerySort(search.sort),
+      cat: parseLibraryCategory(search.cat),
+      c,
+      // Viewer only valid while a collection is open
+      v: c != null ? parseViewerIndex(search.v) : undefined,
+    };
+  },
   beforeLoad: ({ context }) => {
     if (!context.user) throw redirect({ to: "/login" });
   },
@@ -136,6 +316,14 @@ async function copyProductCodes(codes: string[], successMessage: string): Promis
 
 function GalleryPage() {
   const router = useRouter();
+  const navigate = Route.useNavigate();
+  const searchParams = Route.useSearch();
+  const {
+    sort: sortParam = "created_desc",
+    cat: categorySlug,
+    c: selectedId,
+    v: viewerIndexParam,
+  } = searchParams;
   const loaderData = Route.useLoaderData() as {
     collections: GalleryCollection[];
     candidates: GalleryImageCandidate[];
@@ -143,20 +331,214 @@ function GalleryPage() {
   const { user } = Route.useRouteContext();
   const isAdmin = user.role === "admin";
   const [collections, setCollections] = useState(loaderData.collections);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<CollectionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<GalleryCollection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"name" | "created_at">("name");
   const deferredSearch = useDeferredValue(search);
   const uploadRef = useRef<HTMLInputElement>(null);
+  /** True when this session pushed collection onto history (not deep-link / F5). */
+  const pushedCollectionRef = useRef(false);
+  /** True when this session pushed viewer onto history. */
+  const pushedViewerRef = useRef(false);
+
+  const viewerIndex =
+    selectedId != null && viewerIndexParam != null ? viewerIndexParam : null;
+
+  function patchSearch(
+    patch: Partial<ThuVienSearch> | ((prev: ThuVienSearch) => ThuVienSearch),
+    opts?: { replace?: boolean },
+  ) {
+    navigate({
+      search: (prev: ThuVienSearch) => {
+        const base =
+          typeof patch === "function" ? patch(prev) : { ...prev, ...patch };
+        const next: ThuVienSearch = { ...base };
+        if (!next.sort || next.sort === "created_desc") delete next.sort;
+        if (!next.cat) delete next.cat;
+        if (next.c == null) {
+          delete next.c;
+          delete next.v;
+        }
+        if (next.v == null) delete next.v;
+        return next;
+      },
+      replace: opts?.replace ?? false,
+    });
+  }
+
+  function setSort(sort: GallerySort) {
+    patchSearch({ sort }, { replace: true });
+  }
+
+  function setCategoryFilter(slug: LibraryCategorySlug | undefined) {
+    patchSearch(
+      (prev) => {
+        const next: ThuVienSearch = { ...prev };
+        if (slug) next.cat = slug;
+        else delete next.cat;
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  const activeCategory = useMemo(
+    () => LIBRARY_CATEGORY_CHIPS.find((chip) => chip.slug === categorySlug),
+    [categorySlug],
+  );
+
+  /** collectionId → set category string (từ SP liên kết trong candidates) */
+  const collectionIdsByCategory = useMemo(() => {
+    const map = new Map<string, Set<number>>();
+    for (const candidate of loaderData.candidates) {
+      const category = candidate.category?.trim();
+      if (!category || !candidate.gallery_collection_ids?.length) continue;
+      let ids = map.get(category);
+      if (!ids) {
+        ids = new Set<number>();
+        map.set(category, ids);
+      }
+      for (const collectionId of candidate.gallery_collection_ids) {
+        const id = Number(collectionId);
+        if (Number.isFinite(id) && id > 0) ids.add(id);
+      }
+    }
+    return map;
+  }, [loaderData.candidates]);
+
+  function openCollection(id: number) {
+    // push — Android / browser Back returns to list
+    pushedCollectionRef.current = true;
+    pushedViewerRef.current = false;
+    patchSearch((prev) => {
+      const next: ThuVienSearch = { ...prev, c: id };
+      delete next.v;
+      return next;
+    });
+  }
+
+  function closeCollection() {
+    // Prefer history.back so we don't leave a duplicate list entry on the stack
+    if (pushedCollectionRef.current) {
+      pushedCollectionRef.current = false;
+      pushedViewerRef.current = false;
+      window.history.back();
+      return;
+    }
+    patchSearch(
+      (prev) => {
+        const next: ThuVienSearch = { ...prev };
+        delete next.c;
+        delete next.v;
+        return next;
+      },
+      { replace: true },
+    );
+    setDetail(null);
+  }
+
+  function openViewer(index: number) {
+    if (selectedId == null) return;
+    // push — Back closes viewer, stays on collection
+    pushedViewerRef.current = true;
+    patchSearch({ v: index });
+  }
+
+  function closeViewer() {
+    if (viewerIndex == null) return;
+    if (pushedViewerRef.current) {
+      pushedViewerRef.current = false;
+      window.history.back();
+      return;
+    }
+    patchSearch(
+      (prev) => {
+        const next: ThuVienSearch = { ...prev };
+        delete next.v;
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  // Sync push flags when URL layers close via system Back
+  useEffect(() => {
+    if (selectedId == null) {
+      pushedCollectionRef.current = false;
+      pushedViewerRef.current = false;
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (viewerIndex == null) pushedViewerRef.current = false;
+  }, [viewerIndex]);
+
+  // Load / clear detail when URL collection id changes (incl. browser back)
+  useEffect(() => {
+    if (selectedId == null) {
+      setDetail(null);
+      setLoadingDetail(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDetail(true);
+    // Drop stale detail when switching collections via history
+    setDetail((prev) =>
+      prev && prev.collection.id === selectedId ? prev : null,
+    );
+    void (async () => {
+      try {
+        const result = await fetchGalleryCollection({ data: { id: selectedId } });
+        if (cancelled) return;
+        setDetail(result);
+      } catch (error) {
+        if (cancelled) return;
+        toast.error(errorMessage(error, "Không tải được bộ sưu tập"));
+        patchSearch(
+          (prev) => {
+            const next: ThuVienSearch = { ...prev };
+            delete next.c;
+            delete next.v;
+            return next;
+          },
+          { replace: true },
+        );
+      } finally {
+        if (!cancelled) setLoadingDetail(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to c
+  }, [selectedId]);
+
+  // Clamp / drop invalid viewer index once items are known
+  useEffect(() => {
+    if (viewerIndex == null || !detail) return;
+    if (detail.items.length === 0) {
+      patchSearch(
+        (prev) => {
+          const next: ThuVienSearch = { ...prev };
+          delete next.v;
+          return next;
+        },
+        { replace: true },
+      );
+      return;
+    }
+    if (viewerIndex >= detail.items.length) {
+      patchSearch({ v: detail.items.length - 1 }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerIndex, detail?.items.length, detail?.collection.id]);
+
   const sortedCollections = useMemo(() => {
     const needle = normalizeSearchText(deferredSearch);
     const matchingCollectionNames = needle
@@ -166,19 +548,64 @@ function GalleryPage() {
             .map((candidate) => candidate.collections),
         )
       : null;
-    return collections
-      .filter(
-        (collection) =>
-          !needle ||
-          normalizeSearchText(collection.name).includes(needle) ||
-          matchingCollectionNames?.has(collection.name),
-      )
-      .sort((left, right) =>
-        sortBy === "name"
-          ? left.name.localeCompare(right.name, "vi", { sensitivity: "base" })
-          : new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+    const categoryCollectionIds = activeCategory
+      ? collectionIdsByCategory.get(activeCategory.category)
+      : undefined;
+    const list = collections.filter((collection) => {
+      if (activeCategory) {
+        if (!categoryCollectionIds?.has(collection.id)) return false;
+      }
+      if (!needle) return true;
+      return (
+        normalizeSearchText(collection.name).includes(needle) ||
+        Boolean(matchingCollectionNames?.has(collection.name))
       );
-  }, [collections, deferredSearch, loaderData.candidates, sortBy]);
+    });
+    switch (sortParam) {
+      case "created_asc":
+        return list.sort((a, b) => {
+          const d = timeMs(a.created_at) - timeMs(b.created_at);
+          return d !== 0 ? d : compareCollectionName(a, b);
+        });
+      case "updated_desc":
+        return list.sort((a, b) => {
+          const d = timeMs(b.updated_at) - timeMs(a.updated_at);
+          return d !== 0 ? d : compareCollectionName(a, b);
+        });
+      case "updated_asc":
+        return list.sort((a, b) => {
+          const d = timeMs(a.updated_at) - timeMs(b.updated_at);
+          return d !== 0 ? d : compareCollectionName(a, b);
+        });
+      case "name_asc":
+        return list.sort(compareCollectionName);
+      case "name_desc":
+        return list.sort((a, b) => compareCollectionName(b, a));
+      case "items_desc":
+        return list.sort((a, b) => {
+          const d = (b.item_count || 0) - (a.item_count || 0);
+          return d !== 0 ? d : compareCollectionName(a, b);
+        });
+      case "items_asc":
+        return list.sort((a, b) => {
+          const d = (a.item_count || 0) - (b.item_count || 0);
+          return d !== 0 ? d : compareCollectionName(a, b);
+        });
+      case "created_desc":
+      default:
+        return list.sort((a, b) => {
+          const d = timeMs(b.created_at) - timeMs(a.created_at);
+          return d !== 0 ? d : compareCollectionName(a, b);
+        });
+    }
+  }, [
+    activeCategory,
+    collectionIdsByCategory,
+    collections,
+    deferredSearch,
+    loaderData.candidates,
+    sortParam,
+  ]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
@@ -189,20 +616,6 @@ function GalleryPage() {
     const rows = await fetchGalleryCollections();
     setCollections(rows);
     return rows;
-  }
-
-  async function openCollection(id: number) {
-    setSelectedId(id);
-    setLoadingDetail(true);
-    try {
-      const result = await fetchGalleryCollection({ data: { id } });
-      setDetail(result);
-    } catch (error) {
-      toast.error(errorMessage(error, "Không tải được bộ sưu tập"));
-      setSelectedId(null);
-    } finally {
-      setLoadingDetail(false);
-    }
   }
 
   async function copyCollectionCodes(collection: GalleryCollection) {
@@ -235,7 +648,15 @@ function GalleryPage() {
       await deleteGalleryCollectionFn({ data: { id: collection.id } });
       toast.success("Đã xóa bộ sưu tập");
       if (selectedId === collection.id) {
-        setSelectedId(null);
+        patchSearch(
+          (prev) => {
+            const next: ThuVienSearch = { ...prev };
+            delete next.c;
+            delete next.v;
+            return next;
+          },
+          { replace: true },
+        );
         setDetail(null);
       }
       await refreshCollections();
@@ -330,16 +751,17 @@ function GalleryPage() {
   if (selectedId != null) {
     return (
       <div className="space-y-5">
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedId(null);
-            setDetail(null);
-          }}
-          className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-4" /> Tất cả bộ sưu tập
-        </button>
+        <div className="mb-1">
+          <button
+            type="button"
+            onClick={closeCollection}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5 shrink-0" />
+            Thư viện
+          </button>
+        </div>
+
         {loadingDetail || !detail ? (
           <div className="grid min-h-64 place-items-center text-muted-foreground">
             <Loader2 className="size-6 animate-spin" />
@@ -349,7 +771,8 @@ function GalleryPage() {
             <PageHeader
               title={detail.collection.name}
               description={
-                detail.collection.description || `${detail.items.length} ảnh trong bộ sưu tập`
+                detail.collection.description ||
+                `${detail.items.length} ảnh trong bộ sưu tập`
               }
               actions={
                 <>
@@ -424,7 +847,7 @@ function GalleryPage() {
                           isCover={detail.collection.cover_path === item.path}
                           canEdit={isAdmin}
                           disabled={busy || reordering}
-                          onView={() => setViewerIndex(index)}
+                          onView={() => openViewer(index)}
                           onSetCover={() => void setCover(item)}
                           onRemove={() => void removeItem(item)}
                         />
@@ -452,7 +875,7 @@ function GalleryPage() {
               items={detail.items}
               initialIndex={viewerIndex ?? 0}
               onOpenChange={(open) => {
-                if (!open) setViewerIndex(null);
+                if (!open) closeViewer();
               }}
             />
           </>
@@ -482,28 +905,61 @@ function GalleryPage() {
         }
       />
       {collections.length ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <label className="relative inline-flex items-center">
-            <ArrowUpDown className="pointer-events-none absolute left-3 size-3.5 text-muted-foreground" />
-            <select
-              value={sortBy}
-              onChange={(event) => setSortBy(event.target.value as "name" | "created_at")}
-              className="h-9 rounded-lg border border-border bg-card pl-9 pr-3 text-xs font-medium outline-none"
-              aria-label="Sắp xếp bộ sưu tập"
-            >
-              <option value="name">Theo tên</option>
-              <option value="created_at">Theo ngày tạo</option>
-            </select>
-          </label>
-          <label className="relative min-w-56 flex-1 sm:max-w-sm">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm tên thư viện hoặc mã sản phẩm..."
-              className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/10"
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {LIBRARY_CATEGORY_CHIPS.map((chip) => {
+              const active = categorySlug === chip.slug;
+              const count = collectionIdsByCategory.get(chip.category)?.size ?? 0;
+              return (
+                <button
+                  key={chip.slug}
+                  type="button"
+                  onClick={() =>
+                    setCategoryFilter(active ? undefined : chip.slug)
+                  }
+                  aria-pressed={active}
+                  className={cn(
+                    "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-terracotta-soft text-terracotta ring-1 ring-terracotta/30"
+                      : "border border-border text-muted-foreground hover:bg-surface-strong/60 hover:text-foreground",
+                  )}
+                >
+                  <span>{chip.label}</span>
+                  <span
+                    className={cn(
+                      "inline-flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
+                      active
+                        ? "bg-terracotta text-primary-foreground"
+                        : "bg-surface-strong text-muted-foreground",
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:flex-none">
+            <SortMenu
+              value={sortParam}
+              defaultValue="created_desc"
+              fields={GALLERY_SORT_FIELDS}
+              decode={decodeGallerySort}
+              encode={encodeGallerySort}
+              onChange={setSort}
+              className="h-9"
             />
-          </label>
+            <label className="relative min-w-56 flex-1 sm:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Tìm tên thư viện hoặc mã sản phẩm..."
+                className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/10"
+              />
+            </label>
+          </div>
         </div>
       ) : null}
       {sortedCollections.length ? (
@@ -616,10 +1072,36 @@ function GalleryPage() {
           <div className="space-y-3">
             <Images className="mx-auto size-10 text-muted-foreground/50" />
             <div>
-              <p className="text-sm font-medium">Chưa có bộ sưu tập</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Tạo bộ đầu tiên để gom ảnh theo dự án hoặc ý tưởng.
-              </p>
+              {collections.length === 0 ? (
+                <>
+                  <p className="text-sm font-medium">Chưa có bộ sưu tập</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tạo bộ đầu tiên để gom ảnh theo dự án hoặc ý tưởng.
+                  </p>
+                </>
+              ) : activeCategory || deferredSearch.trim() ? (
+                <>
+                  <p className="text-sm font-medium">
+                    {activeCategory
+                      ? `Không có bộ sưu tập nào cho ${activeCategory.label}`
+                      : "Không tìm thấy bộ sưu tập phù hợp"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {activeCategory && deferredSearch.trim()
+                      ? "Thử bỏ lọc danh mục hoặc đổi từ khóa tìm kiếm."
+                      : activeCategory
+                        ? "Bấm lại chip để xem tất cả, hoặc thêm ảnh sản phẩm danh mục này vào bộ sưu tập."
+                        : "Thử từ khóa khác hoặc bỏ bộ lọc."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">Chưa có bộ sưu tập</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tạo bộ đầu tiên để gom ảnh theo dự án hoặc ý tưởng.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -849,12 +1331,34 @@ function GalleryViewerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="inset-0 flex h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-black p-0 text-white sm:inset-0 sm:h-[100dvh] sm:max-h-none sm:w-screen sm:max-w-none sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:p-0 [&>button]:z-30 [&>button]:grid [&>button]:size-11 [&>button]:place-items-center [&>button]:rounded-full [&>button]:bg-black/50 [&>button]:text-white">
+      <DialogContent className="inset-0 flex h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-black p-0 text-white sm:inset-0 sm:h-[100dvh] sm:max-h-none sm:w-screen sm:max-w-none sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:p-0 [&>button]:hidden">
         <DialogHeader className="sr-only">
           <DialogTitle>Xem ảnh bộ sưu tập</DialogTitle>
         </DialogHeader>
         {item ? (
           <>
+            {/* Top chrome: labeled Đóng — distinct from OS back / prev-image */}
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-3 sm:px-5"
+              style={{
+                paddingTop: "max(0.75rem, env(safe-area-inset-top))",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="pointer-events-auto inline-flex h-11 min-w-11 items-center gap-2 rounded-full bg-black/55 px-3.5 text-sm font-medium text-white shadow-lg ring-1 ring-white/20 backdrop-blur-md hover:bg-black/75"
+              >
+                <X className="size-4 shrink-0" strokeWidth={2.5} />
+                Đóng
+              </button>
+              {hasMultiple ? (
+                <span className="pointer-events-none mt-2 rounded-full bg-black/45 px-2.5 py-1 text-xs tabular-nums text-white/85 ring-1 ring-white/10 backdrop-blur-sm">
+                  {index + 1} / {items.length}
+                </span>
+              ) : null}
+            </div>
+
             <div
               className="relative min-h-0 flex-1 touch-pan-y select-none"
               onPointerDown={(event) => {
@@ -871,14 +1375,14 @@ function GalleryViewerDialog({
                 alt={item.caption || item.product_name}
                 fit="contain"
                 loading="eager"
-                className="p-3 pb-20 pt-[max(3.5rem,env(safe-area-inset-top))] sm:p-8 sm:pb-24"
+                className="p-3 pb-20 pt-[max(4.5rem,calc(env(safe-area-inset-top)+3.25rem))] sm:p-8 sm:pb-24 sm:pt-20"
               />
               {hasMultiple ? (
                 <>
                   <button
                     type="button"
                     onClick={() => move(-1)}
-                    className="absolute left-2 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 sm:left-5"
+                    className="absolute left-4 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 sm:left-10"
                     aria-label="Ảnh trước"
                   >
                     <ChevronLeft className="size-6" />
@@ -886,7 +1390,7 @@ function GalleryViewerDialog({
                   <button
                     type="button"
                     onClick={() => move(1)}
-                    className="absolute right-2 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 sm:right-5"
+                    className="absolute right-4 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 sm:right-10"
                     aria-label="Ảnh sau"
                   >
                     <ChevronRight className="size-6" />
@@ -903,9 +1407,6 @@ function GalleryViewerDialog({
                       {item.product_name || item.caption || "Không gắn sản phẩm"}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs tabular-nums text-white/70">
-                    {index + 1} / {items.length}
-                  </span>
                 </div>
               </div>
             </div>

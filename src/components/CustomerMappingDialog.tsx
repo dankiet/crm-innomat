@@ -221,7 +221,9 @@ export function CustomerMappingDialog({
       setLoading(true);
       try {
         const [cs, ps] = await Promise.all([
-          defaultCustomerId != null ? Promise.resolve<Customer[]>([]) : fetchCustomers(),
+          defaultCustomerId != null
+            ? Promise.resolve<Customer[]>([])
+            : fetchCustomers({ data: { limit: 300 } }),
           fetchProducts({ data: { limit: 2000 } }),
         ]);
         setCustomers(cs);

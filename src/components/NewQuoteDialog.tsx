@@ -174,7 +174,7 @@ export function NewQuoteDialog({
       setLoadingEdit(true);
       try {
         const [cs, ps, detail] = await Promise.all([
-          fetchCustomers(),
+          fetchCustomers({ data: { limit: 300 } }),
           fetchProducts({ data: { limit: 2000 } }),
           quoteId ? fetchQuote({ data: { id: quoteId } }) : Promise.resolve(null),
         ]);

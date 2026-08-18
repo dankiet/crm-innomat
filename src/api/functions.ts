@@ -597,12 +597,22 @@ export const deleteGalleryCollectionFn = createServerFn({ method: "POST" })
 // ─── Customers ──────────────────────────────────────────────
 
 export const fetchCustomers = createServerFn({ method: "GET" })
-  .inputValidator((data?: { status?: CustomerStatus | "all" }) => data)
+  .inputValidator(
+    (data?: {
+      status?: CustomerStatus | "all";
+      search?: string;
+      /** Mặc định 500; dialog chọn KH nên truyền 100–200. */
+      limit?: number;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     const { requireUser, ownerFilter } = await import("@/db/auth.server");
     const me = await requireUser();
     const { listCustomers } = await import("@/db/crm.server");
-    return await listCustomers(data?.status, ownerFilter(me));
+    return await listCustomers(data?.status, ownerFilter(me), {
+      search: data?.search,
+      limit: data?.limit,
+    });
   });
 
 // ─── Customer mappings (mapping mẫu gạch theo KH) ─────────────
@@ -902,12 +912,24 @@ export const deleteCustomerFn = createServerFn({ method: "POST" })
 
 // ─── Quotes ─────────────────────────────────────────────────
 
-export const fetchQuotes = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireUser, ownerFilter } = await import("@/db/auth.server");
-  const me = await requireUser();
-  const { listQuotes } = await import("@/db/crm.server");
-  return await listQuotes(ownerFilter(me));
-});
+export const fetchQuotes = createServerFn({ method: "GET" })
+  .inputValidator(
+    (data?: {
+      search?: string;
+      statuses?: QuoteStatus[];
+      limit?: number;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireUser, ownerFilter } = await import("@/db/auth.server");
+    const me = await requireUser();
+    const { listQuotes } = await import("@/db/crm.server");
+    return await listQuotes(ownerFilter(me), {
+      search: data?.search,
+      statuses: data?.statuses,
+      limit: data?.limit,
+    });
+  });
 
 export const fetchQuote = createServerFn({ method: "GET" })
   .inputValidator((data: { id: number }) => data)
@@ -1039,12 +1061,24 @@ export const deleteQuoteFn = createServerFn({ method: "POST" })
 
 // ─── Orders ─────────────────────────────────────────────────
 
-export const fetchOrders = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireUser, ownerFilter } = await import("@/db/auth.server");
-  const me = await requireUser();
-  const { listOrders } = await import("@/db/crm.server");
-  return await listOrders(ownerFilter(me));
-});
+export const fetchOrders = createServerFn({ method: "GET" })
+  .inputValidator(
+    (data?: {
+      search?: string;
+      statuses?: OrderStatus[];
+      limit?: number;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireUser, ownerFilter } = await import("@/db/auth.server");
+    const me = await requireUser();
+    const { listOrders } = await import("@/db/crm.server");
+    return await listOrders(ownerFilter(me), {
+      search: data?.search,
+      statuses: data?.statuses,
+      limit: data?.limit,
+    });
+  });
 
 export const setOrderStatusFn = createServerFn({ method: "POST" })
   .inputValidator((data: { id: number; status: OrderStatus }) => data)

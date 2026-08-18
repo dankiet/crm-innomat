@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Columns3, FilePlus2, GripVertical, List, Pencil, Phone } from "lucide-react";
 import {
   DndContext,
@@ -14,6 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
+import { PageFilterBar, PageSearchInput } from "@/components/PageFilterBar";
 import { NewCustomerDialog } from "@/components/NewCustomerDialog";
 import { NewQuoteDialog } from "@/components/NewQuoteDialog";
 import { useLocalStorageState } from "@/hooks/useLocalStorageState";
@@ -21,13 +22,23 @@ import { fetchCustomers, setCustomerStatus } from "@/api/functions";
 import { pipelineStages, statusMeta, type Customer, type CustomerStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+type CoHoiSearch = { q?: string };
+
 export const Route = createFileRoute("/_app/co-hoi")({
   head: () => ({
     meta: [{ title: "Cơ hội — Innomat CRM" }],
   }),
-  loader: async (): Promise<{ customers: Customer[] }> => {
-    const customers = await fetchCustomers({ data: { status: "all" } });
-    return { customers };
+  validateSearch: (search: Record<string, unknown>): CoHoiSearch => ({
+    q: typeof search.q === "string" && search.q.trim() ? search.q : undefined,
+  }),
+  loaderDeps: ({ search }: { search: CoHoiSearch }) => ({
+    q: search.q?.trim() || "",
+  }),
+  loader: async ({ deps }): Promise<{ customers: Customer[]; q: string }> => {
+    const customers = await fetchCustomers({
+      data: { status: "all", search: deps.q || undefined },
+    });
+    return { customers, q: deps.q };
   },
   component: PipelinePage,
 });
@@ -228,14 +239,39 @@ function DroppableStageColumn({
 
 function PipelinePage() {
   const router = useRouter();
-  const navigate = useNavigate();
-  const { customers: loaderCustomers } = Route.useLoaderData() as {
+  const navigate = useNavigate({ from: "/co-hoi" });
+  const { customers: loaderCustomers, q: qParam } = Route.useLoaderData() as {
     customers: Customer[];
+    q: string;
   };
   const [customers, setCustomers] = useState<Customer[]>(loaderCustomers);
   useEffect(() => {
     setCustomers(loaderCustomers);
   }, [loaderCustomers]);
+
+  const [searchDraft, setSearchDraft] = useState(qParam || "");
+  const committedSearchRef = useRef(qParam || "");
+  useEffect(() => {
+    const next = qParam || "";
+    if (next === committedSearchRef.current) return;
+    committedSearchRef.current = next;
+    setSearchDraft(next);
+  }, [qParam]);
+  useEffect(() => {
+    if (searchDraft === (qParam || "")) return;
+    const t = setTimeout(() => {
+      const committed = searchDraft.trim();
+      committedSearchRef.current = committed;
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          q: committed || undefined,
+        }),
+        replace: true,
+      });
+    }, 220);
+    return () => clearTimeout(t);
+  }, [searchDraft, qParam, navigate]);
 
   const [viewMode, setViewMode] = useLocalStorageState<ViewMode>("pipeline.viewMode", "board");
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
@@ -362,6 +398,16 @@ function PipelinePage() {
         }
       />
 
+      <PageFilterBar
+        search={
+          <PageSearchInput
+            value={searchDraft}
+            onChange={setSearchDraft}
+            placeholder="Tìm tên, SĐT, khu vực, sales…"
+          />
+        }
+      />
+
       <div className="flex items-center gap-2 flex-wrap mb-4 p-2.5 rounded-xl bg-surface-strong/40 ring-1 ring-black/5">
         <span className="text-[11px] text-muted-foreground">Hiển thị cột:</span>
         <div className="flex items-center gap-1.5 flex-wrap flex-1">
@@ -466,7 +512,9 @@ function PipelinePage() {
         <div className="space-y-4">
           {pipelineTotal === 0 ? (
             <div className="bg-card ring-1 ring-black/5 rounded-xl p-12 text-center text-sm text-muted-foreground">
-              Chưa có lead trong pipeline.
+              {(qParam || "").trim()
+                ? "Không tìm thấy cơ hội phù hợp."
+                : "Chưa có lead trong pipeline."}
             </div>
           ) : (
             listByStage.map(({ stage, deals }) => (

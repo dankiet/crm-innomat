@@ -1,5 +1,5 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { PageFilterBar, PageSearchInput } from "@/components/PageFilterBar";
 import { NewQuoteDialog } from "@/components/NewQuoteDialog";
@@ -38,27 +38,46 @@ const ORDER_STATUSES: OrderStatus[] = [
   "delivered",
 ];
 
+type BaoGiaSearch = {
+  q?: string;
+  tab?: "quotes" | "orders";
+};
+
 export const Route = createFileRoute("/_app/bao-gia")({
   head: () => ({
     meta: [{ title: "Báo giá & Đơn hàng — Innomat CRM" }],
   }),
-  loader: async () => {
+  validateSearch: (search: Record<string, unknown>): BaoGiaSearch => ({
+    q: typeof search.q === "string" && search.q.trim() ? search.q : undefined,
+    tab: search.tab === "orders" || search.tab === "quotes" ? search.tab : undefined,
+  }),
+  loaderDeps: ({ search }: { search: BaoGiaSearch }) => ({
+    q: search.q?.trim() || "",
+  }),
+  loader: async ({ deps }) => {
     const [quotes, orders] = await Promise.all([
-      fetchQuotes(),
-      fetchOrders(),
+      fetchQuotes({
+        data: { search: deps.q || undefined },
+      }),
+      fetchOrders({
+        data: { search: deps.q || undefined },
+      }),
     ]);
-    return { quotes, orders };
+    return { quotes, orders, q: deps.q };
   },
   component: QuotesPage,
 });
 
 function QuotesPage() {
-  const { quotes, orders } = Route.useLoaderData() as {
+  const { quotes, orders, q: qParam } = Route.useLoaderData() as {
     quotes: Quote[];
     orders: Order[];
+    q: string;
   };
+  const searchParams = Route.useSearch();
+  const navigate = useNavigate({ from: "/bao-gia" });
   const router = useRouter();
-  const [tab, setTab] = useState<"quotes" | "orders">("quotes");
+  const tab = searchParams.tab === "orders" ? "orders" : "quotes";
   const [editQuoteId, setEditQuoteId] = useState<number | null>(null);
   const [exportQuote, setExportQuote] = useState<Quote | null>(null);
   const [converting, setConverting] = useState<number | null>(null);
@@ -77,53 +96,50 @@ function QuotesPage() {
   const [orderStatusFilter, setOrderStatusFilter] = useLocalStorageState<
     OrderStatus[]
   >("bao-gia.orderStatusFilter", []);
-  const [search, setSearch] = useState("");
+
+  const [searchDraft, setSearchDraft] = useState(qParam || "");
+  const committedSearchRef = useRef(qParam || "");
+  useEffect(() => {
+    const next = qParam || "";
+    if (next === committedSearchRef.current) return;
+    committedSearchRef.current = next;
+    setSearchDraft(next);
+  }, [qParam]);
+  useEffect(() => {
+    if (searchDraft === (qParam || "")) return;
+    const t = setTimeout(() => {
+      const committed = searchDraft.trim();
+      committedSearchRef.current = committed;
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          q: committed || undefined,
+        }),
+        replace: true,
+      });
+    }, 220);
+    return () => clearTimeout(t);
+  }, [searchDraft, qParam, navigate]);
+
+  function setTab(next: "quotes" | "orders") {
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        tab: next === "quotes" ? undefined : next,
+      }),
+      replace: true,
+    });
+  }
 
   const filteredQuotes = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return quotes.filter((item) => {
-      if (
-        quoteStatusFilter.length > 0 &&
-        !quoteStatusFilter.includes(item.status)
-      ) {
-        return false;
-      }
-      if (!q) return true;
-      const hay = [
-        item.code,
-        item.customer_name,
-        item.customer_source,
-        item.notes,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }, [quotes, quoteStatusFilter, search]);
+    if (quoteStatusFilter.length === 0) return quotes;
+    return quotes.filter((item) => quoteStatusFilter.includes(item.status));
+  }, [quotes, quoteStatusFilter]);
 
   const filteredOrders = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return orders.filter((item) => {
-      if (
-        orderStatusFilter.length > 0 &&
-        !orderStatusFilter.includes(item.status)
-      ) {
-        return false;
-      }
-      if (!q) return true;
-      const hay = [
-        item.code,
-        item.customer_name,
-        item.customer_source,
-        item.notes,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }, [orders, orderStatusFilter, search]);
+    if (orderStatusFilter.length === 0) return orders;
+    return orders.filter((item) => orderStatusFilter.includes(item.status));
+  }, [orders, orderStatusFilter]);
 
   async function handleOrderStatus(o: Order, status: OrderStatus) {
     if (orderStatusBusy || o.status === status) return;
@@ -264,8 +280,8 @@ function QuotesPage() {
       <PageFilterBar
         search={
           <PageSearchInput
-            value={search}
-            onChange={setSearch}
+            value={searchDraft}
+            onChange={setSearchDraft}
             placeholder={
               tab === "quotes"
                 ? "Tìm mã BG, tên khách…"
@@ -320,7 +336,7 @@ function QuotesPage() {
           filteredQuotes.length === 0 ? (
             <Empty
               text={
-                search.trim() || quoteStatusFilter.length
+                (qParam || "").trim() || quoteStatusFilter.length
                   ? "Không có báo giá phù hợp bộ lọc."
                   : "Chưa có báo giá. Dùng nút «Tạo báo giá» trên thanh trên cùng."
               }
@@ -388,7 +404,7 @@ function QuotesPage() {
         ) : filteredOrders.length === 0 ? (
           <Empty
             text={
-              search.trim() || orderStatusFilter.length
+              (qParam || "").trim() || orderStatusFilter.length
                 ? "Không có đơn hàng phù hợp bộ lọc."
                 : "Chưa có đơn hàng. Chuyển báo giá thành đơn để ghi nhận công nợ."
             }

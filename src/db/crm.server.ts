@@ -1,24 +1,4 @@
 import fs from "node:fs";
-import {
-  candidates,
-  extractAliasCodes,
-  extractNameDimPack,
-  normRaw,
-  parsePackaging,
-  titleCaseVn,
-  type ParsedPackaging,
-} from "@/lib/product-code-matcher";
-import {
-  allProductAliases,
-  normalizeInternalCodesInput,
-  parseInternalCodesList,
-  serializeInternalCodes,
-} from "@/lib/product-internal-codes";
-import {
-  mergePackingVariants,
-  parsePackingFromHhdvName,
-  type PackingByCode,
-} from "@/lib/hhdv-packing";
 import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage";
 import { normalizeUploadImageBuffer } from "@/lib/image-upload.server";
 import path from "node:path";
@@ -42,71 +22,6 @@ import type {
 } from "@/lib/types";
 import { isPhoneMatchable, phonesMatch } from "@/lib/phone";
 import { statusMeta } from "@/lib/types";
-
-function extractCoreVariants(code: string): string[] {
-  const parts = code.split("-");
-  return parts.length > 1 ? [parts[0], code] : [code];
-}
-
-type ProductStockRef = {
-  id: number;
-  code: string;
-  name: string;
-  internal_code: string;
-  internal_codes: string;
-  packing: string;
-  packing_pcs: number | null;
-  packing_m2: number | null;
-  stock_m2: number | null;
-  stock_vp: number | null;
-};
-
-type StockImportRow = {
-  internal_code: string;
-  stock_m2: number;
-  stock_vp?: number;
-  product_name?: string;
-  mo_ta?: string;
-  kho?: string;
-};
-
-type StockImportMatched = {
-  product_id: number;
-  code: string;
-  name: string;
-  internal_code: string;
-  old_stock: number | null;
-  new_stock: number;
-  old_stock_vp?: number | null;
-  new_stock_vp?: number;
-  source_codes?: string[];
-  source_stocks?: number[];
-  new_internal_codes?: string;
-  old_internal_codes?: string;
-  multi_codes_added?: string[];
-  packing_pcs?: number | null;
-  packing_m2?: number | null;
-  packing?: string;
-  packing_changed?: boolean;
-  packing_conflict?: boolean;
-  so_luong_dong_goi?: string;
-  dien_tich?: string;
-  don_vi_tinh?: string;
-  parsed_name?: string;
-  name_changed?: boolean;
-  match_rule?: string;
-};
-
-type StockImportPreview = {
-  matched: StockImportMatched[];
-  unmatched: StockImportRow[];
-  matched_count?: number;
-  unmatched_count?: number;
-  packing_update_count?: number;
-  multi_update_count?: number;
-  name_update_count?: number;
-  packing_conflict_count?: number;
-};
 
 export { priceAfterDiscount, unitPriceForProduct, effectiveDiscountPct };
 
@@ -534,10 +449,32 @@ export async function deleteProductImage(imageId: number): Promise<{
 
 // ─── Customers ──────────────────────────────────────────────
 
+/** Trần an toàn cho list UI (~100–500 KH). Dialog/combobox nên truyền limit nhỏ hơn. */
+export const DEFAULT_CUSTOMER_LIST_LIMIT = 500;
+export const DEFAULT_QUOTE_LIST_LIMIT = 500;
+export const DEFAULT_ORDER_LIST_LIMIT = 500;
+
+export type ListCustomersOptions = {
+  search?: string;
+  /** Mặc định DEFAULT_CUSTOMER_LIST_LIMIT; truyền <=0 để không LIMIT (nội bộ/dashboard). */
+  limit?: number;
+};
+
+function clampListLimit(limit: number | undefined, fallback: number): number | null {
+  if (limit != null && Number(limit) <= 0) return null;
+  const n = limit != null && Number.isFinite(Number(limit)) ? Math.floor(Number(limit)) : fallback;
+  return Math.min(Math.max(n, 1), 2000);
+}
+
+function likePattern(raw: string): string {
+  return `%${raw.trim().replace(/[%_\\]/g, "")}%`;
+}
+
 /** ownerId = null → tất cả (admin); số → chỉ KH của sales đó */
 export async function listCustomers(
   status?: CustomerStatus | "all",
   ownerId?: number | null,
+  opts?: ListCustomersOptions,
 ): Promise<Customer[]> {
   const db = getDb();
   const where: string[] = [];
@@ -551,6 +488,18 @@ export async function listCustomers(
     where.push("c.owner_id = ?");
     params.push(ownerId);
   }
+  const q = opts?.search?.trim();
+  if (q) {
+    where.push(
+      `(c.name LIKE ? OR c.phone LIKE ? OR c.region LIKE ? OR c.company LIKE ?
+        OR c.short_name LIKE ? OR c.email LIKE ? OR c.source LIKE ?
+        OR u.display_name LIKE ?)`,
+    );
+    const pat = likePattern(q);
+    params.push(pat, pat, pat, pat, pat, pat, pat, pat);
+  }
+
+  const limit = clampListLimit(opts?.limit, DEFAULT_CUSTOMER_LIST_LIMIT);
 
   const sql = `
     SELECT c.*, u.display_name AS owner_name
@@ -558,7 +507,9 @@ export async function listCustomers(
     LEFT JOIN users u ON u.id = c.owner_id
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY c.updated_at DESC
+    ${limit != null ? "LIMIT ?" : ""}
   `;
+  if (limit != null) params.push(limit);
   return (await db.prepare(sql).all<Customer>(...(params as SqlValue[]))) as Customer[];
 }
 
@@ -1423,17 +1374,28 @@ export async function updateCustomer(
 
 // ─── Quotes ─────────────────────────────────────────────────
 
-export async function listQuotes(ownerId?: number | null): Promise<Quote[]> {
-  return listQuotesForCustomer(ownerId, null);
+export type ListQuotesOptions = {
+  search?: string;
+  statuses?: QuoteStatus[];
+  /** Mặc định DEFAULT_QUOTE_LIST_LIMIT; <=0 = không LIMIT (detail/dashboard). */
+  limit?: number;
+};
+
+export async function listQuotes(
+  ownerId?: number | null,
+  opts?: ListQuotesOptions,
+): Promise<Quote[]> {
+  return listQuotesForCustomer(ownerId, null, opts);
 }
 
 async function listQuotesForCustomer(
   ownerId?: number | null,
   customerId?: number | null,
+  opts?: ListQuotesOptions,
 ): Promise<Quote[]> {
   const db = getDb();
   const where: string[] = [];
-  const params: number[] = [];
+  const params: unknown[] = [];
   if (ownerId != null) {
     where.push("c.owner_id = ?");
     params.push(ownerId);
@@ -1442,19 +1404,50 @@ async function listQuotesForCustomer(
     where.push("q.customer_id = ?");
     params.push(customerId);
   }
+  const statuses = (opts?.statuses ?? []).filter(Boolean);
+  if (statuses.length === 1) {
+    where.push("q.status = ?");
+    params.push(statuses[0]);
+  } else if (statuses.length > 1) {
+    where.push(`q.status IN (${statuses.map(() => "?").join(", ")})`);
+    params.push(...statuses);
+  }
+  const q = opts?.search?.trim();
+  if (q) {
+    where.push(
+      `(q.code LIKE ? OR q.notes LIKE ? OR c.name LIKE ? OR c.source LIKE ? OR c.phone LIKE ?)`,
+    );
+    const pat = likePattern(q);
+    params.push(pat, pat, pat, pat, pat);
+  }
+
+  // Detail 1 KH / dashboard: không cắt; list trang: trần mặc định.
+  const limit =
+    customerId != null
+      ? clampListLimit(opts?.limit ?? 0, DEFAULT_QUOTE_LIST_LIMIT)
+      : clampListLimit(opts?.limit, DEFAULT_QUOTE_LIST_LIMIT);
+
   return (await db
     .prepare(
       `SELECT q.*,
         c.name AS customer_name,
         c.source AS customer_source,
-        COALESCE((SELECT SUM(line_total) FROM quote_items qi WHERE qi.quote_id = q.id), 0) AS amount,
-        COALESCE((SELECT COUNT(*) FROM quote_items qi WHERE qi.quote_id = q.id), 0) AS items_count
+        COALESCE(qi.amount, 0) AS amount,
+        COALESCE(qi.items_count, 0) AS items_count
        FROM quotes q
        JOIN customers c ON c.id = q.customer_id
+       LEFT JOIN (
+         SELECT quote_id,
+           SUM(line_total) AS amount,
+           COUNT(*) AS items_count
+         FROM quote_items
+         GROUP BY quote_id
+       ) qi ON qi.quote_id = q.id
        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-       ORDER BY q.created_at DESC`,
+       ORDER BY q.created_at DESC
+       ${limit != null ? "LIMIT ?" : ""}`,
     )
-    .all<Quote>(...params)) as Quote[];
+    .all<Quote>(...(limit != null ? [...params, limit] : params) as SqlValue[])) as Quote[];
 }
 
 async function getQuoteItemsForQuotes(quoteIds: number[]): Promise<Map<number, QuoteItem[]>> {
@@ -1830,16 +1823,27 @@ export async function updateQuote(input: {
 
 // ─── Orders ─────────────────────────────────────────────────
 
-export async function listOrders(ownerId?: number | null): Promise<Order[]> {
-  return listOrdersForCustomer(ownerId, null);
+export type ListOrdersOptions = {
+  search?: string;
+  statuses?: OrderStatus[];
+  /** Mặc định DEFAULT_ORDER_LIST_LIMIT; <=0 = không LIMIT (detail/dashboard). */
+  limit?: number;
+};
+
+export async function listOrders(
+  ownerId?: number | null,
+  opts?: ListOrdersOptions,
+): Promise<Order[]> {
+  return listOrdersForCustomer(ownerId, null, opts);
 }
 
 async function listOrdersForCustomer(
   ownerId?: number | null,
   customerId?: number | null,
+  opts?: ListOrdersOptions,
 ): Promise<Order[]> {
   const where: string[] = [];
-  const params: number[] = [];
+  const params: unknown[] = [];
   if (ownerId != null) {
     where.push("c.owner_id = ?");
     params.push(ownerId);
@@ -1848,18 +1852,46 @@ async function listOrdersForCustomer(
     where.push("o.customer_id = ?");
     params.push(customerId);
   }
+  const statuses = (opts?.statuses ?? []).filter(Boolean);
+  if (statuses.length === 1) {
+    where.push("o.status = ?");
+    params.push(statuses[0]);
+  } else if (statuses.length > 1) {
+    where.push(`o.status IN (${statuses.map(() => "?").join(", ")})`);
+    params.push(...statuses);
+  }
+  const q = opts?.search?.trim();
+  if (q) {
+    where.push(
+      `(o.code LIKE ? OR o.notes LIKE ? OR c.name LIKE ? OR c.source LIKE ? OR c.phone LIKE ?)`,
+    );
+    const pat = likePattern(q);
+    params.push(pat, pat, pat, pat, pat);
+  }
+
+  const limit =
+    customerId != null
+      ? clampListLimit(opts?.limit ?? 0, DEFAULT_ORDER_LIST_LIMIT)
+      : clampListLimit(opts?.limit, DEFAULT_ORDER_LIST_LIMIT);
+
   return (await getDb()
     .prepare(
       `SELECT o.*,
         c.name AS customer_name,
         c.source AS customer_source,
-        COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.order_id = o.id), 0) AS paid_amount
+        COALESCE(pay.paid_amount, 0) AS paid_amount
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN (
+         SELECT order_id, SUM(amount) AS paid_amount
+         FROM payments
+         GROUP BY order_id
+       ) pay ON pay.order_id = o.id
        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-       ORDER BY o.created_at DESC`,
+       ORDER BY o.created_at DESC
+       ${limit != null ? "LIMIT ?" : ""}`,
     )
-    .all<Order>(...params)) as Order[];
+    .all<Order>(...(limit != null ? [...params, limit] : params) as SqlValue[])) as Order[];
 }
 
 export async function createOrder(input: {
@@ -1901,13 +1933,23 @@ export async function createOrder(input: {
     )
     .run(ts, input.customer_id);
 
-  const orders = await listOrders();
-  return orders.find((o) => o.id === Number(info.lastInsertRowid))!;
+  return (await getOrder(Number(info.lastInsertRowid)))!;
 }
 
 export async function getOrder(id: number): Promise<Order | null> {
-  const orders = await listOrders(null);
-  return (orders.find((o) => o.id === id) as Order | undefined) ?? null;
+  return (
+    ((await getDb()
+      .prepare(
+        `SELECT o.*,
+          c.name AS customer_name,
+          c.source AS customer_source,
+          COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.order_id = o.id), 0) AS paid_amount
+         FROM orders o
+         JOIN customers c ON c.id = o.customer_id
+         WHERE o.id = ?`,
+      )
+      .get<Order>(id)) as Order | undefined) ?? null
+  );
 }
 
 export async function updateOrderStatus(id: number, status: OrderStatus): Promise<Order> {
@@ -2209,11 +2251,12 @@ export async function createNote(input: {
 // ─── Dashboard ──────────────────────────────────────────────
 
 export async function getDashboardStats(ownerId?: number | null) {
+  // limit <= 0: không cắt — dashboard cần đủ để đếm giai đoạn / KPI (quy mô ~100–1000).
   const [customers, debts, orders, quotes, notes] = await Promise.all([
-    listCustomers("all", ownerId),
+    listCustomers("all", ownerId, { limit: 0 }),
     listCustomerDebts(ownerId),
-    listOrders(ownerId),
-    listQuotes(ownerId),
+    listOrders(ownerId, { limit: 0 }),
+    listQuotes(ownerId, { limit: 0 }),
     listNotes(10, ownerId),
   ]);
 
@@ -2462,529 +2505,3 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
   return (await getProduct(Number(info.lastInsertRowid)))!;
 }
 
-/**
- * Map mã hàng file → SP:
- * 1. candidates(fileCode)
- * 2. extractAliasCodes(moTa)
- * 3. extractCoreVariants(fileCode)
- */
-function resolveProductFromFileCode(
-  fileCode: string,
-  byAlias: Map<string, ProductStockRef>,
-  moTa?: string,
-): { product: ProductStockRef; matchRule: string } | null {
-  const code = fileCode.trim();
-  if (!code) return null;
-
-  const tryGet = (c: string) =>
-    byAlias.get(c) ?? byAlias.get(c.toUpperCase()) ?? byAlias.get(normRaw(c)) ?? null;
-
-  const cands = candidates(code);
-  for (const cand of cands) {
-    const hit = tryGet(cand);
-    if (hit) return { product: hit, matchRule: "Candidates Mã hàng" };
-  }
-
-  if (moTa) {
-    const aliases = extractAliasCodes(moTa);
-    for (const alias of aliases) {
-      const aliasCands = candidates(alias);
-      for (const cand of aliasCands) {
-        const hit = tryGet(cand);
-        if (hit) return { product: hit, matchRule: "Alias trong Mô tả" };
-      }
-    }
-  }
-
-  const variants = extractCoreVariants(code);
-  for (const v of variants) {
-    const hit = tryGet(v);
-    if (hit) return { product: hit, matchRule: "Core Variant" };
-  }
-
-  return null;
-}
-
-/**
- * Union-find: nhóm mã liên quan từ mã hàng trên file.
- * Các mã sinh ra cùng một Core Variant sẽ được gom chung họ hàng.
- */
-function buildCodeGroups(items: StockImportRow[]): Map<string, string[]> {
-  const parent = new Map<string, string>();
-  const find = (x: string): string => {
-    const k = x.toUpperCase();
-    if (!parent.has(k)) parent.set(k, k);
-    const p = parent.get(k)!;
-    if (p !== k) {
-      const r = find(p);
-      parent.set(k, r);
-      return r;
-    }
-    return k;
-  };
-  const union = (a: string, b: string) => {
-    const ra = find(a);
-    const rb = find(b);
-    if (ra !== rb) parent.set(ra, rb);
-  };
-
-  const variantMap = new Map<string, string[]>();
-
-  for (const item of items) {
-    const code = String(item.internal_code ?? "").trim();
-    if (!code) continue;
-    find(code);
-
-    const variants = extractCoreVariants(code);
-    variants.push(code.toUpperCase());
-
-    for (const v of variants) {
-      if (v.length < 3) continue;
-      if (!variantMap.has(v)) variantMap.set(v, []);
-      variantMap.get(v)!.push(code);
-    }
-  }
-
-  for (const codes of variantMap.values()) {
-    for (let i = 1; i < codes.length; i++) {
-      union(codes[0], codes[i]);
-    }
-  }
-
-  const groups = new Map<string, string[]>();
-  for (const [k] of parent) {
-    const r = find(k);
-    if (!groups.has(r)) groups.set(r, []);
-    groups.get(r)!.push(k);
-  }
-  return groups;
-}
-
-/**
- * So khớp mã hàng file với DB (multi-internal + mã báo giá).
- * - Option 1: Tồn kho
- * - Option 2: Mã nội bộ
- * - Option 3: Quy cách / Packing
- * - Option 4: Tên sản phẩm
- */
-async function previewStockImport(items: StockImportRow[]): Promise<StockImportPreview> {
-  const db = getDb();
-  const byAlias = new Map<string, ProductStockRef>();
-
-  const rows = (await db
-    .prepare(
-      `SELECT p.id, p.code, p.name, pic.internal_code, pic.multi_codes_list as internal_codes,
-              p.packing, p.packing_pcs, p.packing_m2,
-              invQ9.quantity_stock as stock_m2,
-              invVP.quantity_stock as stock_vp
-       FROM products p
-       LEFT JOIN (
-           SELECT product_id, MIN(internal_code) as internal_code, GROUP_CONCAT(DISTINCT internal_code) as multi_codes_list
-           FROM product_internal_codes GROUP BY product_id
-       ) pic ON pic.product_id = p.id
-       LEFT JOIN inventory invQ9 ON invQ9.internal_code = pic.internal_code AND invQ9.stock_location = 'Q9'
-       LEFT JOIN inventory invVP ON invVP.internal_code = pic.internal_code AND invVP.stock_location = 'VP'`,
-    )
-    .all<ProductStockRef>()) as ProductStockRef[];
-
-  for (const r of rows) {
-    const ref: ProductStockRef = {
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      internal_code: (r.internal_code ?? "").trim(),
-      internal_codes: (r.internal_codes ?? "").trim(),
-      packing: (r.packing ?? "").trim(),
-      packing_pcs: r.packing_pcs ?? null,
-      packing_m2: r.packing_m2 ?? null,
-      stock_m2: r.stock_m2,
-      stock_vp: r.stock_vp ?? null,
-    };
-    const aliases = allProductAliases(ref);
-    for (const a of aliases) {
-      if (!byAlias.has(a)) byAlias.set(a, ref);
-      const up = a.toUpperCase();
-      if (!byAlias.has(up)) byAlias.set(up, ref);
-      const nr = normRaw(a);
-      if (nr && !byAlias.has(nr)) byAlias.set(nr, ref);
-    }
-  }
-
-  type SourceRow = {
-    code: string;
-    stock: number;
-    product_name: string;
-    mo_ta: string;
-    match_rule: string;
-  };
-
-  type Acc = {
-    product: ProductStockRef;
-    sumStock: number;
-    sources: SourceRow[];
-    seenCodes: Set<string>;
-  };
-  const byProduct = new Map<number, Acc>();
-  const unmatched: StockImportRow[] = [];
-
-  const codeGroups = buildCodeGroups(items);
-  const codeToRoot = new Map<string, string>();
-  for (const [root, members] of codeGroups) {
-    for (const m of members) codeToRoot.set(m.toUpperCase(), root);
-  }
-
-  const codeToProduct = new Map<string, ProductStockRef>();
-
-  function attachToProduct(
-    p: ProductStockRef,
-    code: string,
-    newStock: number,
-    product_name: string,
-    mo_ta: string,
-    match_rule: string,
-  ) {
-    const codeKey = code.toUpperCase();
-    codeToProduct.set(codeKey, p);
-    const acc = byProduct.get(p.id);
-    if (!acc) {
-      byProduct.set(p.id, {
-        product: p,
-        sumStock: newStock,
-        sources: [{ code, stock: newStock, product_name, mo_ta, match_rule }],
-        seenCodes: new Set([codeKey]),
-      });
-    } else if (acc.seenCodes.has(codeKey)) {
-      const idx = acc.sources.findIndex((s) => s.code.toUpperCase() === codeKey);
-      if (idx >= 0 && newStock > acc.sources[idx].stock) {
-        acc.sumStock += newStock - acc.sources[idx].stock;
-        acc.sources[idx] = {
-          code,
-          stock: newStock,
-          product_name: product_name || acc.sources[idx].product_name,
-          mo_ta: mo_ta || acc.sources[idx].mo_ta,
-          match_rule: match_rule || acc.sources[idx].match_rule,
-        };
-      }
-    } else {
-      acc.seenCodes.add(codeKey);
-      acc.sources.push({ code, stock: newStock, product_name, mo_ta, match_rule });
-      acc.sumStock += newStock;
-    }
-  }
-
-  const pending: Array<{
-    code: string;
-    stock: number;
-    product_name: string;
-    mo_ta: string;
-  }> = [];
-
-  for (const item of items) {
-    const code = String(item.internal_code ?? "").trim();
-    if (!code) continue;
-    const stock = Number(item.stock_m2);
-    const newStock = Number.isFinite(stock) && stock >= 0 ? stock : 0;
-    const product_name = String(item.product_name ?? "").trim();
-    const mo_ta = String(item.mo_ta ?? "").trim();
-
-    const resolved = resolveProductFromFileCode(code, byAlias, mo_ta);
-    if (resolved) {
-      attachToProduct(resolved.product, code, newStock, product_name, mo_ta, resolved.matchRule);
-    } else {
-      pending.push({ code, stock: newStock, product_name, mo_ta });
-    }
-  }
-
-  for (const row of pending) {
-    const root = codeToRoot.get(row.code.toUpperCase()) ?? row.code.toUpperCase();
-    const members = codeGroups.get(root) ?? [row.code.toUpperCase()];
-    let resolved: { product: ProductStockRef; matchRule: string } | null = null;
-    for (const m of members) {
-      const p = codeToProduct.get(m);
-      if (p) {
-        resolved = { product: p, matchRule: "Mã nhóm tương quan" };
-        break;
-      }
-      resolved = resolveProductFromFileCode(m, byAlias, row.mo_ta);
-      if (resolved) break;
-    }
-    if (resolved) {
-      attachToProduct(
-        resolved.product,
-        row.code,
-        row.stock,
-        row.product_name,
-        row.mo_ta,
-        resolved.matchRule,
-      );
-    } else {
-      unmatched.push({
-        internal_code: row.code,
-        stock_m2: row.stock,
-        product_name: row.product_name,
-        mo_ta: row.mo_ta,
-      });
-    }
-  }
-
-  let packing_update_count = 0;
-  let multi_update_count = 0;
-  let packing_conflict_count = 0;
-  let name_update_count = 0;
-
-  const matched: StockImportMatched[] = [...byProduct.values()]
-    .map((acc) => {
-      const sourcesSorted = acc.sources.slice().sort((a, b) => {
-        const aHn = /-HN$/i.test(a.code) ? 1 : 0;
-        const bHn = /-HN$/i.test(b.code) ? 1 : 0;
-        if (aHn !== bHn) return aHn - bHn;
-        return b.stock - a.stock;
-      });
-
-      const packRows: PackingByCode[] = [];
-      let primaryParsedName = "";
-      let primaryPackagingInfo: ParsedPackaging = {
-        so_luong_dong_goi: "",
-        dien_tich: "",
-        don_vi_tinh: "",
-      };
-
-      for (const s of sourcesSorted) {
-        if (!s.product_name) continue;
-        const pack = parsePackingFromHhdvName(s.product_name);
-        if (pack.packing_pcs != null || pack.packing_m2 != null) {
-          packRows.push({ code: s.code, raw_name: s.product_name, ...pack });
-        }
-
-        if (!primaryParsedName) {
-          const { name: rawName, pack: packStr } = extractNameDimPack(s.product_name, s.code);
-          if (rawName) {
-            primaryParsedName = titleCaseVn(rawName);
-          }
-          if (packStr) {
-            primaryPackagingInfo = parsePackaging(packStr);
-          }
-        }
-      }
-
-      const merged = mergePackingVariants(packRows);
-      const packing_changed =
-        merged.primary.packing_pcs != null || merged.primary.packing_m2 != null
-          ? merged.packingText !== (acc.product.packing || "") ||
-            merged.primary.packing_pcs !== acc.product.packing_pcs ||
-            merged.primary.packing_m2 !== acc.product.packing_m2
-          : false;
-      if (packing_changed) packing_update_count += 1;
-      if (merged.hasConflict) packing_conflict_count += 1;
-
-      // Check name change
-      const name_changed =
-        Boolean(primaryParsedName) &&
-        primaryParsedName.trim().toLowerCase() !== acc.product.name.trim().toLowerCase();
-      if (name_changed) name_update_count += 1;
-
-      // Multi-codes
-      const oldMulti = parseInternalCodesList(
-        acc.product.internal_codes,
-        acc.product.internal_code,
-        acc.product.code,
-      );
-      const extras: string[] = [];
-      for (const s of acc.sources) {
-        extras.push(s.code);
-        if (s.mo_ta) {
-          extras.push(...extractAliasCodes(s.mo_ta));
-        }
-      }
-      const newMultiList = parseInternalCodesList(...oldMulti, ...extras);
-      const new_internal_codes = serializeInternalCodes(newMultiList);
-      const old_internal_codes =
-        serializeInternalCodes(
-          parseInternalCodesList(acc.product.internal_codes, acc.product.internal_code),
-        ) || "";
-      const added = newMultiList.filter(
-        (c) => !oldMulti.some((o) => o.toUpperCase() === c.toUpperCase()),
-      );
-      const multiChanged =
-        added.length > 0 || new_internal_codes.toUpperCase() !== old_internal_codes.toUpperCase();
-      if (multiChanged && (added.length > 0 || !old_internal_codes)) {
-        multi_update_count += 1;
-      }
-
-      return {
-        product_id: acc.product.id,
-        code: acc.product.code,
-        name: acc.product.name,
-        internal_code: new_internal_codes || acc.product.code,
-        old_stock: acc.product.stock_m2,
-        new_stock: Math.round(acc.sumStock * 1000) / 1000,
-        source_codes: acc.sources.map((s) => s.code),
-        source_stocks: acc.sources.map((s) => s.stock),
-        old_internal_codes,
-        new_internal_codes: multiChanged ? new_internal_codes : undefined,
-        multi_codes_added: added.length ? added : undefined,
-        packing_pcs: packing_changed ? merged.primary.packing_pcs : undefined,
-        packing_m2: packing_changed ? merged.primary.packing_m2 : undefined,
-        packing: packing_changed ? merged.packingText : undefined,
-        packing_changed,
-        packing_conflict: merged.hasConflict,
-        parsed_name: primaryParsedName || undefined,
-        name_changed,
-        so_luong_dong_goi: primaryPackagingInfo.so_luong_dong_goi || undefined,
-        dien_tich: primaryPackagingInfo.dien_tich || undefined,
-        don_vi_tinh: primaryPackagingInfo.don_vi_tinh || undefined,
-      } satisfies StockImportMatched;
-    })
-    .sort((a, b) => a.code.localeCompare(b.code, "vi", { sensitivity: "base" }));
-
-  return {
-    matched,
-    unmatched,
-    matched_count: matched.length,
-    unmatched_count: unmatched.length,
-    packing_update_count,
-    multi_update_count,
-    packing_conflict_count,
-    name_update_count,
-  };
-}
-
-type StockImportApplyItem = {
-  product_id: number;
-  stock_m2?: number;
-  update_stock?: boolean;
-  packing?: string;
-  packing_pcs?: number | null;
-  packing_m2?: number | null;
-  update_packing?: boolean;
-  internal_codes?: string;
-  update_multi?: boolean;
-  new_name?: string;
-  update_name?: boolean;
-};
-
-/**
- * Áp dụng tồn + packing + multi-codes + tên sản phẩm từ preview «Nhập tồn kho».
- */
-async function applyStockImport(
-  items: StockImportApplyItem[],
-  opts?: {
-    update_stock?: boolean;
-    update_packing?: boolean;
-    update_multi?: boolean;
-    update_name?: boolean;
-  },
-): Promise<{
-  stock_count: number;
-  packing_count: number;
-  multi_count: number;
-  name_count: number;
-}> {
-  const doStock = opts?.update_stock !== false;
-  const doPack = opts?.update_packing !== false;
-  const doMulti = opts?.update_multi !== false;
-  const doName = opts?.update_name === true;
-
-  const db = getDb();
-  let stock_count = 0;
-  let packing_count = 0;
-  let multi_count = 0;
-  let name_count = 0;
-
-  const updStock = db.prepare(
-    `INSERT INTO inventory (internal_code, stock_location, quantity_stock)
-     SELECT internal_code, 'Q9', ? FROM product_internal_codes
-     WHERE product_id = ? ORDER BY id LIMIT 1
-     ON CONFLICT(internal_code, stock_location)
-     DO UPDATE SET quantity_stock = excluded.quantity_stock`,
-  );
-  const updPack = db.prepare(
-    "UPDATE products SET packing = ?, packing_pcs = ?, packing_m2 = ? WHERE id = ?",
-  );
-  const updMulti = db.prepare(
-    "UPDATE products SET internal_codes = ?, internal_code = ? WHERE id = ?",
-  );
-  const updName = db.prepare("UPDATE products SET name = ? WHERE id = ?");
-
-  const createTx = db.transaction(async () => {
-    for (const item of items) {
-      const id = Number(item.product_id);
-      if (!Number.isFinite(id) || id <= 0) continue;
-
-      if (doStock && item.update_stock !== false && item.stock_m2 != null) {
-        const stock = Number(item.stock_m2);
-        if (Number.isFinite(stock) && stock >= 0) {
-          stock_count += (await updStock.run(stock, id)).changes;
-        }
-      }
-
-      if (
-        doPack &&
-        item.update_packing !== false &&
-        (item.packing_pcs != null ||
-          item.packing_m2 != null ||
-          (item.packing && item.packing.length > 0))
-      ) {
-        packing_count += (
-          await updPack.run(
-            item.packing ?? "",
-            item.packing_pcs ?? null,
-            item.packing_m2 ?? null,
-            id,
-          )
-        ).changes;
-      }
-
-      if (
-        doMulti &&
-        item.update_multi !== false &&
-        item.internal_codes &&
-        item.internal_codes.trim()
-      ) {
-        const { multi, primary } = normalizeInternalCodesInput(item.internal_codes);
-        multi_count += (await updMulti.run(multi, primary, id)).changes;
-      }
-
-      if (doName && item.update_name !== false && item.new_name && item.new_name.trim()) {
-        name_count += (await updName.run(item.new_name.trim(), id)).changes;
-      }
-    }
-  });
-  await createTx();
-
-  return { stock_count, packing_count, multi_count, name_count };
-}
-
-async function bulkUpdateStockByProductId(
-  items: Array<{ product_id: number; stock_m2: number }>,
-): Promise<number> {
-  const db = getDb();
-  let updatedCount = 0;
-  const updateStmt = db.prepare(
-    `INSERT INTO inventory (internal_code, stock_location, quantity_stock)
-     SELECT internal_code, 'Q9', ? FROM product_internal_codes
-     WHERE product_id = ? ORDER BY id LIMIT 1
-     ON CONFLICT(internal_code, stock_location)
-     DO UPDATE SET quantity_stock = excluded.quantity_stock`,
-  );
-
-  const runTx = db.transaction(async () => {
-    for (const item of items) {
-      updatedCount += (await updateStmt.run(item.stock_m2, item.product_id)).changes;
-    }
-  });
-  await runTx();
-  return updatedCount;
-}
-
-async function bulkUpdateStock(
-  items: Array<{ internal_code: string; stock_m2: number }>,
-): Promise<number> {
-  const preview = await previewStockImport(items);
-  return await bulkUpdateStockByProductId(
-    preview.matched.map((m) => ({
-      product_id: m.product_id,
-      stock_m2: m.new_stock,
-    })),
-  );
-}

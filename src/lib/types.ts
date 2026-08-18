@@ -70,12 +70,12 @@ export type GalleryImageCandidate = {
   shape: string;
   collections: string;
   material: string;
+  /** Bộ sưu tập đang gắn ảnh này (từ join) */
+  gallery_collection_ids: number[];
 };
 
 export type Product = {
-  stock_m2?: number | null;
   internal_codes?: string;
-  stock_vp?: number | null;
   id: number;
   code: string;
   /** Tồn kho tổng hợp từ product_internal_codes (ảo) */

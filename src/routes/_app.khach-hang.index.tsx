@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FilePlus2,
   LayoutGrid,
@@ -22,20 +22,9 @@ import { statusMeta, type Customer, type CustomerStatus } from "@/lib/types";
 import { formatVND, formatVNDShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_app/khach-hang/")({
-  head: () => ({
-    meta: [{ title: "Khách hàng — Innomat CRM" }],
-  }),
-  loader: async () => {
-    const [customers, debts, notes] = await Promise.all([
-      fetchCustomers({ data: { status: "all" } }),
-      fetchCustomerDebts(),
-      fetchNotes({ data: { limit: 8 } }),
-    ]);
-    return { customers, debts, notes };
-  },
-  component: CustomersPage,
-});
+type KhachHangSearch = {
+  q?: string;
+};
 
 type ViewMode = "grid" | "list";
 
@@ -48,13 +37,40 @@ const filters: { key: "all" | CustomerStatus; label: string }[] = [
   { key: "lost", label: "Bỏ lỡ" },
 ];
 
+export const Route = createFileRoute("/_app/khach-hang/")({
+  head: () => ({
+    meta: [{ title: "Khách hàng — Innomat CRM" }],
+  }),
+  validateSearch: (search: Record<string, unknown>): KhachHangSearch => ({
+    q: typeof search.q === "string" && search.q.trim() ? search.q : undefined,
+  }),
+  loaderDeps: ({ search }: { search: KhachHangSearch }) => ({
+    q: search.q?.trim() || "",
+  }),
+  loader: async ({ deps }) => {
+    const [customers, debts, notes] = await Promise.all([
+      fetchCustomers({
+        data: {
+          status: "all",
+          search: deps.q || undefined,
+        },
+      }),
+      fetchCustomerDebts(),
+      fetchNotes({ data: { limit: 8 } }),
+    ]);
+    return { customers, debts, notes, q: deps.q };
+  },
+  component: CustomersPage,
+});
+
 function CustomersPage() {
   const router = useRouter();
-  const navigate = useNavigate();
-  const { customers, debts, notes } = Route.useLoaderData() as {
+  const navigate = useNavigate({ from: "/khach-hang/" });
+  const { customers, debts, notes, q: qParam } = Route.useLoaderData() as {
     customers: Customer[];
     debts: Array<{ customer_id: number; debt: number }>;
     notes: import("@/lib/types").Note[];
+    q: string;
   };
   const [filter, setFilter] = useLocalStorageState<"all" | CustomerStatus>(
     "khach-hang.statusFilter",
@@ -64,7 +80,30 @@ function CustomersPage() {
     "khach-hang.viewMode",
     "grid",
   );
-  const [search, setSearch] = useState("");
+  const [searchDraft, setSearchDraft] = useState(qParam || "");
+  const committedSearchRef = useRef(qParam || "");
+  useEffect(() => {
+    const next = qParam || "";
+    if (next === committedSearchRef.current) return;
+    committedSearchRef.current = next;
+    setSearchDraft(next);
+  }, [qParam]);
+  useEffect(() => {
+    if (searchDraft === (qParam || "")) return;
+    const t = setTimeout(() => {
+      const committed = searchDraft.trim();
+      committedSearchRef.current = committed;
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          q: committed || undefined,
+        }),
+        replace: true,
+      });
+    }, 220);
+    return () => clearTimeout(t);
+  }, [searchDraft, qParam, navigate]);
+
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [quoteCustomerId, setQuoteCustomerId] = useState<number | null>(null);
 
@@ -74,27 +113,11 @@ function CustomersPage() {
     return m;
   }, [debts]);
 
+  // Status chip vẫn client (~100 KH); ô tìm đã filter server qua ?q=
   const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return customers.filter((c) => {
-      if (filter !== "all" && c.status !== filter) return false;
-      if (!q) return true;
-      const hay = [
-        c.name,
-        c.phone,
-        c.region,
-        c.company,
-        c.short_name,
-        c.email,
-        c.owner_name,
-        c.source,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }, [customers, filter, search]);
+    if (filter === "all") return customers;
+    return customers.filter((c) => c.status === filter);
+  }, [customers, filter]);
 
   const quotedCount = customers.filter(
     (c) => c.status === "quoted" || c.status === "consulting",
@@ -152,8 +175,8 @@ function CustomersPage() {
       <PageFilterBar
         search={
           <PageSearchInput
-            value={search}
-            onChange={setSearch}
+            value={searchDraft}
+            onChange={setSearchDraft}
             placeholder="Tìm tên, SĐT, khu vực, sales…"
           />
         }
@@ -179,7 +202,7 @@ function CustomersPage() {
       {visible.length === 0 ? (
         <div className="bg-card ring-1 ring-black/5 rounded-xl p-12 text-center">
           <p className="text-sm text-muted-foreground">
-            {search.trim()
+            {(qParam || "").trim()
               ? "Không tìm thấy khách hàng phù hợp."
               : `Chưa có khách hàng${filter !== "all" ? " ở trạng thái này" : ""}. Dùng nút "+ Khách hàng mới" trên thanh trên cùng.`}
           </p>
@@ -311,7 +334,7 @@ function CustomersPage() {
             {filter !== "all"
               ? ` · lọc ${filters.find((f) => f.key === filter)?.label}`
               : ""}
-            {search.trim() ? ` · tìm “${search.trim()}”` : ""}
+            {(qParam || "").trim() ? ` · tìm “${(qParam || "").trim()}”` : ""}
           </p>
         </div>
       )}

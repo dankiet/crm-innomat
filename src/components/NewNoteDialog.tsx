@@ -44,7 +44,7 @@ export function NewNoteDialog({
 
     void (async () => {
       try {
-        const cs = await fetchCustomers({ data: { status: "all" } });
+        const cs = await fetchCustomers({ data: { status: "all", limit: 300 } });
         setCustomers(cs);
       } catch {
         /* ignore */
