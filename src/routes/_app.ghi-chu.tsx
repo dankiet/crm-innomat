@@ -23,6 +23,7 @@ function NotesPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Vận hành"
         title="Ghi chú & Hoạt động"
         description="Nhật ký trao đổi, phản hồi và điều chỉnh yêu cầu từ khách hàng."
         actions={

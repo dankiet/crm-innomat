@@ -1,5 +1,5 @@
-export const CLIENT_IMAGE_MAX_SIDE = 1600;
-export const CLIENT_IMAGE_MAX_BYTES = 30 * 1024 * 1024;
+const CLIENT_IMAGE_MAX_SIDE = 1600;
+const CLIENT_IMAGE_MAX_BYTES = 30 * 1024 * 1024;
 
 export async function readImageFileAsWebpDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {

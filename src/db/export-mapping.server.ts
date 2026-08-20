@@ -2,7 +2,7 @@ import { getDb } from "./index.server";
 import { readImageBytes } from "@/lib/storage";
 import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";
 
-export type MappingExportResult = {
+type MappingExportResult = {
   filename: string;
   base64: string;
   mimeType: string;

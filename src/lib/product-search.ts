@@ -8,7 +8,7 @@
  * (ví dụ thu-vien bỏ dấu, trang SP/dialog chỉ lowercase) để không hồi quy.
  */
 
-export type SearchCodeRow = {
+type SearchCodeRow = {
   /** Mã chính (đã normalize theo normalize của nơi gọi) */
   code: string;
   /** Các mã phụ (đã normalize) — split từ internal_codes / multi_codes_list */

@@ -21,12 +21,12 @@ pgTypes.setTypeParser(1700, (v) => Number(v));
 
 export type SqlValue = string | number | boolean | bigint | null;
 
-export interface RunResult {
+interface RunResult {
   changes: number;
   lastInsertRowid: number | null;
 }
 
-export interface AsyncStmt {
+interface AsyncStmt {
   get<T = unknown>(...params: SqlValue[]): Promise<T | undefined>;
   all<T = unknown>(...params: SqlValue[]): Promise<T[]>;
   run(...params: SqlValue[]): Promise<RunResult>;

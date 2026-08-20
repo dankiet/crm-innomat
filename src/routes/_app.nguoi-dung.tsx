@@ -159,6 +159,7 @@ function UsersPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <PageHeader
+        eyebrow="Quản trị"
         title="Người dùng"
         description="Tạo tài khoản sales, gán role admin/user, khóa hoặc reset mật khẩu."
         actions={

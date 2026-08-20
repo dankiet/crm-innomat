@@ -37,33 +37,3 @@ export function parseInternalCodesList(
   }
   return out;
 }
-
-/** Chuẩn lưu trữ / Excel: `A,B,C` */
-export function serializeInternalCodes(codes: string[]): string {
-  return parseInternalCodesList(...codes).join(",");
-}
-
-/** Alias match stock / search: multi + primary cũ + mã báo giá. */
-export function allProductAliases(p: {
-  code?: string | null;
-  internal_code?: string | null;
-  internal_codes?: string | null;
-}): string[] {
-  return parseInternalCodesList(p.internal_codes, p.internal_code, p.code);
-}
-
-/**
- * Chuẩn hóa multi → { multi, primary }.
- * multi luôn dạng `A,B,C`.
- */
-export function normalizeInternalCodesInput(
-  raw: string | null | undefined,
-  /** @deprecated gộp vào multi nếu còn */
-  legacyPrimary?: string | null,
-): { multi: string; primary: string } {
-  const list = parseInternalCodesList(raw, legacyPrimary);
-  return {
-    multi: serializeInternalCodes(list),
-    primary: list[0] ?? "",
-  };
-}

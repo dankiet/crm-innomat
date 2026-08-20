@@ -247,6 +247,7 @@ function QuotesPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Bán hàng"
         title="Báo giá & Đơn hàng"
         description="Báo giá theo giá bán lẻ + chiết khấu (CK TP / CK B2B). Đơn hàng ghi nhận công nợ."
         actions={

@@ -454,9 +454,19 @@ export function NewQuoteDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    /** true = mở form tạo mới (không phải sửa BG có sẵn qua quoteId) */
+    const isCreateFlow = quoteId == null;
     const quote = await saveCurrentQuote();
     if (!quote) return;
     onCreated?.(quote);
+    if (isCreateFlow) {
+      // Tạo mới: đóng ngay sau lưu — không giữ popup / không chuyển sang form sửa bản vừa tạo
+      setSavedQuote(null);
+      setJustSaved(false);
+      if (savedTimer.current) window.clearTimeout(savedTimer.current);
+      onOpenChange(false);
+      return;
+    }
     setJustSaved(true);
     if (savedTimer.current) window.clearTimeout(savedTimer.current);
     savedTimer.current = window.setTimeout(() => setJustSaved(false), 1500);

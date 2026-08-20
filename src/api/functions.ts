@@ -324,6 +324,48 @@ export const updateProductFn = createServerFn({ method: "POST" })
     return product;
   });
 
+export const createProductFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      code: string;
+      name?: string;
+      size?: string;
+      material?: string;
+      surface?: string;
+      shape?: string;
+      collections?: string;
+      category?: string;
+      supplier?: string;
+      color?: string;
+      packing?: string;
+      packing_m2?: number | null;
+      packing_pcs?: number | null;
+      retail_price: number;
+      trade_price?: number | null;
+      b2b_price?: number | null;
+      discount_tp?: number | null;
+      discount_b2b?: number | null;
+      note?: string;
+      is_hot?: number;
+      image_path?: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { createProduct } = await import("@/db/crm.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const product = await createProduct(data);
+    await writeAudit({
+      user: me,
+      action: "product.create",
+      entity_type: "product",
+      entity_id: product.id,
+      summary: `Tạo SP ${product.code}`,
+    });
+    return product;
+  });
+
 export const deleteProductFn = createServerFn({ method: "POST" })
   .inputValidator((data: { id: number }) => data)
   .handler(async ({ data }) => {

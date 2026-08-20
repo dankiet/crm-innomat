@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useRouter } from "@tanstack/react-router";
-import { Menu, FilePlus2, UserPlus, Map } from "lucide-react";
+﻿import { useState } from "react";
+import { useRouter, useRouterState } from "@tanstack/react-router";
+import { Menu, FilePlus2, Map, Plus } from "lucide-react";
 import { NewCustomerDialog } from "@/components/NewCustomerDialog";
 import { NewQuoteDialog } from "@/components/NewQuoteDialog";
 import { CustomerMappingDialog } from "@/components/CustomerMappingDialog";
@@ -9,77 +9,62 @@ type Props = {
   onMenuClick?: () => void;
 };
 
+const pageTitles: Record<string, { eyebrow: string; title: string }> = {
+  "/tong-quan": { eyebrow: "Workspace", title: "Tổng quan" },
+  "/khach-hang": { eyebrow: "Bán hàng", title: "Khách hàng" },
+  "/co-hoi": { eyebrow: "Bán hàng", title: "Cơ hội" },
+  "/bao-gia": { eyebrow: "Bán hàng", title: "Báo giá & đơn hàng" },
+  "/cong-no": { eyebrow: "Tài chính", title: "Công nợ" },
+  "/ghi-chu": { eyebrow: "Vận hành", title: "Ghi chú" },
+  "/thu-vien": { eyebrow: "Catalog", title: "Thư viện" },
+  "/san-pham": { eyebrow: "Catalog", title: "Sản phẩm" },
+  "/nguoi-dung": { eyebrow: "Quản trị", title: "Người dùng" },
+  "/nhat-ky": { eyebrow: "Vận hành", title: "Nhật ký" },
+};
+
 export function TopBar({ onMenuClick }: Props) {
   const router = useRouter();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [customerOpen, setCustomerOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [mappingOpen, setMappingOpen] = useState(false);
+  const page = pageTitles[pathname] ?? { eyebrow: "Workspace", title: "Innomat CRM" };
 
   return (
     <>
-      <header className="h-14 min-h-14 border-b border-border bg-surface/80 backdrop-blur-sm flex items-center gap-2 px-3 sm:px-5 lg:px-8 flex-shrink-0 safe-pt sticky top-0 z-30">
-        <button
-          type="button"
-          onClick={onMenuClick}
-          className="lg:hidden size-10 grid place-items-center rounded-xl text-foreground hover:bg-surface-strong active:bg-surface-strong/80 -ml-1"
-          aria-label="Mở menu"
-        >
+      <header className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-border/70 bg-surface/85 px-4 backdrop-blur-xl sm:px-6">
+        <button type="button" onClick={onMenuClick} className="grid size-10 shrink-0 place-items-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden" aria-label="Mở menu">
           <Menu className="size-5" />
         </button>
 
-        <div className="lg:hidden flex items-center gap-2 min-w-0 flex-1">
-          <img
-            src="/logo.png"
-            alt=""
-            width={28}
-            height={28}
-            className="size-7 rounded-md object-contain bg-white ring-1 ring-black/5 p-0.5 flex-shrink-0"
-          />
-          <span className="text-sm font-medium tracking-tight truncate">
-            Innomat CRM
-          </span>
+        <div className="min-w-0 flex-1">
+          <p className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground sm:block">{page.eyebrow}</p>
+          <h1 className="truncate text-base font-bold tracking-tight text-foreground sm:text-lg">{page.title}</h1>
         </div>
 
-        <div className="hidden lg:block flex-1" />
-
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setQuoteOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground h-9 px-2.5 sm:px-3 bg-card ring-1 ring-black/5 rounded-lg shadow-sm hover:bg-surface-strong transition-colors active:scale-[0.98]"
-          >
-            <FilePlus2 className="size-3.5 sm:hidden" />
-            <span className="hidden sm:inline">Tạo báo giá</span>
-            <span className="sm:hidden">Báo giá</span>
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => setCustomerOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:px-4" aria-label="Tạo khách hàng mới">
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">Khách hàng mới</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setMappingOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground h-9 px-2.5 sm:px-3 bg-card ring-1 ring-black/5 rounded-lg shadow-sm hover:bg-surface-strong transition-colors active:scale-[0.98]"
-          >
-            <Map className="size-3.5 sm:hidden" />
-            <span className="hidden sm:inline">Đề xuất vật liệu</span>
-            <span className="sm:hidden">Vật liệu</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCustomerOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-foreground h-9 px-2.5 sm:px-3 bg-terracotta rounded-lg shadow-sm hover:opacity-90 transition-opacity active:scale-[0.98]"
-          >
-            <UserPlus className="size-3.5 sm:hidden" />
-            <span className="hidden sm:inline">+ Khách hàng mới</span>
-            <span className="sm:hidden">+ KH</span>
-          </button>
+          <div className="hidden items-center gap-1.5 md:flex">
+            <button type="button" onClick={() => setQuoteOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Tạo báo giá">
+              <FilePlus2 className="size-3.5" />
+              Báo giá
+            </button>
+            <button type="button" onClick={() => setMappingOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Mở mapping khách hàng">
+              <Map className="size-3.5" />
+              Mapping
+            </button>
+          </div>
         </div>
       </header>
 
       <NewCustomerDialog open={customerOpen} onOpenChange={setCustomerOpen} />
       <NewQuoteDialog open={quoteOpen} onOpenChange={setQuoteOpen} />
-      <CustomerMappingDialog
-        open={mappingOpen}
-        onOpenChange={setMappingOpen}
-        onSaved={() => void router.invalidate()}
-      />
+      <CustomerMappingDialog open={mappingOpen} onOpenChange={setMappingOpen} onSaved={() => void router.invalidate()} />
     </>
   );
 }
+
+

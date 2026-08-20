@@ -28,6 +28,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import { EditProductDialog } from "@/components/EditProductDialog";
 import { EditProductImagesDialog } from "@/components/EditProductImagesDialog";
+import { NewProductDialog } from "@/components/NewProductDialog";
 import { BulkEditFieldDialog } from "@/components/BulkEditFieldDialog";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import {
@@ -66,6 +67,7 @@ import {
   List,
   Loader2,
   Pencil,
+  Plus,
   Search,
   SlidersHorizontal,
   Tags,
@@ -464,7 +466,13 @@ export const Route = createFileRoute("/_app/san-pham")({
   },
   loaderDeps: ({ search }: { search: SanPhamSearch }) => ({ stockLocation: search.stockLocation }),
   loader: async ({ deps }) => {
-    const products = await fetchProducts({ data: { stockLocation: deps.stockLocation } });
+    // UI defaults the warehouse chip to Kho Q9 when URL has no stockLocation.
+    // Must mirror that here — otherwise listProducts sums Q9+VP (no JOIN filter).
+    const stockLocation =
+      !deps.stockLocation || deps.stockLocation === "ALL"
+        ? "KHOQ9"
+        : deps.stockLocation;
+    const products = await fetchProducts({ data: { stockLocation } });
     return { products };
   },
   component: ProductsPage,
@@ -473,6 +481,7 @@ export const Route = createFileRoute("/_app/san-pham")({
 function ProductsPage() {
   const { products } = Route.useLoaderData() as { products: Product[] };
   const [importExportOpen, setImportExportOpen] = useState(false);
+  const [createProductOpen, setCreateProductOpen] = useState(false);
   const [importStockOpen, setImportStockOpen] = useState(false);
   const [importStockTab, setImportStockTab] = useState<"mapping" | "stock">("stock");
   const [stockPreviewData, setStockPreviewData] = useState<any[] | null>(null);
@@ -1140,6 +1149,7 @@ function ProductsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Catalog"
         title={groupLabel}
         description={`${scoped.length} mã · ${withImg} ảnh · ${hotTotal} bán chạy`}
         actions={
@@ -1147,10 +1157,20 @@ function ProductsPage() {
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" ref={stockFileRef} onChange={handleStockFileChange} />
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" ref={mappingFileRef} onChange={handleMappingFileChange} />
 
+            {canEditProducts ? (
+              <button
+                type="button"
+                onClick={() => setCreateProductOpen(true)}
+                className="h-8 px-3.5 rounded-md text-[12px] font-semibold bg-terracotta text-primary-foreground hover:bg-terracotta/90 inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Tạo sản phẩm
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => stockFileRef.current?.click()}
-              className="h-8 px-3.5 rounded-md text-[12px] font-semibold bg-terracotta text-primary-foreground hover:bg-terracotta/90 inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              className="h-8 px-3.5 rounded-md text-[12px] font-semibold border border-border/80 bg-card hover:bg-surface-strong/60 text-foreground inline-flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
             >
               <FilePlus2 className="w-4 h-4" />
               Nhập Tồn Kho
@@ -1890,6 +1910,7 @@ function ProductsPage() {
         open={bulkEditOpen}
         onOpenChange={setBulkEditOpen}
         productIds={Array.from(selectedIds)}
+        canManageOptions={canEditProducts}
         onDone={() => {
           clearSelection();
           router.invalidate();
@@ -1932,6 +1953,12 @@ function ProductsPage() {
         onOpenChange={setImportExportOpen}
         category={category}
       />
+      <NewProductDialog
+        open={createProductOpen}
+        onOpenChange={setCreateProductOpen}
+        defaultCategory={category !== "all" ? category : ""}
+        canManageOptions={canEditProducts}
+      />
       <ImportStockDialog
         open={importStockOpen}
         onOpenChange={setImportStockOpen}
@@ -1945,6 +1972,7 @@ function ProductsPage() {
           if (!o) setEditProduct(null);
         }}
         product={editProduct}
+        canManageOptions={canEditProducts}
         onEditImages={() => {
           if (editProduct) {
             setImagesProduct(editProduct);
@@ -2351,5 +2379,9 @@ function QuickBtn({
     </button>
   );
 }
+
+
+
+
 
 

@@ -3,7 +3,7 @@ import { VAT_RATE } from "@/lib/pricing";
 import { readImageBytes } from "@/lib/storage";
 import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";
 
-export type QuoteExportResult = {
+type QuoteExportResult = {
   filename: string;
   base64: string;
   mimeType: string;

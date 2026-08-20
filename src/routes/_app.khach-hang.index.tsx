@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FilePlus2,
@@ -130,7 +130,8 @@ function CustomersPage() {
   return (
     <>
       <PageHeader
-        title="Danh mục khách hàng hiện tại"
+        eyebrow="Bán hàng"
+        title="Khách hàng"
         description={`Theo dõi tiến độ dự án của ${customers.length} khách hàng. Nhấp để xem hồ sơ (BG, SP đã báo).`}
         actions={
           <div
@@ -467,3 +468,5 @@ function IconBtn({
     </button>
   );
 }
+
+

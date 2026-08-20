@@ -16,6 +16,7 @@ import {
   ScrollText,
   LogOut,
   Images,
+  ChevronRight,
 } from "lucide-react";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { useEffect } from "react";
@@ -23,19 +24,29 @@ import type { SessionUser } from "@/lib/auth-types";
 import { ROLE_LABEL, initialsFromName } from "@/lib/auth-types";
 import { logoutFn } from "@/api/functions";
 
-const mainNav = [
-  { to: "/tong-quan", label: "Tổng Quan", icon: LayoutDashboard },
-  { to: "/khach-hang", label: "Khách Hàng", icon: Users },
-  { to: "/co-hoi", label: "Cơ Hội", icon: Target },
-  { to: "/bao-gia", label: "Báo Giá & Đơn Hàng", icon: FileText },
-  { to: "/cong-no", label: "Công Nợ", icon: Wallet },
-  { to: "/ghi-chu", label: "Ghi Chú", icon: StickyNote },
-  { to: "/thu-vien", label: "Thư Viện", icon: Images },
+const navGroups = [
+  {
+    label: "Workspace",
+    items: [{ to: "/tong-quan", label: "Tổng quan", icon: LayoutDashboard }],
+  },
+  {
+    label: "Bán hàng",
+    items: [
+      { to: "/khach-hang", label: "Khách hàng", icon: Users },
+      { to: "/co-hoi", label: "Cơ hội", icon: Target },
+      { to: "/bao-gia", label: "Báo giá & đơn hàng", icon: FileText },
+      { to: "/ghi-chu", label: "Ghi chú", icon: StickyNote },
+    ],
+  },
+  {
+    label: "Tài chính",
+    items: [{ to: "/cong-no", label: "Công nợ", icon: Wallet }],
+  },
 ] as const;
 
 const adminNav = [
-  { to: "/nguoi-dung", label: "Người Dùng", icon: UserCog },
-  { to: "/nhat-ky", label: "Nhật Ký", icon: ScrollText },
+  { to: "/nguoi-dung", label: "Người dùng", icon: UserCog },
+  { to: "/nhat-ky", label: "Nhật ký", icon: ScrollText },
 ] as const;
 
 const productIcons: Record<string, typeof LayoutGrid> = {
@@ -48,224 +59,170 @@ const productIcons: Record<string, typeof LayoutGrid> = {
 
 type Props = {
   user: SessionUser;
-  /** Mobile drawer open */
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 };
 
+type NavItem = { to: string; label: string; icon: typeof LayoutGrid };
+
+function NavLink({
+  item,
+  active,
+  onClick,
+}: {
+  item: NavItem;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  const Icon = item.icon;
+  return (
+    <Link
+      to={item.to}
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`group flex items-center gap-3 rounded-xl border-l-2 px-3 py-2.5 text-sm transition-all duration-150 ${
+        active
+          ? "border-primary bg-accent font-semibold text-accent-foreground shadow-sm"
+          : "border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+      }`}
+    >
+      <Icon className={`size-[17px] shrink-0 ${active ? "text-primary" : "text-muted-foreground/75 group-hover:text-primary"}`} />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {active ? <ChevronRight className="size-3.5 text-primary/70" /> : null}
+    </Link>
+  );
+}
+
 export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const router = useRouter();
   const { pathname, search } = useRouterState({
-    select: (s) => ({
-      pathname: s.location.pathname,
-      search: s.location.search as { nhom?: string },
+    select: (state) => ({
+      pathname: state.location.pathname,
+      search: state.location.search as { nhom?: string },
     }),
   });
 
-  // Close drawer on route change (mobile)
-  useEffect(() => {
-    onMobileClose?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, search?.nhom]);
-
-  // Lock body scroll when drawer open
   useEffect(() => {
     if (!mobileOpen) return;
-    const prev = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = previousOverflow;
     };
   }, [mobileOpen]);
+
+  useEffect(() => {
+    onMobileClose?.();
+  }, [pathname, search?.nhom]);
 
   async function onLogout() {
     try {
       await logoutFn();
     } catch {
-      /* still leave */
+      // Still leave the protected area if the server session is already gone.
     }
     await router.navigate({ to: "/login" });
   }
 
+  const displayName = user.display_name || user.username;
+  const isCatalogActive = pathname === "/san-pham";
+  const isLibraryActive = pathname === "/thu-vien";
+
   const nav = (
     <>
-      <div className="p-5 flex items-center gap-3">
+      <div className="flex items-center gap-3 border-b border-border/70 px-5 py-5">
         <img
           src="/logo.png"
           alt="Innomat"
-          width={36}
-          height={36}
-          className="size-9 rounded-lg object-contain bg-white ring-1 ring-black/5 flex-shrink-0 p-0.5"
+          width={38}
+          height={38}
+          className="size-9 rounded-xl object-contain bg-white p-1 ring-1 ring-black/5"
         />
         <div className="min-w-0 flex-1">
-          <p className="font-medium tracking-tight text-foreground text-sm">Innomat CRM</p>
-          <p className="text-[10px] text-muted-foreground">Showroom Manager</p>
+          <p className="truncate text-sm font-bold tracking-tight text-foreground">Innomat CRM</p>
+          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Showroom workspace</p>
         </div>
         {onMobileClose ? (
-          <button
-            type="button"
-            onClick={onMobileClose}
-            className="lg:hidden size-9 grid place-items-center rounded-lg text-muted-foreground hover:bg-surface-strong hover:text-foreground"
-            aria-label="Đóng menu"
-          >
+          <button type="button" onClick={onMobileClose} className="grid size-9 place-items-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden" aria-label="Đóng menu">
             <X className="size-5" />
           </button>
         ) : null}
       </div>
 
-      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto overscroll-contain pb-4">
-        <div className="pt-2 pb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-          Quản lý
-        </div>
-        {mainNav.map((item) => {
-          const active = pathname === item.to;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={() => onMobileClose?.()}
-              className={
-                active
-                  ? "flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground bg-surface-strong rounded-lg shadow-sm ring-1 ring-black/5"
-                  : "flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-surface-strong/50 rounded-lg transition-colors active:bg-surface-strong"
-              }
-            >
-              <Icon
-                className={
-                  active
-                    ? "size-4 flex-shrink-0 text-terracotta"
-                    : "size-4 flex-shrink-0 text-muted-foreground/70"
-                }
-              />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-5 pb-6">
+        {navGroups.map((group) => (
+          <section key={group.label}>
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">{group.label}</p>
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <NavLink key={item.to} item={item} active={pathname === item.to} onClick={onMobileClose} />
+              ))}
+            </div>
+          </section>
+        ))}
 
-        <div className="pt-4 pb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-          Sản phẩm
-        </div>
-        {PRODUCT_GROUPS.map((g) => {
-          const active = pathname === "/san-pham" && search?.nhom === g.slug;
-          const Icon = productIcons[g.slug] ?? LayoutGrid;
-          return (
-            <Link
-              key={g.slug}
-              to="/san-pham"
-              search={{ nhom: g.slug }}
-              onClick={() => onMobileClose?.()}
-              className={
-                active
-                  ? "flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground bg-surface-strong rounded-lg shadow-sm ring-1 ring-black/5"
-                  : "flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-surface-strong/50 rounded-lg transition-colors active:bg-surface-strong"
-              }
-            >
-              <Icon
-                className={
-                  active
-                    ? "size-4 flex-shrink-0 text-terracotta"
-                    : "size-4 flex-shrink-0 text-muted-foreground/70"
-                }
-              />
-              {g.label}
-            </Link>
-          );
-        })}
+        <section>
+          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">Catalog</p>
+          <div className="space-y-1">
+            <NavLink item={{ to: "/san-pham", label: "Sản phẩm", icon: LayoutGrid }} active={isCatalogActive} onClick={onMobileClose} />
+            <div className={`ml-4 border-l pl-3 ${isCatalogActive ? "border-primary/30" : "border-border/70"}`}>
+              {PRODUCT_GROUPS.map((group) => {
+                const Icon = productIcons[group.slug] ?? LayoutGrid;
+                const active = isCatalogActive && search?.nhom === group.slug;
+                return (
+                  <Link
+                    key={group.slug}
+                    to="/san-pham"
+                    search={{ nhom: group.slug }}
+                    onClick={onMobileClose}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
+                      active ? "font-semibold text-primary" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="size-3.5 shrink-0" />
+                    <span className="truncate">{group.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+            <NavLink item={{ to: "/thu-vien", label: "Thư viện", icon: Images }} active={isLibraryActive} onClick={onMobileClose} />
+          </div>
+        </section>
 
         {user.role === "admin" ? (
-          <>
-            <div className="pt-4 pb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-              Hệ thống
+          <section>
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">Quản trị</p>
+            <div className="space-y-1">
+              {adminNav.map((item) => (
+                <NavLink key={item.to} item={item} active={pathname === item.to} onClick={onMobileClose} />
+              ))}
             </div>
-            {adminNav.map((item) => {
-              const active = pathname === item.to;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => onMobileClose?.()}
-                  className={
-                    active
-                      ? "flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground bg-surface-strong rounded-lg shadow-sm ring-1 ring-black/5"
-                      : "flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-surface-strong/50 rounded-lg transition-colors active:bg-surface-strong"
-                  }
-                >
-                  <Icon
-                    className={
-                      active
-                        ? "size-4 flex-shrink-0 text-terracotta"
-                        : "size-4 flex-shrink-0 text-muted-foreground/70"
-                    }
-                  />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </>
+          </section>
         ) : null}
       </nav>
 
-      <div className="p-4 border-t border-border safe-pb space-y-2">
-        <div className="flex items-center gap-2 px-1">
-          <div className="size-8 bg-surface-strong ring-1 ring-black/5 rounded-full grid place-items-center flex-shrink-0 text-xs font-medium text-foreground">
-            {initialsFromName(user.display_name)}
-          </div>
+      <div className="space-y-2 border-t border-border/70 p-4 safe-pb">
+        <div className="flex items-center gap-3 rounded-xl bg-accent/55 p-3">
+          <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{initialsFromName(displayName)}</div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-foreground truncate">{user.display_name}</p>
-            <p className="text-[10px] text-muted-foreground truncate">{ROLE_LABEL[user.role]}</p>
+            <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{ROLE_LABEL[user.role]}</p>
           </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="size-8 grid place-items-center rounded-lg text-muted-foreground hover:bg-surface-strong hover:text-foreground"
-            title="Đăng xuất"
-            aria-label="Đăng xuất"
-          >
-            <LogOut className="size-4" />
-          </button>
         </div>
+        <button type="button" onClick={() => void onLogout()} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" aria-label="Đăng xuất">
+          <LogOut className="size-4" />
+          Đăng xuất
+        </button>
       </div>
     </>
   );
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-60 flex-shrink-0 flex-col border-r border-border bg-surface">
-        {nav}
-      </aside>
-
-      {/* Mobile drawer */}
-      <div
-        className={
-          mobileOpen
-            ? "lg:hidden fixed inset-0 z-50"
-            : "lg:hidden fixed inset-0 z-50 pointer-events-none"
-        }
-        aria-hidden={!mobileOpen}
-      >
-        <button
-          type="button"
-          className={
-            mobileOpen
-              ? "absolute inset-0 bg-black/40 backdrop-blur-[1px] transition-opacity"
-              : "absolute inset-0 bg-black/0 transition-opacity"
-          }
-          onClick={onMobileClose}
-          aria-label="Đóng menu"
-          tabIndex={mobileOpen ? 0 : -1}
-        />
-        <aside
-          className={
-            mobileOpen
-              ? "absolute inset-y-0 left-0 w-[min(18rem,88vw)] flex flex-col bg-surface border-r border-border shadow-xl transition-transform duration-200 ease-out translate-x-0 safe-pt"
-              : "absolute inset-y-0 left-0 w-[min(18rem,88vw)] flex flex-col bg-surface border-r border-border shadow-xl transition-transform duration-200 ease-out -translate-x-full"
-          }
-        >
-          {nav}
-        </aside>
+      <aside className="relative z-40 hidden w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">{nav}</aside>
+      <div className={`fixed inset-0 z-50 lg:hidden ${mobileOpen ? "pointer-events-auto" : "pointer-events-none"}`} aria-hidden={!mobileOpen}>
+        <button type="button" className={`absolute inset-0 bg-black/30 backdrop-blur-[1px] transition-opacity ${mobileOpen ? "opacity-100" : "opacity-0"}`} onClick={onMobileClose} aria-label="Đóng menu" tabIndex={mobileOpen ? 0 : -1} />
+        <aside className={`absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-border bg-card shadow-2xl transition-transform duration-200 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>{nav}</aside>
       </div>
     </>
   );

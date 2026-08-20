@@ -41,6 +41,7 @@ import {
   addGalleryProductImagesFn,
   createGalleryCollectionFn,
   deleteGalleryCollectionFn,
+  deleteProductImageFn,
   fetchGalleryCollection,
   fetchGalleryCollections,
   fetchGalleryImageCandidates,
@@ -48,7 +49,9 @@ import {
   removeGalleryItemFn,
   setGalleryCoverFn,
   updateGalleryCollectionFn,
+  fetchProducts,
   uploadGalleryImageFn,
+  uploadProductImageFn,
 } from "@/api/functions";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
@@ -73,7 +76,12 @@ import {
   matchSearchTokens,
   splitSearchTokens,
 } from "@/lib/product-search";
-import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate } from "@/lib/types";
+import type {
+  GalleryCollection,
+  GalleryCollectionItem,
+  GalleryImageCandidate,
+  Product,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Chip lọc danh mục trên list Thư viện (3 nhóm chính) — thứ tự: Thẻ, Bông, Mosaic. */
@@ -314,6 +322,77 @@ async function copyProductCodes(codes: string[], successMessage: string): Promis
   }
 }
 
+/**
+ * Optional view-only sort: group by product (1a,1b stay adjacent), then order
+ * clusters by stock high→low. Does not rewrite saved sort_order.
+ *
+ * Cover stays put: the cover photo is pinned first (badge still on cover_path),
+ * remaining photos of the same product stay right after it, then other products
+ * by stock. So sorting never moves/replaces the đại diện tile.
+ */
+function sortCollectionItemsByStockDesc(
+  items: GalleryCollectionItem[],
+  coverPath?: string | null,
+): GalleryCollectionItem[] {
+  type Cluster = {
+    key: string;
+    stock: number;
+    firstOrder: number;
+    items: GalleryCollectionItem[];
+  };
+  const clusters: Cluster[] = [];
+  const byProduct = new Map<number, Cluster>();
+  const cover = coverPath?.trim() || "";
+
+  items.forEach((item, index) => {
+    const stock = Number(item.total_stock) || 0;
+    if (item.product_id != null) {
+      let cluster = byProduct.get(item.product_id);
+      if (!cluster) {
+        cluster = {
+          key: `p-${item.product_id}`,
+          stock,
+          firstOrder: index,
+          items: [],
+        };
+        byProduct.set(item.product_id, cluster);
+        clusters.push(cluster);
+      }
+      cluster.items.push(item);
+      return;
+    }
+    clusters.push({
+      key: `i-${item.id}`,
+      stock,
+      firstOrder: index,
+      items: [item],
+    });
+  });
+
+  // Within each product cluster, put the cover photo first so badge stays on
+  // the lead tile of that product when we pin the cover cluster.
+  if (cover) {
+    for (const cluster of clusters) {
+      const coverIdx = cluster.items.findIndex((item) => item.path === cover);
+      if (coverIdx > 0) {
+        const [coverItem] = cluster.items.splice(coverIdx, 1);
+        cluster.items.unshift(coverItem!);
+      }
+    }
+  }
+
+  clusters.sort((a, b) => {
+    const aIsCover = cover ? a.items.some((item) => item.path === cover) : false;
+    const bIsCover = cover ? b.items.some((item) => item.path === cover) : false;
+    if (aIsCover !== bIsCover) return aIsCover ? -1 : 1;
+    const byStock = b.stock - a.stock;
+    if (byStock !== 0) return byStock;
+    return a.firstOrder - b.firstOrder;
+  });
+
+  return clusters.flatMap((cluster) => cluster.items);
+}
+
 function GalleryPage() {
   const router = useRouter();
   const navigate = Route.useNavigate();
@@ -331,6 +410,7 @@ function GalleryPage() {
   const { user } = Route.useRouteContext();
   const isAdmin = user.role === "admin";
   const [collections, setCollections] = useState(loaderData.collections);
+  const [candidates, setCandidates] = useState(loaderData.candidates);
   const [detail, setDetail] = useState<CollectionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -339,6 +419,8 @@ function GalleryPage() {
   const [busy, setBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
+  /** Inside open collection: false = saved drag order; true = stock high→low (view-only). */
+  const [sortByStock, setSortByStock] = useState(false);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -349,6 +431,17 @@ function GalleryPage() {
 
   const viewerIndex =
     selectedId != null && viewerIndexParam != null ? viewerIndexParam : null;
+
+  useEffect(() => {
+    setCollections(loaderData.collections);
+    setCandidates(loaderData.candidates);
+  }, [loaderData.collections, loaderData.candidates]);
+
+  async function refreshCandidates() {
+    const rows = await fetchGalleryImageCandidates();
+    setCandidates(rows);
+    return rows;
+  }
 
   function patchSearch(
     patch: Partial<ThuVienSearch> | ((prev: ThuVienSearch) => ThuVienSearch),
@@ -396,7 +489,7 @@ function GalleryPage() {
   /** collectionId → set category string (từ SP liên kết trong candidates) */
   const collectionIdsByCategory = useMemo(() => {
     const map = new Map<string, Set<number>>();
-    for (const candidate of loaderData.candidates) {
+    for (const candidate of candidates) {
       const category = candidate.category?.trim();
       if (!category || !candidate.gallery_collection_ids?.length) continue;
       let ids = map.get(category);
@@ -410,7 +503,7 @@ function GalleryPage() {
       }
     }
     return map;
-  }, [loaderData.candidates]);
+  }, [candidates]);
 
   function openCollection(id: number) {
     // push — Android / browser Back returns to list
@@ -484,10 +577,12 @@ function GalleryPage() {
     if (selectedId == null) {
       setDetail(null);
       setLoadingDetail(false);
+      setSortByStock(false);
       return;
     }
     let cancelled = false;
     setLoadingDetail(true);
+    setSortByStock(false);
     // Drop stale detail when switching collections via history
     setDetail((prev) =>
       prev && prev.collection.id === selectedId ? prev : null,
@@ -519,10 +614,22 @@ function GalleryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to c
   }, [selectedId]);
 
-  // Clamp / drop invalid viewer index once items are known
+  const displayedItems = useMemo(() => {
+    if (!detail) return [] as GalleryCollectionItem[];
+    if (sortByStock) {
+      return sortCollectionItemsByStockDesc(
+        detail.items,
+        detail.collection.cover_path,
+      );
+    }
+    return detail.items;
+  }, [detail, sortByStock]);
+
+  // Clamp / drop invalid viewer index once items are known (uses display order)
   useEffect(() => {
     if (viewerIndex == null || !detail) return;
-    if (detail.items.length === 0) {
+    const count = displayedItems.length;
+    if (count === 0) {
       patchSearch(
         (prev) => {
           const next: ThuVienSearch = { ...prev };
@@ -533,17 +640,17 @@ function GalleryPage() {
       );
       return;
     }
-    if (viewerIndex >= detail.items.length) {
-      patchSearch({ v: detail.items.length - 1 }, { replace: true });
+    if (viewerIndex >= count) {
+      patchSearch({ v: count - 1 }, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewerIndex, detail?.items.length, detail?.collection.id]);
+  }, [viewerIndex, displayedItems.length, detail?.collection.id, sortByStock]);
 
   const sortedCollections = useMemo(() => {
     const needle = normalizeSearchText(deferredSearch);
     const matchingCollectionNames = needle
       ? new Set(
-          loaderData.candidates
+          candidates
             .filter((candidate) => normalizeSearchText(candidate.code).includes(needle))
             .map((candidate) => candidate.collections),
         )
@@ -603,15 +710,9 @@ function GalleryPage() {
     collectionIdsByCategory,
     collections,
     deferredSearch,
-    loaderData.candidates,
+    candidates,
     sortParam,
   ]);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
   async function refreshCollections() {
     const rows = await fetchGalleryCollections();
     setCollections(rows);
@@ -723,8 +824,15 @@ function GalleryPage() {
     }
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   async function reorderItems(event: DragEndEvent) {
-    if (!detail || event.over == null || event.active.id === event.over.id) return;
+    if (!detail || sortByStock) return;
+    if (event.over == null || event.active.id === event.over.id) return;
     const oldIndex = detail.items.findIndex((item) => item.id === event.active.id);
     const newIndex = detail.items.findIndex((item) => item.id === event.over!.id);
     if (oldIndex < 0 || newIndex < 0) return;
@@ -769,6 +877,7 @@ function GalleryPage() {
         ) : (
           <>
             <PageHeader
+        eyebrow="Catalog"
               title={detail.collection.name}
               description={
                 detail.collection.description ||
@@ -778,10 +887,10 @@ function GalleryPage() {
                 <>
                   <button
                     type="button"
-                    disabled={!detail.items.some((item) => item.product_code)}
+                    disabled={!displayedItems.some((item) => item.product_code)}
                     onClick={() =>
                       void copyProductCodes(
-                        detail.items.map((item) => item.product_code),
+                        displayedItems.map((item) => item.product_code),
                         `Đã copy toàn bộ mã trong ${detail.collection.name}`,
                       )
                     }
@@ -821,32 +930,51 @@ function GalleryPage() {
             />
             {detail.items.length ? (
               <div className="space-y-2">
-                {reordering ? (
-                  <p className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin" /> Đang lưu thứ tự…
-                  </p>
-                ) : isAdmin ? (
-                  <p className="text-right text-xs text-muted-foreground">
-                    Kéo nút <GripVertical className="inline size-3.5" /> để đổi vị trí ảnh.
-                  </p>
-                ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSortByStock((v) => !v)}
+                    className={cn(
+                      "h-8 rounded-full px-3 text-xs font-medium transition-all ring-1",
+                      sortByStock
+                        ? "bg-terracotta text-primary-foreground ring-terracotta/30 shadow-sm"
+                        : "bg-card text-muted-foreground ring-black/5 hover:bg-surface-strong hover:text-foreground",
+                    )}
+                    title="Gom ảnh cùng SP, sắp xếp theo tồn kho Q9 cao → thấp (không đổi thứ tự đã lưu)"
+                  >
+                    Tồn cao → thấp
+                  </button>
+                  {reordering ? (
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" /> Đang lưu thứ tự…
+                    </p>
+                  ) : sortByStock ? (
+                    <p className="text-xs text-muted-foreground">
+                      Ảnh cùng SP liền nhau · không đổi thứ tự đã lưu
+                    </p>
+                  ) : isAdmin ? (
+                    <p className="text-xs text-muted-foreground">
+                      Kéo nút <GripVertical className="inline size-3.5" /> để đổi vị trí ảnh.
+                    </p>
+                  ) : null}
+                </div>
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   onDragEnd={(event) => void reorderItems(event)}
                 >
                   <SortableContext
-                    items={detail.items.map((item) => item.id)}
+                    items={displayedItems.map((item) => item.id)}
                     strategy={rectSortingStrategy}
                   >
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
-                      {detail.items.map((item, index) => (
+                      {displayedItems.map((item, index) => (
                         <SortableGalleryCard
                           key={item.id}
                           item={item}
                           isCover={detail.collection.cover_path === item.path}
                           canEdit={isAdmin}
-                          disabled={busy || reordering}
+                          disabled={busy || reordering || sortByStock}
                           onView={() => openViewer(index)}
                           onSetCover={() => void setCover(item)}
                           onRemove={() => void removeItem(item)}
@@ -867,12 +995,17 @@ function GalleryPage() {
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               collection={detail}
-              candidates={loaderData.candidates}
-              onAdded={refreshDetail}
+              candidates={candidates}
+              isAdmin={isAdmin}
+              onAdded={async () => {
+                await refreshDetail();
+                await refreshCandidates();
+              }}
+              onCandidatesChanged={refreshCandidates}
             />
             <GalleryViewerDialog
               open={viewerIndex !== null}
-              items={detail.items}
+              items={displayedItems}
               initialIndex={viewerIndex ?? 0}
               onOpenChange={(open) => {
                 if (!open) closeViewer();
@@ -1531,52 +1664,118 @@ function CollectionFormDialog({
   );
 }
 
+/** How many product groups to mount at once in the library image picker.
+ *  Without this, filtered=all mounts ~3k <img> tags and most tiles stay blank
+ *  (browser lazy-load + connection limits against Supabase). */
+const PICKER_GROUP_BATCH = 40;
+
 function ImagePickerDialog({
   open,
   onOpenChange,
   collection,
   candidates,
+  isAdmin,
   onAdded,
+  onCandidatesChanged,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   collection: CollectionDetail;
   candidates: GalleryImageCandidate[];
+  isAdmin: boolean;
   onAdded: () => Promise<void>;
+  onCandidatesChanged: () => Promise<unknown>;
 }) {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Partial<Record<FacetKey, string>>>({});
+  /** Membership set: ảnh đang được giữ trong BST (đã có + mới tick). */
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [uploadingProductId, setUploadingProductId] = useState<number | null>(null);
+  const [pendingDeleteImageId, setPendingDeleteImageId] = useState<number | null>(null);
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
+  const [emptyProducts, setEmptyProducts] = useState<Product[]>([]);
+  const [loadingEmptyProducts, setLoadingEmptyProducts] = useState(false);
+  const [visibleGroupCount, setVisibleGroupCount] = useState(PICKER_GROUP_BATCH);
+  const pickerListRef = useRef<HTMLDivElement | null>(null);
+  const pickerSentinelRef = useRef<HTMLDivElement | null>(null);
+  const productUploadRefs = useRef<Map<number, HTMLInputElement | null>>(new Map());
   const deferredQuery = useDeferredValue(query);
-  const existingPaths = useMemo(
-    () => new Set(collection.items.map((item) => item.path)),
-    [collection.items],
-  );
+  /** path → gallery_collection_items.id (để gỡ khi unselect) */
+  const galleryItemIdByPath = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of collection.items) map.set(item.path, item.id);
+    return map;
+  }, [collection.items]);
+  /** product_image_id → gallery item id */
+  const galleryItemIdByProductImageId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const item of collection.items) {
+      if (item.product_image_id != null) map.set(item.product_image_id, item.id);
+    }
+    return map;
+  }, [collection.items]);
+  const currentCollectionId = collection.collection.id;
+  const isAvailableForThisCollection = useMemo(() => {
+    return (candidate: GalleryImageCandidate) =>
+      candidate.gallery_collection_ids.length === 0 ||
+      candidate.gallery_collection_ids.some(
+        (collectionId) => Number(collectionId) === currentCollectionId,
+      );
+  }, [currentCollectionId]);
+  /** Ảnh được chọn/thêm vào BST hiện tại (SP free hoặc đã thuộc BST này). */
   const available = useMemo(
-    () =>
-      candidates.filter(
-        (candidate) =>
-          !existingPaths.has(candidate.path) &&
-          (candidate.gallery_collection_ids.length === 0 ||
-            candidate.gallery_collection_ids.some(
-              (collectionId) => Number(collectionId) === collection.collection.id,
-            )),
-      ),
-    [candidates, collection.collection.id, existingPaths],
+    () => candidates.filter((candidate) => isAvailableForThisCollection(candidate)),
+    [candidates, isAvailableForThisCollection],
   );
+  /** SP/ảnh đang thuộc BST khác — hiện khi tìm để giải thích vì sao không thêm được. */
+  const blocked = useMemo(
+    () => candidates.filter((candidate) => !isAvailableForThisCollection(candidate)),
+    [candidates, isAvailableForThisCollection],
+  );
+  const isInCollection = useMemo(() => {
+    return (row: GalleryImageCandidate) =>
+      galleryItemIdByProductImageId.has(row.product_image_id) ||
+      galleryItemIdByPath.has(row.path);
+  }, [galleryItemIdByPath, galleryItemIdByProductImageId]);
+  const galleryItemIdFor = useMemo(() => {
+    return (row: GalleryImageCandidate) =>
+      galleryItemIdByProductImageId.get(row.product_image_id) ??
+      galleryItemIdByPath.get(row.path);
+  }, [galleryItemIdByPath, galleryItemIdByProductImageId]);
+  /** Snapshot membership lúc mở dialog — diff khi lưu. */
+  const baselineSelected = useMemo(() => {
+    const ids = new Set<number>();
+    for (const row of available) {
+      if (isInCollection(row)) ids.add(row.product_image_id);
+    }
+    return ids;
+  }, [available, isInCollection]);
   const searchRows = useMemo(
     () =>
       available.map((row) => ({
         row,
+        alreadyInCollection: isInCollection(row),
+        blockedElsewhere: false as boolean,
         index: codeRowFromProduct(row.code, row.internal_codes, normalizeSearchText),
-          searchable: normalizeSearchText(
-            [row.code, row.internal_codes, row.name, row.supplier]
-              .filter(Boolean)
-              .join(" "),
-          ),
+        searchable: normalizeSearchText(
+          [row.code, row.internal_codes, row.name, row.supplier].filter(Boolean).join(" "),
+        ),
       })),
-    [available],
+    [available, isInCollection],
+  );
+  const blockedSearchRows = useMemo(
+    () =>
+      blocked.map((row) => ({
+        row,
+        alreadyInCollection: false as boolean,
+        blockedElsewhere: true as boolean,
+        index: codeRowFromProduct(row.code, row.internal_codes, normalizeSearchText),
+        searchable: normalizeSearchText(
+          [row.code, row.internal_codes, row.name, row.supplier].filter(Boolean).join(" "),
+        ),
+      })),
+    [blocked],
   );
   const exactSet = useMemo(
     () =>
@@ -1611,21 +1810,52 @@ function ImagePickerDialog({
     }
     return result;
   }, [searchRows, tokens, exactSet, filters]);
+  type PickerImage = GalleryImageCandidate & {
+    alreadyInCollection: boolean;
+    blockedElsewhere: boolean;
+  };
   const filtered = useMemo(() => {
     const matches = searchRows
       .filter(({ row, index, searchable }) => {
         if (!matchSearchTokens(index, tokens, searchable, exactSet)) return false;
         return FACETS.every(({ key }) => !filters[key] || row[key] === filters[key]);
       })
-      .map(({ row }) => row);
-    const uniqueByPath = new Map<string, GalleryImageCandidate>();
+      .map(
+        ({ row, alreadyInCollection, blockedElsewhere }): PickerImage => ({
+          ...row,
+          alreadyInCollection,
+          blockedElsewhere,
+        }),
+      );
+    const uniqueByPath = new Map<string, PickerImage>();
     for (const candidate of matches) {
       if (!uniqueByPath.has(candidate.path)) uniqueByPath.set(candidate.path, candidate);
     }
     return [...uniqueByPath.values()];
   }, [searchRows, tokens, exactSet, filters]);
+  /** Only when user is searching — show SP locked in other collections. */
+  const blockedFiltered = useMemo(() => {
+    if (!tokens.length && !FACETS.some(({ key }) => filters[key])) return [] as PickerImage[];
+    const matches = blockedSearchRows
+      .filter(({ row, index, searchable }) => {
+        if (!matchSearchTokens(index, tokens, searchable, exactSet)) return false;
+        return FACETS.every(({ key }) => !filters[key] || row[key] === filters[key]);
+      })
+      .map(
+        ({ row, alreadyInCollection, blockedElsewhere }): PickerImage => ({
+          ...row,
+          alreadyInCollection,
+          blockedElsewhere,
+        }),
+      );
+    const uniqueByPath = new Map<string, PickerImage>();
+    for (const candidate of matches) {
+      if (!uniqueByPath.has(candidate.path)) uniqueByPath.set(candidate.path, candidate);
+    }
+    return [...uniqueByPath.values()];
+  }, [blockedSearchRows, tokens, exactSet, filters]);
   const groups = useMemo(() => {
-    const map = new Map<number, GalleryImageCandidate[]>();
+    const map = new Map<number, PickerImage[]>();
     for (const image of filtered) {
       const rows = map.get(image.product_id) ?? [];
       rows.push(image);
@@ -1633,15 +1863,115 @@ function ImagePickerDialog({
     }
     return [...map.values()];
   }, [filtered]);
+  const blockedGroups = useMemo(() => {
+    const map = new Map<number, PickerImage[]>();
+    for (const image of blockedFiltered) {
+      const rows = map.get(image.product_id) ?? [];
+      rows.push(image);
+      map.set(image.product_id, rows);
+    }
+    return [...map.values()];
+  }, [blockedFiltered]);
+  const alreadyCount = useMemo(
+    () => filtered.reduce((n, row) => n + (row.alreadyInCollection ? 1 : 0), 0),
+    [filtered],
+  );
+  const toAddIds = useMemo(
+    () => [...selected].filter((id) => !baselineSelected.has(id)),
+    [selected, baselineSelected],
+  );
+  const toRemoveImageIds = useMemo(
+    () => [...baselineSelected].filter((id) => !selected.has(id)),
+    [selected, baselineSelected],
+  );
+  const dirty = toAddIds.length > 0 || toRemoveImageIds.length > 0;
+  const filterKey = useMemo(
+    () =>
+      JSON.stringify({
+        q: deferredQuery,
+        ...filters,
+      }),
+    [deferredQuery, filters],
+  );
+  useEffect(() => {
+    setVisibleGroupCount(PICKER_GROUP_BATCH);
+  }, [filterKey, open]);
+  const visibleGroups = useMemo(
+    () => groups.slice(0, visibleGroupCount),
+    [groups, visibleGroupCount],
+  );
+  const hasMoreGroups = visibleGroupCount < groups.length;
+  useEffect(() => {
+    if (!open || !hasMoreGroups) return;
+    const root = pickerListRef.current;
+    const el = pickerSentinelRef.current;
+    if (!root || !el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleGroupCount((n) => Math.min(n + PICKER_GROUP_BATCH, groups.length));
+        }
+      },
+      { root, rootMargin: "600px 0px", threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [open, hasMoreGroups, groups.length, filterKey, visibleGroupCount]);
   useEffect(() => {
     if (!open) {
       setQuery("");
       setFilters({});
       setSelected(new Set());
+      setVisibleGroupCount(PICKER_GROUP_BATCH);
+      setPendingDeleteImageId(null);
+      setDeletingImageId(null);
+      setUploadingProductId(null);
+      setEmptyProducts([]);
+      return;
     }
+    // Ảnh đã có trong BST → checked sẵn; user bỏ tick = gỡ khi lưu
+    setSelected(new Set(baselineSelected));
+    setPendingDeleteImageId(null);
+    // Chỉ seed khi mở dialog — không reset khi baseline đổi giữa chừng
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open edge only
   }, [open]);
 
+  // When searching: also surface SP that have zero photos so admin can upload.
+  useEffect(() => {
+    if (!open || !isAdmin) {
+      setEmptyProducts([]);
+      return;
+    }
+    const q = deferredQuery.trim();
+    if (q.length < 2) {
+      setEmptyProducts([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingEmptyProducts(true);
+    void (async () => {
+      try {
+        const products = await fetchProducts({
+          data: { search: q, limit: 40, stockLocation: "KHOQ9" },
+        });
+        if (cancelled) return;
+        const withImages = new Set(candidates.map((c) => c.product_id));
+        setEmptyProducts(
+          products.filter((p) => !withImages.has(p.id)).slice(0, 12),
+        );
+      } catch {
+        if (!cancelled) setEmptyProducts([]);
+      } finally {
+        if (!cancelled) setLoadingEmptyProducts(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isAdmin, deferredQuery, candidates]);
+
   function toggle(ids: number[]) {
+    if (!ids.length) return;
     setSelected((current) => {
       const next = new Set(current);
       const allSelected = ids.every((id) => next.has(id));
@@ -1653,22 +1983,122 @@ function ImagePickerDialog({
     });
   }
 
-  async function addSelected() {
-    if (!selected.size) return;
+  async function uploadToProduct(productId: number, files: FileList | null) {
+    if (!isAdmin || !files?.length) return;
+    setUploadingProductId(productId);
     setBusy(true);
     try {
-      const result = await addGalleryProductImagesFn({
-        data: {
-          collectionId: collection.collection.id,
-          productImageIds: [...selected],
-        },
+      const uploadedIds: number[] = [];
+      let first = true;
+      const existingCount = candidates.filter((c) => c.product_id === productId).length;
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith("image/")) {
+          toast.error(`Bỏ qua ${file.name}: không phải ảnh`);
+          continue;
+        }
+        if (file.size > 30 * 1024 * 1024) {
+          toast.error(`Bỏ qua ${file.name}: ảnh gốc quá 30MB`);
+          continue;
+        }
+        const dataBase64 = await readImageFileAsWebpDataUrl(file);
+        const row = await uploadProductImageFn({
+          data: {
+            product_id: productId,
+            filename: `${file.name.replace(/\.[^.]+$/, "")}.webp`,
+            dataBase64,
+            mimeType: "image/webp",
+            is_primary: existingCount === 0 && first,
+          },
+        });
+        uploadedIds.push(row.id);
+        first = false;
+      }
+      if (!uploadedIds.length) return;
+      await onCandidatesChanged();
+      // Auto-select mới upload để bấm Lưu là vào BST này (và đã nằm trong catalog SP).
+      setSelected((current) => {
+        const next = new Set(current);
+        for (const id of uploadedIds) next.add(id);
+        return next;
       });
-      toast.success(`Đã thêm ${result.added} ảnh`);
+      toast.success(
+        `Đã upload ${uploadedIds.length} ảnh vào SP · đã tick sẵn — bấm Lưu để gắn vào bộ sưu tập`,
+      );
+    } catch (error) {
+      toast.error(errorMessage(error, "Không upload được ảnh sản phẩm"));
+    } finally {
+      setBusy(false);
+      setUploadingProductId(null);
+      const input = productUploadRefs.current.get(productId);
+      if (input) input.value = "";
+    }
+  }
+
+  async function permanentlyDeleteImage(imageId: number) {
+    if (!isAdmin || pendingDeleteImageId !== imageId || deletingImageId !== null) return;
+    setDeletingImageId(imageId);
+    setBusy(true);
+    try {
+      await deleteProductImageFn({ data: { imageId } });
+      setSelected((current) => {
+        const next = new Set(current);
+        next.delete(imageId);
+        return next;
+      });
+      setPendingDeleteImageId(null);
+      toast.success("Đã xóa vĩnh viễn ảnh sản phẩm");
+      await onCandidatesChanged();
+      await onAdded();
+    } catch (error) {
+      toast.error(errorMessage(error, "Không xóa được ảnh"));
+    } finally {
+      setDeletingImageId(null);
+      setBusy(false);
+    }
+  }
+
+  async function applySelection() {
+    if (!dirty) {
+      onOpenChange(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      let added = 0;
+      let removed = 0;
+      if (toAddIds.length) {
+        const result = await addGalleryProductImagesFn({
+          data: {
+            collectionId: collection.collection.id,
+            productImageIds: toAddIds,
+          },
+        });
+        added = result.added;
+      }
+      if (toRemoveImageIds.length) {
+        const removeItemIds = new Set<number>();
+        const byImageId = new Map(
+          available.map((row) => [row.product_image_id, row] as const),
+        );
+        for (const productImageId of toRemoveImageIds) {
+          const row = byImageId.get(productImageId);
+          const itemId = row ? galleryItemIdFor(row) : undefined;
+          if (itemId != null) removeItemIds.add(itemId);
+        }
+        await Promise.all(
+          [...removeItemIds].map((itemId) => removeGalleryItemFn({ data: { itemId } })),
+        );
+        removed = removeItemIds.size;
+      }
+      const parts: string[] = [];
+      if (added) parts.push(`thêm ${added}`);
+      if (removed) parts.push(`gỡ ${removed}`);
+      toast.success(parts.length ? `Đã ${parts.join(", ")} ảnh` : "Không có thay đổi");
       setSelected(new Set());
       await onAdded();
       onOpenChange(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Không thêm được ảnh"));
+      toast.error(errorMessage(error, "Không cập nhật được ảnh"));
     } finally {
       setBusy(false);
     }
@@ -1736,39 +2166,81 @@ function ImagePickerDialog({
             ))}
             <span className="text-xs text-muted-foreground">
               {groups.length} sản phẩm · {filtered.length} ảnh
+              {alreadyCount > 0 ? ` · ${alreadyCount} đã có` : ""}
             </span>
           </div>
           <div className="flex max-h-24 flex-wrap gap-2 overflow-y-auto rounded-lg bg-surface-strong/50 p-2 sm:max-h-none">
             <QuickSelect
               label="Chọn mọi ảnh đang lọc"
-              onClick={() => setSelected(new Set(filtered.map((row) => row.product_image_id)))}
+              onClick={() =>
+                setSelected((current) => {
+                  const next = new Set(current);
+                  for (const row of filtered) next.add(row.product_image_id);
+                  return next;
+                })
+              }
             />
             <QuickSelect
               label="Chọn ảnh chính đang lọc"
               onClick={() =>
-                setSelected(
-                  new Set(
-                    groups.map(
-                      (rows) => (rows.find((row) => row.is_primary) ?? rows[0])!.product_image_id,
-                    ),
-                  ),
-                )
+                setSelected((current) => {
+                  const next = new Set(current);
+                  for (const rows of groups) {
+                    const pick = rows.find((row) => row.is_primary) ?? rows[0];
+                    if (pick) next.add(pick.product_image_id);
+                  }
+                  return next;
+                })
               }
             />
-            <QuickSelect label="Bỏ chọn" onClick={() => setSelected(new Set())} />
+            <QuickSelect
+              label="Bỏ chọn đang lọc"
+              onClick={() =>
+                setSelected((current) => {
+                  const next = new Set(current);
+                  for (const row of filtered) next.delete(row.product_image_id);
+                  return next;
+                })
+              }
+            />
+            <QuickSelect
+              label="Khôi phục"
+              onClick={() => setSelected(new Set(baselineSelected))}
+            />
             <span className="ml-auto self-center text-xs font-medium text-terracotta">
-              Đã chọn {selected.size}
+              {dirty
+                ? [
+                    toAddIds.length ? `+${toAddIds.length}` : null,
+                    toRemoveImageIds.length ? `−${toRemoveImageIds.length}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : `${selected.size} đang giữ`}
             </span>
           </div>
         </div>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6">
-          {groups.map((images) => {
+        <div
+          ref={pickerListRef}
+          className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6"
+        >
+          {visibleGroups.map((images) => {
             const first = images[0]!;
             const ids = images.map((image) => image.product_image_id);
-            const allSelected = ids.every((id) => selected.has(id));
+            const alreadyInCount = images.filter((image) => image.alreadyInCollection).length;
+            const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+            const anySelected = ids.some((id) => selected.has(id));
+            const uploading = uploadingProductId === first.product_id;
             return (
-              <section key={first.product_id} className="rounded-xl border border-border p-3">
-                <div className="mb-3 flex items-center gap-3">
+              <section
+                key={first.product_id}
+                className={cn(
+                  "rounded-xl border p-3",
+                  alreadyInCount === images.length && allSelected
+                    ? "border-terracotta/30 bg-terracotta/[0.03]"
+                    : "border-border",
+                )}
+              >
+                <div className="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => toggle(ids)}
@@ -1776,7 +2248,9 @@ function ImagePickerDialog({
                       "grid size-10 shrink-0 place-items-center rounded-md border text-white",
                       allSelected
                         ? "border-terracotta bg-terracotta"
-                        : "border-border bg-background",
+                        : anySelected
+                          ? "border-terracotta/50 bg-terracotta/20"
+                          : "border-border bg-background",
                     )}
                   >
                     {allSelected ? <Check className="size-4" /> : null}
@@ -1787,8 +2261,39 @@ function ImagePickerDialog({
                     </p>
                     <p className="truncate text-[10px] text-muted-foreground">
                       {first.internal_codes || "Không có mã nội bộ"} · {images.length} ảnh
+                      {alreadyInCount > 0 ? ` · ${alreadyInCount} đã có` : ""}
                     </p>
                   </div>
+                  {isAdmin ? (
+                    <>
+                      <input
+                        ref={(el) => {
+                          productUploadRefs.current.set(first.product_id, el);
+                        }}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        hidden
+                        onChange={(event) =>
+                          void uploadToProduct(first.product_id, event.target.files)
+                        }
+                      />
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => productUploadRefs.current.get(first.product_id)?.click()}
+                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[11px] font-medium hover:bg-surface-strong disabled:opacity-50"
+                        title="Upload ảnh mới vào catalog SP này (rồi tick để gắn BST)"
+                      >
+                        {uploading ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="size-3.5" />
+                        )}
+                        Thêm ảnh SP
+                      </button>
+                    </>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => toggle(ids)}
@@ -1799,41 +2304,244 @@ function ImagePickerDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:grid-cols-5 lg:grid-cols-8">
                   {images.map((image) => {
+                    const already = image.alreadyInCollection;
                     const checked = selected.has(image.product_image_id);
+                    const willRemove = already && !checked;
+                    const willAdd = !already && checked;
+                    const confirmDelete = pendingDeleteImageId === image.product_image_id;
+                    const deleting = deletingImageId === image.product_image_id;
                     return (
-                      <button
+                      <div
                         key={image.product_image_id}
-                        type="button"
-                        onClick={() => toggle([image.product_image_id])}
                         className={cn(
                           "relative aspect-square overflow-hidden rounded-lg border-2 bg-white p-1",
-                          checked ? "border-terracotta" : "border-transparent ring-1 ring-border",
+                          willRemove
+                            ? "border-destructive/60 opacity-70 ring-1 ring-destructive/20"
+                            : checked
+                              ? "border-terracotta"
+                              : "border-transparent ring-1 ring-border",
                         )}
                       >
-                        <ProductImage src={image.path} alt={image.caption || first.code} />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirmDelete) setPendingDeleteImageId(null);
+                            else toggle([image.product_image_id]);
+                          }}
+                          title={
+                            willRemove
+                              ? "Bỏ chọn để gỡ khỏi bộ sưu tập"
+                              : already
+                                ? "Đã có — bấm để bỏ chọn / gỡ khỏi BST"
+                                : "Bấm để chọn thêm vào BST"
+                          }
+                          className="absolute inset-0 z-0 block size-full p-1"
+                        >
+                          <ProductImage
+                            src={image.path}
+                            alt={image.caption || first.code}
+                            loading="eager"
+                          />
+                        </button>
                         <span
                           className={cn(
-                            "absolute right-1 top-1 grid size-7 place-items-center rounded-full border text-white shadow",
-                            checked
-                              ? "border-terracotta bg-terracotta"
-                              : "border-white bg-black/25",
+                            "pointer-events-none absolute right-1 top-1 z-10 grid size-7 place-items-center rounded-full border text-white shadow",
+                            willRemove
+                              ? "border-destructive bg-destructive"
+                              : checked
+                                ? "border-terracotta bg-terracotta"
+                                : "border-white bg-black/25",
                           )}
                         >
-                          {checked ? <Check className="size-3" /> : null}
+                          {willRemove ? (
+                            <X className="size-3" />
+                          ) : checked ? (
+                            <Check className="size-3" />
+                          ) : null}
                         </span>
-                        {image.is_primary ? (
-                          <Star className="absolute bottom-1 left-1 size-4 fill-amber-400 text-amber-500 drop-shadow" />
+                        {already && checked ? (
+                          <span className="pointer-events-none absolute left-1 top-1 z-10 max-w-[calc(100%-2.25rem)] truncate rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tracking-wide text-white">
+                            Đã có
+                          </span>
                         ) : null}
-                      </button>
+                        {willAdd ? (
+                          <span className="pointer-events-none absolute left-1 top-1 z-10 rounded bg-terracotta/90 px-1 py-0.5 text-[9px] font-semibold tracking-wide text-white">
+                            Thêm
+                          </span>
+                        ) : null}
+                        {willRemove ? (
+                          <span className="pointer-events-none absolute left-1 top-1 z-10 rounded bg-destructive/90 px-1 py-0.5 text-[9px] font-semibold tracking-wide text-white">
+                            Gỡ
+                          </span>
+                        ) : null}
+                        {image.is_primary ? (
+                          <Star className="pointer-events-none absolute bottom-1 left-1 z-10 size-4 fill-amber-400 text-amber-500 drop-shadow" />
+                        ) : null}
+                        {isAdmin ? (
+                          confirmDelete ? (
+                            <div className="absolute inset-x-0.5 bottom-0.5 z-20 flex gap-0.5">
+                              <button
+                                type="button"
+                                disabled={busy || deleting}
+                                onClick={() => void permanentlyDeleteImage(image.product_image_id)}
+                                className="h-7 min-w-0 flex-1 rounded bg-red-600 px-1 text-[9px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                              >
+                                {deleting ? "…" : "Xóa vĩnh viễn"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy || deleting}
+                                onClick={() => setPendingDeleteImageId(null)}
+                                className="h-7 shrink-0 rounded bg-black/55 px-1.5 text-[9px] font-medium text-white hover:bg-black/70 disabled:opacity-50"
+                              >
+                                Không
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setPendingDeleteImageId(image.product_image_id);
+                              }}
+                              className="absolute bottom-1 right-1 z-20 grid size-7 place-items-center rounded-md bg-black/45 text-white opacity-80 hover:bg-destructive hover:opacity-100 disabled:opacity-40"
+                              aria-label="Xóa vĩnh viễn ảnh sản phẩm"
+                              title="Xóa vĩnh viễn khỏi catalog SP (mọi thư viện)"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          )
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
               </section>
             );
           })}
-          {!groups.length ? (
+          {hasMoreGroups ? (
+            <div
+              ref={pickerSentinelRef}
+              className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground"
+            >
+              <Loader2 className="size-3.5 animate-spin" />
+              Đang tải thêm ảnh… ({visibleGroups.length}/{groups.length} SP)
+            </div>
+          ) : null}
+          {isAdmin && (emptyProducts.length > 0 || loadingEmptyProducts) ? (
+            <div className="space-y-2 rounded-xl border border-dashed border-terracotta/30 bg-terracotta/[0.04] p-3">
+              <p className="text-xs font-medium text-foreground">
+                SP chưa có ảnh trong catalog
+                {loadingEmptyProducts ? " · đang tìm…" : ""}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Upload tại đây sẽ gắn vào thư viện ảnh của SP, rồi tick sẵn để thêm vào bộ sưu tập.
+              </p>
+              {emptyProducts.map((product) => {
+                const uploading = uploadingProductId === product.id;
+                return (
+                  <div
+                    key={`empty-${product.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2"
+                  >
+                    <div className="size-12 shrink-0 overflow-hidden rounded-md bg-[#f3f1ed] ring-1 ring-border">
+                      <ProductImage
+                        src={product.image_path}
+                        code={product.code}
+                        alt={product.code}
+                        loading="lazy"
+                        className="p-0.5"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium">
+                        {product.code} · {product.name}
+                      </p>
+                      <p className="truncate text-[10px] text-muted-foreground">
+                        Chưa có ảnh · bấm upload để thêm
+                      </p>
+                    </div>
+                    <input
+                      ref={(el) => {
+                        productUploadRefs.current.set(product.id, el);
+                      }}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      hidden
+                      onChange={(event) =>
+                        void uploadToProduct(product.id, event.target.files)
+                      }
+                    />
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => productUploadRefs.current.get(product.id)?.click()}
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-terracotta px-2.5 text-[11px] font-medium text-white disabled:opacity-50"
+                    >
+                      {uploading ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="size-3.5" />
+                      )}
+                      Upload
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+          {blockedGroups.length ? (
+            <div className="space-y-2 rounded-xl border border-dashed border-border/80 bg-surface-strong/30 p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                {blockedGroups.length} SP đang thuộc thư viện khác — không thêm được vào bộ này
+                (1 SP chỉ 1 thư viện). Gỡ ở thư viện kia trước, hoặc upload ảnh mới nếu cần.
+              </p>
+              {blockedGroups.slice(0, 12).map((images) => {
+                const first = images[0]!;
+                return (
+                  <div
+                    key={`blocked-${first.product_id}`}
+                    className="flex items-center gap-3 rounded-lg border border-border/60 bg-card/80 px-3 py-2"
+                  >
+                    <div className="size-12 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-border">
+                      <ProductImage
+                        src={first.path}
+                        alt={first.code}
+                        loading="lazy"
+                        className="p-0.5"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium">
+                        {first.code} · {first.name}
+                      </p>
+                      <p className="truncate text-[10px] text-muted-foreground">
+                        {images.length} ảnh · đã khóa ở thư viện khác
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {blockedGroups.length > 12 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  …và {blockedGroups.length - 12} SP khác
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {!groups.length && !blockedGroups.length && !emptyProducts.length ? (
             <p className="py-16 text-center text-sm text-muted-foreground">
               Không có ảnh phù hợp bộ lọc.
+              {isAdmin
+                ? " Gõ ≥2 ký tự mã/tên SP — nếu SP chưa có ảnh sẽ hiện nút Upload."
+                : ""}
+            </p>
+          ) : null}
+          {!groups.length && blockedGroups.length ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Chỉ còn SP đang thuộc thư viện khác (xem danh sách trên).
             </p>
           ) : null}
         </div>
@@ -1841,18 +2549,26 @@ function ImagePickerDialog({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-11 rounded-lg border border-border px-4 text-xs"
+            disabled={busy}
+            className="h-11 rounded-lg border border-border px-4 text-xs disabled:opacity-50"
           >
             Đóng
           </button>
           <button
             type="button"
-            disabled={!selected.size || busy}
-            onClick={() => void addSelected()}
+            disabled={!dirty || busy}
+            onClick={() => void applySelection()}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-terracotta px-4 text-xs font-medium text-white disabled:opacity-50"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}{" "}
-            Thêm {selected.size} ảnh
+            {dirty
+              ? [
+                  toAddIds.length ? `Thêm ${toAddIds.length}` : null,
+                  toRemoveImageIds.length ? `Gỡ ${toRemoveImageIds.length}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+              : "Không có thay đổi"}
           </button>
         </DialogFooter>
       </DialogContent>

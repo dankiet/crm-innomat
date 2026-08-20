@@ -3,7 +3,7 @@ import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage
 import { normalizeUploadImageBuffer } from "@/lib/image-upload.server";
 import path from "node:path";
 import { getDb, type SqlValue } from "./index.server";
-import { unitPriceForProduct, effectiveDiscountPct, priceAfterDiscount } from "@/lib/pricing";
+import { unitPriceForProduct, effectiveDiscountPct } from "@/lib/pricing";
 import type {
   Customer,
   CustomerDebt,
@@ -22,8 +22,6 @@ import type {
 } from "@/lib/types";
 import { isPhoneMatchable, phonesMatch } from "@/lib/phone";
 import { statusMeta } from "@/lib/types";
-
-export { priceAfterDiscount, unitPriceForProduct, effectiveDiscountPct };
 
 function nowLocal() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -157,7 +155,7 @@ export async function getProduct(id: number): Promise<Product | null> {
 }
 
 /** Field cho phép gợi ý (datalist) & bulk apply — whitelist để tránh SQL injection */
-export const PRODUCT_SUGGEST_FIELDS = [
+const PRODUCT_SUGGEST_FIELDS = [
   "color",
   "supplier",
   "category",
@@ -167,7 +165,7 @@ export const PRODUCT_SUGGEST_FIELDS = [
   "material",
   "size",
 ] as const;
-export type ProductSuggestField = (typeof PRODUCT_SUGGEST_FIELDS)[number];
+type ProductSuggestField = (typeof PRODUCT_SUGGEST_FIELDS)[number];
 
 /** Lấy danh sách giá trị distinct đã dùng cho 1 field phân loại — dùng làm gợi ý datalist */
 export async function listProductFieldValues(field: ProductSuggestField): Promise<string[]> {
@@ -418,21 +416,62 @@ export async function deleteProductImage(imageId: number): Promise<{
     .get<ProductImageRow>(imageId)) as ProductImageRow | undefined;
   if (!row) throw new Error("Không tìm thấy ảnh");
 
-  await db.prepare("DELETE FROM product_images WHERE id = ?").run(imageId);
+  // Gallery FK is ON DELETE SET NULL — also drop collection tiles that pointed at
+  // this product photo so permanent delete from the library picker stays clean.
+  const galleryRows = (await db
+    .prepare(
+      `SELECT id, collection_id, path FROM gallery_collection_items
+       WHERE product_image_id = ? OR path = ?`,
+    )
+    .all<{ id: number; collection_id: number; path: string }>(imageId, row.path)) as Array<{
+    id: number;
+    collection_id: number;
+    path: string;
+  }>;
+  const touchedCollectionIds = [...new Set(galleryRows.map((g) => g.collection_id))];
 
-  // If deleted primary, promote first remaining
-  if (row.is_primary) {
-    const next = (await db
-      .prepare(
-        `SELECT id FROM product_images
-         WHERE product_id = ?
-         ORDER BY sort_order ASC, id ASC LIMIT 1`,
-      )
-      .get<{ id: number }>(row.product_id)) as { id: number } | undefined;
-    if (next) {
-      await db.prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?").run(next.id);
+  await db.transaction(async (tx) => {
+    if (galleryRows.length) {
+      const placeholders = galleryRows.map(() => "?").join(", ");
+      await tx
+        .prepare(
+          `DELETE FROM gallery_collection_items WHERE id IN (${placeholders})`,
+        )
+        .run(...galleryRows.map((g) => g.id));
+      for (const collectionId of touchedCollectionIds) {
+        const next = await tx
+          .prepare(
+            `SELECT path FROM gallery_collection_items
+             WHERE collection_id = ? ORDER BY sort_order, id LIMIT 1`,
+          )
+          .get<{ path: string }>(collectionId);
+        await tx
+          .prepare(
+            `UPDATE gallery_collections
+             SET cover_path = CASE WHEN cover_path = ? THEN ? ELSE cover_path END,
+                 updated_at = ?
+             WHERE id = ?`,
+          )
+          .run(row.path, next?.path ?? "", nowLocal(), collectionId);
+      }
     }
-  }
+
+    await tx.prepare("DELETE FROM product_images WHERE id = ?").run(imageId);
+
+    // If deleted primary, promote first remaining
+    if (row.is_primary) {
+      const next = (await tx
+        .prepare(
+          `SELECT id FROM product_images
+           WHERE product_id = ?
+           ORDER BY sort_order ASC, id ASC LIMIT 1`,
+        )
+        .get<{ id: number }>(row.product_id)) as { id: number } | undefined;
+      if (next) {
+        await tx.prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?").run(next.id);
+      }
+    }
+  })();
 
   await syncPrimaryImagePath(row.product_id);
 
@@ -450,11 +489,11 @@ export async function deleteProductImage(imageId: number): Promise<{
 // ─── Customers ──────────────────────────────────────────────
 
 /** Trần an toàn cho list UI (~100–500 KH). Dialog/combobox nên truyền limit nhỏ hơn. */
-export const DEFAULT_CUSTOMER_LIST_LIMIT = 500;
-export const DEFAULT_QUOTE_LIST_LIMIT = 500;
-export const DEFAULT_ORDER_LIST_LIMIT = 500;
+const DEFAULT_CUSTOMER_LIST_LIMIT = 500;
+const DEFAULT_QUOTE_LIST_LIMIT = 500;
+const DEFAULT_ORDER_LIST_LIMIT = 500;
 
-export type ListCustomersOptions = {
+type ListCustomersOptions = {
   search?: string;
   /** Mặc định DEFAULT_CUSTOMER_LIST_LIMIT; truyền <=0 để không LIMIT (nội bộ/dashboard). */
   limit?: number;
@@ -573,7 +612,7 @@ export function phoneConflictPayload(c: Customer): PhoneConflict {
   };
 }
 
-export async function assertPhoneAvailable(
+async function assertPhoneAvailable(
   phone: string,
   opts?: { excludeId?: number; requirePhone?: boolean },
 ): Promise<void> {
@@ -661,7 +700,7 @@ export async function updateCustomerStatus(id: number, status: CustomerStatus) {
   return await getCustomer(id);
 }
 
-export type QuotedProductSummary = {
+type QuotedProductSummary = {
   id: number;
   product_id: number | null;
   product_code: string;
@@ -677,7 +716,7 @@ export type QuotedProductSummary = {
   total_stock: number;
 };
 
-export type CustomerDetail = {
+type CustomerDetail = {
   customer: Customer;
   quotes: Array<Quote & { items: QuoteItem[] }>;
   orders: Order[];
@@ -1374,7 +1413,7 @@ export async function updateCustomer(
 
 // ─── Quotes ─────────────────────────────────────────────────
 
-export type ListQuotesOptions = {
+type ListQuotesOptions = {
   search?: string;
   statuses?: QuoteStatus[];
   /** Mặc định DEFAULT_QUOTE_LIST_LIMIT; <=0 = không LIMIT (detail/dashboard). */
@@ -1823,7 +1862,7 @@ export async function updateQuote(input: {
 
 // ─── Orders ─────────────────────────────────────────────────
 
-export type ListOrdersOptions = {
+type ListOrdersOptions = {
   search?: string;
   statuses?: OrderStatus[];
   /** Mặc định DEFAULT_ORDER_LIST_LIMIT; <=0 = không LIMIT (detail/dashboard). */
@@ -1894,7 +1933,7 @@ async function listOrdersForCustomer(
     .all<Order>(...(limit != null ? [...params, limit] : params) as SqlValue[])) as Order[];
 }
 
-export async function createOrder(input: {
+async function createOrder(input: {
   customer_id: number;
   amount: number;
   quote_id?: number | null;
@@ -2012,7 +2051,7 @@ export async function createOrderFromQuote(quoteId: number): Promise<Order> {
 
 // ─── Payments & Debt ────────────────────────────────────────
 
-export async function listPayments(customerId?: number): Promise<Payment[]> {
+async function listPayments(customerId?: number): Promise<Payment[]> {
   const db = getDb();
   if (customerId) {
     return (await db
@@ -2216,7 +2255,10 @@ export async function listNotes(
        FROM notes n
        LEFT JOIN customers c ON c.id = n.customer_id
        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-       ORDER BY n.created_at DESC
+       ORDER BY
+         CASE WHEN n.created_at IS NULL OR n.created_at = '' THEN 1 ELSE 0 END DESC,
+         n.created_at DESC,
+         n.id DESC
        LIMIT ?`,
     )
     .all<Note>(...params)) as Note[];
@@ -2228,16 +2270,21 @@ export async function createNote(input: {
   author?: string;
   author_user_id?: number | null;
 }): Promise<Note> {
+  // Must set created_at explicitly — column default is '' and listNotes
+  // orders by created_at DESC, so blank timestamps sink new notes to the
+  // bottom (or off the LIMIT window) and look like they never synced.
+  const ts = nowLocal();
   const info = await getDb()
     .prepare(
-      `INSERT INTO notes (customer_id, author, author_user_id, content)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO notes (customer_id, author, author_user_id, content, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
     )
     .run(
       input.customer_id ?? null,
       input.author ?? "Showroom",
       input.author_user_id ?? null,
       input.content.trim(),
+      ts,
     );
   return (await getDb()
     .prepare(

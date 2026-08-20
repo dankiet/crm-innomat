@@ -27,6 +27,7 @@ function AuditPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <PageHeader
+        eyebrow="Vận hành"
         title="Nhật ký hệ thống"
         description="Theo dõi đăng nhập, thao tác CRM và quản lý người dùng."
         actions={

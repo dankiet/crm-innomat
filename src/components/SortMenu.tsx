@@ -17,12 +17,12 @@ export type SortFieldOption<F extends string> = {
   descHint?: string;
 };
 
-export type SortDecoded<F extends string> = {
+type SortDecoded<F extends string> = {
   field: F;
   dir?: SortDir;
 };
 
-export type SortMenuProps<T extends string, F extends string> = {
+type SortMenuProps<T extends string, F extends string> = {
   value: T;
   defaultValue: T;
   fields: SortFieldOption<F>[];

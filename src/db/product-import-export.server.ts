@@ -14,7 +14,7 @@ import {
 import type { Product } from "@/lib/types";
 
 /** Header = tên cột DB (snake_case) */
-export const PRODUCT_XLSX_COLUMNS = [
+const PRODUCT_XLSX_COLUMNS = [
   { key: "id", header: "id" },
   { key: "code", header: "code", required: true },
   { key: "name", header: "name" },
@@ -41,9 +41,9 @@ export const PRODUCT_XLSX_COLUMNS = [
   { key: "is_hot", header: "is_hot" }
 ] as const;
 
-export type ProductXlsxKey = (typeof PRODUCT_XLSX_COLUMNS)[number]["key"];
+type ProductXlsxKey = (typeof PRODUCT_XLSX_COLUMNS)[number]["key"];
 
-export type ProductImportRow = {
+type ProductImportRow = {
   code: string;
   id?: number;
   name?: string;
@@ -70,7 +70,7 @@ export type ProductImportRow = {
   is_hot?: number;
 };
 
-export type ProductImportPreviewItem = {
+type ProductImportPreviewItem = {
   action: "create" | "update";
   code: string;
   name: string;
@@ -79,7 +79,7 @@ export type ProductImportPreviewItem = {
   row: ProductImportRow;
 };
 
-export type ProductImportPreview = {
+type ProductImportPreview = {
   create: ProductImportPreviewItem[];
   update: ProductImportPreviewItem[];
   errors: Array<{ code: string; message: string }>;

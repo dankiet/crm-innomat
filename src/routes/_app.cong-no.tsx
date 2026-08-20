@@ -180,6 +180,7 @@ function DebtPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Tài chính"
         title="Quản lý công nợ"
         description="Công nợ cộng dồn theo khách hàng: tổng đơn hàng − tổng đã thanh toán."
       />

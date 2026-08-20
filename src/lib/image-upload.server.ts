@@ -1,7 +1,7 @@
 import { putImageBuffer } from "@/lib/storage";
 
-export const IMAGE_MAX_SIDE = 1600;
-export const IMAGE_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
+const IMAGE_MAX_SIDE = 1600;
+const IMAGE_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
 
 export async function normalizeUploadImageBuffer(input: Buffer): Promise<Buffer> {
   const sharp = (await import("sharp")).default;

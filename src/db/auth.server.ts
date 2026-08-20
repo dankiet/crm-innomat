@@ -6,7 +6,7 @@ import type { AppUser, Role, SessionUser } from "@/lib/auth-types";
 
 const scryptAsync = promisify(scrypt);
 
-export const SESSION_COOKIE = "crm_session";
+const SESSION_COOKIE = "crm_session";
 const SESSION_DAYS = 14;
 
 function nowLocal() {
@@ -25,7 +25,7 @@ export async function hashPassword(password: string): Promise<string> {
   return `${salt}:${derived.toString("hex")}`;
 }
 
-export async function verifyPassword(
+async function verifyPassword(
   password: string,
   stored: string,
 ): Promise<boolean> {
@@ -37,7 +37,7 @@ export async function verifyPassword(
   return timingSafeEqual(keyBuf, derived);
 }
 
-export function toSessionUser(u: AppUser): SessionUser {
+function toSessionUser(u: AppUser): SessionUser {
   return {
     id: u.id,
     username: u.username,
@@ -47,18 +47,7 @@ export function toSessionUser(u: AppUser): SessionUser {
   };
 }
 
-export async function getUserById(id: number): Promise<AppUser | null> {
-  return (
-    (await getDb()
-      .prepare(
-        `SELECT id, username, display_name, role, is_active, created_at, updated_at
-         FROM users WHERE id = ?`,
-      )
-      .get<AppUser>(id)) ?? null
-  );
-}
-
-export async function getUserByUsername(username: string): Promise<
+async function getUserByUsername(username: string): Promise<
   (AppUser & { password_hash: string }) | null
 > {
   return (
@@ -72,7 +61,7 @@ export async function getUserByUsername(username: string): Promise<
   );
 }
 
-export async function createSession(
+async function createSession(
   userId: number,
   userAgent = "",
 ): Promise<{ sessionId: string; expiresAt: string }> {
@@ -87,7 +76,7 @@ export async function createSession(
   return { sessionId, expiresAt: exp };
 }
 
-export async function deleteSession(sessionId: string) {
+async function deleteSession(sessionId: string) {
   await getDb().prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
 }
 
@@ -95,24 +84,7 @@ export async function deleteSessionsForUser(userId: number) {
   await getDb().prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
 }
 
-async function getSessionUserId(sessionId: string): Promise<number | null> {
-  const row = await getDb()
-    .prepare(
-      `SELECT user_id, expires_at FROM sessions WHERE id = ?`,
-    )
-    .get<{ user_id: number; expires_at: string }>(sessionId);
-  if (!row) return null;
-  if (row.expires_at < nowLocal()) {
-    await deleteSession(sessionId);
-    return null;
-  }
-  await getDb()
-    .prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?")
-    .run(nowLocal(), sessionId);
-  return row.user_id;
-}
-
-export function setSessionCookie(sessionId: string) {
+function setSessionCookie(sessionId: string) {
   setCookie(SESSION_COOKIE, sessionId, {
     httpOnly: true,
     sameSite: "lax",
@@ -122,11 +94,11 @@ export function setSessionCookie(sessionId: string) {
   });
 }
 
-export function clearSessionCookie() {
+function clearSessionCookie() {
   deleteCookie(SESSION_COOKIE, { path: "/" });
 }
 
-export function getSessionIdFromCookie(): string | undefined {
+function getSessionIdFromCookie(): string | undefined {
   return getCookie(SESSION_COOKIE);
 }
 
@@ -161,7 +133,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   return user ? toSessionUser(user) : null;
 }
 
-export class AuthError extends Error {
+class AuthError extends Error {
   status: number;
   constructor(message: string, status = 401) {
     super(message);

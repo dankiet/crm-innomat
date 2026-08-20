@@ -4,7 +4,7 @@ import type { DiscountType, Product } from "@/lib/types";
 export const VAT_RATE = 0.08;
 
 /** Quy đơn giá bán về trục gồm VAT — để so sánh đúng với trade_price (đã gồm VAT). */
-export function salePriceInclVat(
+function salePriceInclVat(
   unitPrice: number,
   includeVat: boolean,
 ): number {
@@ -70,7 +70,7 @@ export function unitPriceForProduct(
 }
 
 /** Fallback: tính từ % (khi chưa có trade_price / b2b_price). */
-export function priceAfterDiscount(
+function priceAfterDiscount(
   retail: number,
   discountPct: number | null | undefined,
 ): number {

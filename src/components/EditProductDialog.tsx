@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
   Dialog,
@@ -17,7 +17,7 @@ import {
 } from "@/api/functions";
 import type { Product } from "@/lib/types";
 import { PRODUCT_COLORS } from "@/lib/types";
-import { Combobox } from "@/components/ui/combobox";
+import { ProductSuggestionField } from "@/components/ProductSuggestionField";
 import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
 import { parseInternalCodesList } from "@/lib/product-internal-codes";
@@ -37,9 +37,10 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   product: Product | null;
   onEditImages?: () => void;
+  canManageOptions?: boolean;
 };
 
-export function EditProductDialog({ open, onOpenChange, product, onEditImages }: Props) {
+export function EditProductDialog({ open, onOpenChange, product, onEditImages, canManageOptions = false }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -408,56 +409,69 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages }:
                 />
               </Field>
               <Field label="Bề mặt">
-                <Combobox
+                <ProductSuggestionField
                   value={form.surface}
                   onChange={(v) => setForm((f) => ({ ...f, surface: v }))}
                   options={fieldOptions.surface}
-                  placeholder="vd. Bóng, Mờ, Gợn..."
-                  onDeleteOption={(v) => handleDeleteOption("surface", v)}
+                  placeholder="— Chọn bề mặt —"
+                  label="bề mặt"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("surface", option)}
                 />
               </Field>
               <Field label="Kiểu dáng">
-                <Combobox
+                <ProductSuggestionField
                   value={form.shape}
                   onChange={(v) => setForm((f) => ({ ...f, shape: v }))}
                   options={fieldOptions.shape}
-                  placeholder="vd. Hình vuông, vảy cá, dạng thanh KitKat..."
-                  onDeleteOption={(v) => handleDeleteOption("shape", v)}
+                  placeholder="— Chọn kiểu dáng —"
+                  label="kiểu dáng"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("shape", option)}
                 />
               </Field>
               <Field label="Danh mục">
-                <Combobox
+                <ProductSuggestionField
                   value={form.category}
                   onChange={(v) => setForm((f) => ({ ...f, category: v }))}
                   options={fieldOptions.category}
-                  onDeleteOption={(v) => handleDeleteOption("category", v)}
+                  placeholder="— Chọn danh mục —"
+                  label="danh mục"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("category", option)}
                 />
               </Field>
               <Field label={"Nh\u00e0 cung c\u1ea5p"}>
-                <Combobox
+                <ProductSuggestionField
                   value={form.supplier}
                   onChange={(v) => setForm((f) => ({ ...f, supplier: v }))}
                   options={fieldOptions.supplier}
-                  onDeleteOption={(v) => handleDeleteOption("supplier", v)}
+                  placeholder="— Chọn nhà cung cấp —"
+                  label="nhà cung cấp"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("supplier", option)}
                 />
               </Field>
               <Field label={"B\u1ed9 s\u01b0u t\u1eadp"}>
-                <Combobox
+                <ProductSuggestionField
                   value={form.collections}
                   onChange={(v) => setForm((f) => ({ ...f, collections: v }))}
                   options={fieldOptions.collections}
-                  placeholder="vd. Giả vân gỗ, giả đá, nhũ..."
-                  onDeleteOption={(v) => handleDeleteOption("collections", v)}
+                  placeholder="— Chọn bộ sưu tập —"
+                  label="bộ sưu tập"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("collections", option)}
                 />
               </Field>
               <Field label="Màu sắc">
-                <Combobox
+                <ProductSuggestionField
                   value={form.color}
                   onChange={(v) => setForm((f) => ({ ...f, color: v }))}
                   options={Array.from(new Set([...PRODUCT_COLORS, ...fieldOptions.color]))}
-                  placeholder="Trắng, Xanh mint..."
-                  onDeleteOption={(v) => handleDeleteOption("color", v)}
-                  nonDeletableOptions={PRODUCT_COLORS}
+                  placeholder="— Chọn màu sắc —"
+                  label="màu sắc"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("color", option)}
                 />
               </Field>
               <Field label="m² / Thùng">
@@ -676,3 +690,7 @@ function Field({
 
 const inputCls =
   "w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground";
+
+
+
+

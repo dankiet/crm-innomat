@@ -356,6 +356,7 @@ function PipelinePage() {
   return (
     <>
       <PageHeader
+        eyebrow="Bán hàng"
         title="Pipeline cơ hội"
         description="Tư vấn → Báo giá → Đã chốt · Bỏ lỡ. Kéo thẻ (biểu tượng ⋮⋮) để đổi giai đoạn."
         actions={
