@@ -5,8 +5,38 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useHistoryLayer } from "@/hooks/useHistoryLayer";
 
-const Dialog = DialogPrimitive.Root;
+type DialogProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root> & {
+  /**
+   * When true (default), open dialogs push a history entry so Android / browser
+   * Back closes the dialog. Set false if the screen already manages history
+   * (e.g. Thư viện image viewer via `?v=`).
+   */
+  historyLayer?: boolean;
+};
+
+function Dialog({
+  open,
+  defaultOpen,
+  onOpenChange,
+  historyLayer = true,
+  ...props
+}: DialogProps) {
+  const isOpen = open ?? defaultOpen ?? false;
+  useHistoryLayer(Boolean(historyLayer && isOpen), () => {
+    onOpenChange?.(false);
+  });
+
+  return (
+    <DialogPrimitive.Root
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={onOpenChange}
+      {...props}
+    />
+  );
+}
 
 const DialogPortal = DialogPrimitive.Portal;
 

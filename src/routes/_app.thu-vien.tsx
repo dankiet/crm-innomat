@@ -1462,8 +1462,9 @@ function GalleryViewerDialog({
     if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY)) move(deltaX < 0 ? 1 : -1);
   }
 
+  // historyLayer=false: open/close already push/pop via ?v= URL search
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} historyLayer={false}>
       <DialogContent className="inset-0 flex h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-black p-0 text-white sm:inset-0 sm:h-[100dvh] sm:max-h-none sm:w-screen sm:max-w-none sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:p-0 [&>button]:hidden">
         <DialogHeader className="sr-only">
           <DialogTitle>Xem ảnh bộ sưu tập</DialogTitle>

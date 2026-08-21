@@ -443,10 +443,11 @@ export async function exportQuoteToHtml(
 
     <div class="note-group">
       <h5>4. Quy định về đổi trả hàng:</h5>
-      <p class="dash">Đối với sản phẩm không đúng với chất lượng cam kết, hàng bị lỗi, sai sót trong giao nhận do Bên Bán, quý khách có thể đổi trả hàng trong vòng 07 ngày với quy định như sau:</p>
+      <p class="dash">Đổi hàng: Trong vòng 3 ngày kể từ lúc 2 bên ký vào chứng từ giao nhận hàng, nếu Bên Mua phát hiện sản phẩm không đúng với chất lượng cam kết, hàng bị lỗi, sai sót trong giao nhận do Bên Bán hoặc nhà sản xuất mà 2 bên không có khả năng nhận biết tại thời điểm giao nhận hàng, Trong trường hợp này Bên Bán sẽ thay thế số hàng bị lỗi, hư hỏng này cho Bên Mua với điều kiện hàng còn nguyên vẹn vỏ thùng và chưa qua sử dụng, bể vỡ.</p>
+      <p class="dash">Trả hàng:</p>
       <p style="padding-left:12px"> - Số lượng hàng trả không quá 5% tổng giá trị đơn hàng.</p>
-      <p style="padding-left:12px"> - Thời gian trả hàng không quá 15 ngày kể từ ngày nhận hàng.</p>
-      <p style="padding-left:12px"> - Hàng trả về phải còn nguyên vẹn vỏ thùng và chưa qua sử dụng (chưa ngâm nước, trét vữa, cắt hoặc ốp) và không bể vỡ. Nếu trường hợp hàng bị bể vỡ do nhà sản xuất, quý khách vui lòng cung cấp hình ảnh, video ghi nhận khi khui thùng.</p>
+      <p style="padding-left:12px"> - Thời gian trả hàng không quá 15 ngày kể từ ngày nhận hàng, phí trả hàng 10%.</p>
+      <p style="padding-left:12px"> - Trả hàng tại kho, nguyên thùng, hàng trả về phải còn nguyên vẹn vỏ thùng và chưa qua sử dụng (chưa ngâm nước, trét vữa, cắt hoặc ốp) và không bể vỡ. Nếu trường hợp hàng bị bể vỡ do nhà sản xuất, quý khách vui lòng cung cấp hình ảnh, video ghi nhận khi khui thùng.</p>
     </div>
 
     <div class="note-group">

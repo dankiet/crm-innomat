@@ -14,6 +14,7 @@
     "clean:generated": "node scripts/clean-generated.mjs",
     "storage:backup": "node scripts/storage-backup.mjs",
     "db:migrate": "node scripts/db-migrate.mjs",
+    "db:enable-rls": "node scripts/enable-rls.mjs",
     "db:seed-admin": "node scripts/seed-admin.mjs"
   },
   "dependencies": {

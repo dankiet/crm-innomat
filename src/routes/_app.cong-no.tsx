@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useHistoryLayer } from "@/hooks/useHistoryLayer";
 
 export const Route = createFileRoute("/_app/cong-no")({
   head: () => ({
@@ -54,6 +55,10 @@ function DebtPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  useHistoryLayer(detail != null, () => {
+    setDetail(null);
+  });
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();

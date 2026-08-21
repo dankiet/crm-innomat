@@ -23,6 +23,7 @@ import { useEffect } from "react";
 import type { SessionUser } from "@/lib/auth-types";
 import { ROLE_LABEL, initialsFromName } from "@/lib/auth-types";
 import { logoutFn } from "@/api/functions";
+import { useHistoryLayer } from "@/hooks/useHistoryLayer";
 
 const navGroups = [
   {
@@ -100,6 +101,10 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
       pathname: state.location.pathname,
       search: state.location.search as { nhom?: string },
     }),
+  });
+
+  useHistoryLayer(Boolean(mobileOpen && onMobileClose), () => {
+    onMobileClose?.();
   });
 
   useEffect(() => {

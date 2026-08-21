@@ -284,3 +284,25 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
+
+-- ─── Row Level Security ─────────────────────────────────────
+-- CRM truy cập Postgres qua DATABASE_URL (role server / bypass RLS).
+-- Browser không dùng Supabase PostgREST + anon key cho bảng CRM.
+-- Bật RLS trên mọi bảng public, KHÔNG tạo policy anon/authenticated
+-- → chặn đọc/ghi/xóa qua REST công khai; app server vẫn hoạt động bình thường.
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT c.relname AS tablename
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r' -- ordinary tables only
+      AND c.relname NOT LIKE 'pg_%'
+    ORDER BY c.relname
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', r.tablename);
+  END LOOP;
+END $$;
