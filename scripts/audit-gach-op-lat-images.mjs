@@ -27,6 +27,39 @@ const IMAGE_EXT = new Set([
   ".tiff",
 ]);
 
+/**
+ * Không crawl vào các folder phụ (bất kỳ cấp nào trong path).
+ * Khớp không dấu, không phân biệt hoa thường.
+ */
+const SKIP_DIR_PATTERNS = [
+  /(?:^|[\s_-])(?:ko|khong|no)[\s_-]*logo(?:$|[\s_-])/i,
+  /logo\s*off/i,
+  /hinh\s*(?:chup\s*)?thuc\s*te/i,
+  /thuc\s*te\s*chup/i,
+  /chup\s*thuc\s*te/i,
+  /hinh\s*ma\s*cu/i,
+  /(?:^|[\s_-])ma\s*cu(?:$|[\s_-])/i,
+  // Folder tên "crawl" (không dùng nguồn crawl)
+  /^crawl$/,
+  /(?:^|[\s_-])crawl(?:$|[\s_-])/,
+];
+
+function foldDirName(name) {
+  return String(name ?? "")
+    .normalize("NFC")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/đ/g, "d")
+    .trim();
+}
+
+function shouldSkipDirectory(dirName) {
+  const folded = foldDirName(dirName);
+  if (!folded) return false;
+  return SKIP_DIR_PATTERNS.some((re) => re.test(folded));
+}
+
 function loadDotEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
   const text = fs.readFileSync(filePath, "utf-8");
@@ -88,42 +121,53 @@ function stripFileNoise(baseName) {
   s = s.replace(/\s+nghiêng$/i, "");
   s = s.replace(/\s*-\s*khác$/i, "");
   s = s.replace(/\s+khác$/i, "");
+  // Hậu tố kích thước: _300x600, -400X800, 300x600mm, …
+  s = s.replace(/[_\s-]*\d{2,4}\s*[xX×]\s*\d{2,4}(?:\s*mm)?$/i, "");
+  // Số thứ tự kiểu "6. IZA6618" / "01-MF..."
+  s = s.replace(/^\d{1,3}[\s._-]+/, "");
   return s.trim();
+}
+
+function isPlausibleCode(c) {
+  if (!c || c.length < 3 || c.length > 40) return false;
+  if (!/[A-Z]/.test(c) || !/\d/.test(c)) return false;
+  if (/^\d+$/.test(c)) return false;
+  if (/^Z\d{10,}/.test(c)) return false; // zalo-ish
+  if (/^[A-F0-9]{20,}$/i.test(c)) return false; // hash
+  // Chỉ kích thước 300X600 không phải mã SP
+  if (/^\d{2,4}X\d{2,4}(MM)?$/i.test(c)) return false;
+  return true;
 }
 
 /**
  * Trích các ứng viên mã từ stem tên file.
- * Ưu tiên exact stem sau khi strip; thêm token alphanumeric có chữ+số.
+ * Tách theo _ - khoảng trắng; bỏ hậu tố kích thước (MF36Y05F_300x600 → MF36Y05F).
  */
 function extractCodesFromFileName(fileName) {
   const ext = path.extname(fileName);
   const stem = stripFileNoise(path.basename(fileName, ext));
   const codes = new Set();
 
-  const exact = normalizeCode(stem);
-  // Exact stem chỉ nhận nếu giống mã (có chữ và số, không quá rác)
-  if (
-    exact &&
-    exact.length >= 2 &&
-    exact.length <= 40 &&
-    /[A-Z]/.test(exact) &&
-    /\d/.test(exact) &&
-    !/^Z\d{10,}/.test(exact) // zalo-ish
-  ) {
-    codes.add(exact);
+  const consider = (raw) => {
+    const c = normalizeCode(raw);
+    if (isPlausibleCode(c)) codes.add(c);
+  };
+
+  consider(stem);
+
+  // Tách segment: MF36Y05F_300x600 → MF36Y05F | 300x600
+  for (const part of stem.split(/[_\s-]+/)) {
+    if (!part) continue;
+    const cleaned = part.replace(/\d{2,4}\s*[xX×]\s*\d{2,4}(?:\s*mm)?$/i, "");
+    consider(cleaned || part);
+    consider(part);
   }
 
-  // Token: chữ+số, cho phép - _
-  const tokenRe = /[A-Za-z][A-Za-z0-9_-]{1,30}\d[A-Za-z0-9_-]{0,20}|\d{2,6}[A-Za-z][A-Za-z0-9_-]{0,20}/g;
-  const matches = stem.match(tokenRe) || [];
-  for (const m of matches) {
-    const c = normalizeCode(m);
-    if (!c || c.length < 3 || c.length > 40) continue;
-    if (/^\d+$/.test(c)) continue;
-    if (/^Z\d{10,}/.test(c)) continue;
-    // hash dài
-    if (/^[A-F0-9]{20,}$/i.test(c)) continue;
-    codes.add(c);
+  // Token chữ+số trong stem (không nuốt cả _size thành 1 mã)
+  const tokenRe =
+    /[A-Za-z][A-Za-z0-9]*\d[A-Za-z0-9]*|\d{2,6}[A-Za-z][A-Za-z0-9]*/g;
+  for (const m of stem.match(tokenRe) || []) {
+    consider(m);
   }
 
   return [...codes];
@@ -132,6 +176,8 @@ function extractCodesFromFileName(fileName) {
 function walkImages(dir) {
   /** @type {Array<{relative_path:string, brand_folder:string, file_name:string, extracted_codes:string[]}>} */
   const out = [];
+  /** @type {string[]} */
+  const skippedDirs = [];
   const stack = [dir];
   while (stack.length) {
     const cur = stack.pop();
@@ -145,6 +191,10 @@ function walkImages(dir) {
     for (const ent of entries) {
       const full = path.join(cur, ent.name);
       if (ent.isDirectory()) {
+        if (shouldSkipDirectory(ent.name)) {
+          skippedDirs.push(path.relative(dir, full) || ent.name);
+          continue; // không crawl vào folder này
+        }
         stack.push(full);
         continue;
       }
@@ -153,6 +203,8 @@ function walkImages(dir) {
       if (!IMAGE_EXT.has(ext)) continue;
       const relative_path = path.relative(dir, full);
       const parts = relative_path.split(path.sep);
+      // an toàn: nếu path vẫn chứa folder skip (không xảy ra nếu skip lúc walk)
+      if (parts.some((p) => shouldSkipDirectory(p))) continue;
       const brand_folder = parts.length > 1 ? parts[0] : "(root)";
       const extracted_codes = extractCodesFromFileName(ent.name);
       out.push({
@@ -163,7 +215,7 @@ function walkImages(dir) {
       });
     }
   }
-  return out;
+  return { images: out, skippedDirs };
 }
 
 async function loadCrmProducts(client) {
@@ -237,8 +289,13 @@ async function main() {
   }
 
   console.log("Indexing Y images…");
-  const images = walkImages(Y_ROOT);
-  console.log("Y image files:", images.length);
+  const { images, skippedDirs } = walkImages(Y_ROOT);
+  console.log("Y image files (after skip dirs):", images.length);
+  console.log("Skipped directories:", skippedDirs.length);
+  if (skippedDirs.length) {
+    for (const d of skippedDirs.slice(0, 40)) console.log("  skip:", d);
+    if (skippedDirs.length > 40) console.log(`  … +${skippedDirs.length - 40} more`);
+  }
 
   // code -> list of image rows
   const yByCode = new Map();
@@ -476,6 +533,14 @@ async function main() {
     generated_at: new Date().toISOString(),
     y_root: Y_ROOT,
     match_key: "products.code only (normalized uppercase, no spaces)",
+    skip_dir_rules: [
+      "không/ko/no logo",
+      "hình chụp thực tế / thực tế chụp",
+      "hình mã cũ / mã cũ",
+      'folder tên "crawl"',
+    ],
+    skipped_directories: skippedDirs,
+    skipped_directory_count: skippedDirs.length,
     crm_products: products.length,
     y_image_files: images.length,
     y_files_with_extracted_code: images.length - yNoCode,
@@ -505,22 +570,30 @@ async function main() {
     `- Thời điểm: ${summary.generated_at}`,
     `- Folder Y: \`${summary.y_root}\``,
     `- Khớp theo: **${summary.match_key}**`,
+    `- **Không crawl** folder: ${summary.skip_dir_rules.join("; ")}`,
+    `- Số folder bị skip: **${summary.skipped_directory_count}**`,
+    ``,
+    `## Folder đã skip`,
+    ``,
+    ...(skippedDirs.length
+      ? skippedDirs.map((d) => `- \`${d}\``)
+      : ["- (không có)"]),
     ``,
     `## Số liệu`,
     ``,
     `| Chỉ số | Số |`,
     `|---|---:|`,
     `| SP CRM Gạch Ốp Lát | ${summary.crm_products} |`,
-    `| File ảnh trong Y | ${summary.y_image_files} |`,
-    `| File Y trích được mã | ${summary.y_files_with_extracted_code} |`,
-    `| File Y không trích được mã | ${summary.y_files_no_extracted_code} |`,
-    `| **01 matched** (có mã + có file Y) | **${summary.matched_codes}** |`,
+    `| File ảnh sau khi skip folder | ${summary.y_image_files} |`,
+    `| File trích được mã | ${summary.y_files_with_extracted_code} |`,
+    `| File không trích được mã | ${summary.y_files_no_extracted_code} |`,
+    `| **01 matched** (có mã + có file) | **${summary.matched_codes}** |`,
     `| ↳ matched đã có ảnh CRM | ${summary.matched_with_crm_image} |`,
     `| ↳ matched chưa có ảnh CRM | ${summary.matched_without_crm_image} |`,
-    `| **02** mã/file Y không map CRM | codes: ${summary.y_extracted_codes_not_in_crm} + unparsed files: ${summary.y_files_unparsed} |`,
-    `| **03** có mã CRM, không có hình Y | **${summary.crm_no_y_image}** |`,
-    `| **04** tab SP chưa có ảnh | **${summary.crm_no_image_on_tab}** (trong đó có nguồn Y: ${summary.crm_no_image_but_has_y}) |`,
-    `| **05** tab SP đã có ảnh (cần soi) | **${summary.crm_has_image_review}** (có Y: ${summary.crm_has_image_and_y}, không Y: ${summary.crm_has_image_no_y}) |`,
+    `| **02** mã/file không map CRM | codes: ${summary.y_extracted_codes_not_in_crm} + unparsed files: ${summary.y_files_unparsed} |`,
+    `| **03** có mã CRM, không có hình folder | **${summary.crm_no_y_image}** |`,
+    `| **04** tab SP chưa có ảnh | **${summary.crm_no_image_on_tab}** (trong đó có nguồn folder: ${summary.crm_no_image_but_has_y}) |`,
+    `| **05** tab SP đã có ảnh (cần soi) | **${summary.crm_has_image_review}** (có folder: ${summary.crm_has_image_and_y}, không folder: ${summary.crm_has_image_no_y}) |`,
     ``,
     `## File`,
     ``,
@@ -534,7 +607,7 @@ async function main() {
     `## Gợi ý xử lý`,
     ``,
     `1. Làm \`04\` có \`has_y_source=yes\` trước — upload ảnh từ \`y_paths\`.`,
-    `2. Xem \`03\` — thiếu nguồn Y, tìm thêm hoặc bỏ qua.`,
+    `2. Xem \`03\` — thiếu nguồn folder (đã loại ko logo / thực tế / mã cũ), tìm thêm hoặc bỏ qua.`,
     `3. Review \`05\` trên tab sản phẩm; sai thì xóa ảnh cũ và thêm lại.`,
     `4. \`02\` — kiểm tra mã file có cần tạo SP / đổi tên file không.`,
     ``,

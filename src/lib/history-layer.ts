@@ -2,12 +2,16 @@
  * Stack-based browser history layers for overlays (dialogs, drawers).
  * Android / browser Back closes the topmost layer instead of leaving the page.
  *
- * Nested layers are supported: each push adds one history entry; Back pops one.
- * Closing via UI (X / onOpenChange(false)) removes the entry with history.back
- * and ignores the matching popstate so onClose is not double-fired.
+ * TanStack Router monkey-patches `window.history.pushState` and notifies on
+ * every call. A bare push while opening a dialog was treated as a real
+ * navigation and remounted the page — wiping React state so mobile taps on
+ * products appeared to do nothing.
  *
- * If the user navigates to another route while a layer is open, dispose only
- * drops tracking (no history.go) so the new navigation is not undone.
+ * We therefore:
+ * 1. Call the **native** `History.prototype.pushState` (not the patched
+ *    instance method) so the router is not notified on open.
+ * 2. Merge previous `history.state` and bump `__TSR_index` so when the user
+ *    later presses Back, TanStack's popstate handler still sees a sane delta.
  */
 
 type HistoryLayer = {
@@ -19,6 +23,9 @@ const layers: HistoryLayer[] = [];
 let listening = false;
 /** popstate events to ignore after programmatic history.back */
 let skipPop = 0;
+
+const TSR_INDEX = "__TSR_index";
+const TSR_KEY = "__TSR_key";
 
 function ensureListener() {
   if (listening || typeof window === "undefined") return;
@@ -37,10 +44,25 @@ function nextId(): string {
   return `crm-hl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function randomKey(): string {
+  return (Math.random() + 1).toString(36).substring(7);
+}
+
 function stateLayerId(state: unknown): string | undefined {
   if (state == null || typeof state !== "object") return undefined;
   const id = (state as { __crmHistoryLayer?: unknown }).__crmHistoryLayer;
   return typeof id === "string" ? id : undefined;
+}
+
+function readTsrIndex(state: unknown): number {
+  if (state == null || typeof state !== "object") return 0;
+  const n = (state as Record<string, unknown>)[TSR_INDEX];
+  return typeof n === "number" && Number.isFinite(n) ? n : 0;
+}
+
+/** Native pushState — bypasses TanStack Router's instance monkey-patch. */
+function nativePushState(state: object, url?: string | null) {
+  History.prototype.pushState.call(window.history, state, "", url ?? null);
 }
 
 /**
@@ -54,7 +76,23 @@ export function pushHistoryLayer(close: () => void): () => void {
   ensureListener();
   const id = nextId();
   layers.push({ id, close });
-  window.history.pushState({ __crmHistoryLayer: id }, "");
+
+  const prev = window.history.state;
+  const prevObj =
+    prev != null && typeof prev === "object"
+      ? (prev as Record<string, unknown>)
+      : {};
+  const key = randomKey();
+
+  // Same URL, new state entry. Native push avoids router remount; TSR fields
+  // keep Back delta math correct if the router still observes popstate.
+  nativePushState({
+    ...prevObj,
+    __crmHistoryLayer: id,
+    [TSR_INDEX]: readTsrIndex(prev) + 1,
+    [TSR_KEY]: key,
+    key,
+  });
 
   let released = false;
   return () => {
