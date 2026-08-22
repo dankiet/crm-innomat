@@ -625,6 +625,79 @@ function ProductsPage() {
   /** Sheet / popover «Bộ lọc» (facet phụ + full list trên mobile) */
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
+  /**
+   * Mobile sheet chỉnh filter trên bản nháp rồi commit một lần bằng nút
+   * «Áp dụng» — mỗi tap trước đây đều ghi thẳng vào URL (giật trên mobile).
+   */
+  const [filtersDraft, setFiltersDraft] = useState<{
+    sizes: string[];
+    colors: string[];
+    surfaces: string[];
+    materials: string[];
+    shapes: string[];
+    collections: string[];
+    supplier: string[];
+    min: number;
+    max: number;
+    priceKind: PriceKind;
+  } | null>(null);
+
+  function openMobileFilters() {
+    setFiltersDraft({
+      sizes: sizesParam,
+      colors: colorsParam,
+      surfaces: surfacesParam,
+      materials: materialsParam,
+      shapes: shapesParam,
+      collections: effectsParam,
+      supplier: collectionsParam,
+      min: minParam,
+      max: maxParam,
+      priceKind: priceKindParam,
+    });
+    setMoreFiltersOpen(true);
+  }
+
+  function patchFiltersDraft(patch: Partial<NonNullable<typeof filtersDraft>>) {
+    setFiltersDraft((d) => (d ? { ...d, ...patch } : d));
+  }
+
+  function resetMobileFilters() {
+    setFiltersDraft({
+      sizes: [],
+      colors: [],
+      surfaces: [],
+      materials: [],
+      shapes: [],
+      collections: [],
+      supplier: [],
+      min: 0,
+      max: 0,
+      priceKind: "retail",
+    });
+  }
+
+  function applyMobileFilters() {
+    const d = filtersDraft;
+    if (!d) {
+      setMoreFiltersOpen(false);
+      return;
+    }
+    setSearch({
+      sizes: d.sizes.length ? d.sizes : undefined,
+      colors: d.colors.length ? d.colors : undefined,
+      surfaces: d.surfaces.length ? d.surfaces : undefined,
+      materials: d.materials.length ? d.materials : undefined,
+      shapes: d.shapes.length ? d.shapes : undefined,
+      collections: d.collections.length ? d.collections : undefined,
+      supplier: d.supplier.length ? d.supplier : undefined,
+      min: d.min || undefined,
+      max: d.max || undefined,
+      priceKind: d.priceKind !== "retail" ? d.priceKind : undefined,
+    });
+    setMoreFiltersOpen(false);
+  }
+
   /** Scope theo nhóm sidebar (chỉ đổi khi nhóm đổi) */
   const scoped = useMemo(() => {
     if (category === "all") return products;
@@ -954,6 +1027,20 @@ function ProductsPage() {
     surfacesParam.length +
     sizesParam.length;
   const mobileFiltersBadge = primaryFilterCount + secondaryFilterCount;
+
+  /** Số lựa chọn đang chờ trong bản nháp sheet mobile (hiện trên nút Áp dụng). */
+  const draftFilterCount = filtersDraft
+    ? (filtersDraft.min || filtersDraft.max || filtersDraft.priceKind !== "retail"
+        ? 1
+        : 0) +
+      filtersDraft.colors.length +
+      filtersDraft.surfaces.length +
+      filtersDraft.sizes.length +
+      filtersDraft.shapes.length +
+      filtersDraft.collections.length +
+      filtersDraft.supplier.length +
+      filtersDraft.materials.length
+    : 0;
 
   const priceKindLabel =
     PRICE_KIND_OPTIONS.find((o) => o.value === priceKindParam)?.short ?? "Lẻ";
@@ -1382,7 +1469,7 @@ function ProductsPage() {
           {/* Mobile: 1 nút mở sheet full facets */}
           <button
             type="button"
-            onClick={() => setMoreFiltersOpen(true)}
+            onClick={openMobileFilters}
             className={cn(
               "md:hidden h-9 shrink-0 px-3 rounded-full text-sm font-medium inline-flex items-center gap-1.5 transition-colors",
               mobileFiltersBadge > 0
@@ -1430,119 +1517,108 @@ function ProductsPage() {
               <DialogTitle>Bộ lọc sản phẩm</DialogTitle>
             </DialogHeader>
             <div className="space-y-2 py-1">
-              <FilterSection title="Kích thước" count={sizesParam.length}>
+              <FilterSection title="Kích thước" count={filtersDraft?.sizes.length ?? sizesParam.length}>
                 <MultiSelectFilter
                   title="Chọn kích thước"
                   options={sizeOptions}
-                  selected={sizesParam}
-                  onChange={(next) =>
-                    setSearch({ sizes: next.length ? next : undefined })
-                  }
+                  selected={filtersDraft?.sizes ?? sizesParam}
+                  onChange={(next) => patchFiltersDraft({ sizes: next })}
                   searchable
                 />
               </FilterSection>
-              <FilterSection title="Màu" count={colorsParam.length}>
+              <FilterSection title="Màu" count={filtersDraft?.colors.length ?? colorsParam.length}>
                 <MultiSelectFilter
                   title="Chọn màu"
                   options={colorOptions}
-                  selected={colorsParam}
-                  onChange={(next) =>
-                    setSearch({ colors: next.length ? next : undefined })
-                  }
+                  selected={filtersDraft?.colors ?? colorsParam}
+                  onChange={(next) => patchFiltersDraft({ colors: next })}
                   searchable
                 />
               </FilterSection>
-              <FilterSection title="Bề mặt" count={surfacesParam.length}>
+              <FilterSection title="Bề mặt" count={filtersDraft?.surfaces.length ?? surfacesParam.length}>
                 <MultiSelectFilter
                   title="Chọn bề mặt"
                   options={surfaceOptions}
-                  selected={surfacesParam}
-                  onChange={(next) =>
-                    setSearch({ surfaces: next.length ? next : undefined })
-                  }
+                  selected={filtersDraft?.surfaces ?? surfacesParam}
+                  onChange={(next) => patchFiltersDraft({ surfaces: next })}
                   searchable
                 />
               </FilterSection>
-              <FilterSection title="Chất liệu" count={materialsParam.length}>
+              <FilterSection title="Chất liệu" count={filtersDraft?.materials.length ?? materialsParam.length}>
                 <MultiSelectFilter
                   title="Chọn chất liệu"
                   options={materialOptions}
-                  selected={materialsParam}
-                  onChange={(next) =>
-                    setSearch({ materials: next.length ? next : undefined })
-                  }
+                  selected={filtersDraft?.materials ?? materialsParam}
+                  onChange={(next) => patchFiltersDraft({ materials: next })}
                   searchable
                 />
               </FilterSection>
               <FilterSection
                 title="Giá"
                 count={
-                  minParam || maxParam || priceKindParam !== "retail" ? 1 : 0
+                  (filtersDraft
+                    ? filtersDraft.min || filtersDraft.max || filtersDraft.priceKind !== "retail"
+                    : minParam || maxParam || priceKindParam !== "retail")
+                    ? 1
+                    : 0
                 }
               >
                 <PriceFilter
-                  min={minParam}
-                  max={maxParam}
-                  priceKind={priceKindParam}
+                  min={filtersDraft?.min ?? minParam}
+                  max={filtersDraft?.max ?? maxParam}
+                  priceKind={filtersDraft?.priceKind ?? priceKindParam}
                   onChange={({ min, max, priceKind }) =>
-                    setSearch({
-                      min: min || undefined,
-                      max: max || undefined,
-                      priceKind:
-                        priceKind && priceKind !== "retail"
-                          ? priceKind
-                          : undefined,
-                    })
+                    patchFiltersDraft({ min, max, priceKind: priceKind ?? "retail" })
                   }
                 />
               </FilterSection>
-              <FilterSection title="Kiểu dáng" count={shapesParam.length}>
+              <FilterSection title="Kiểu dáng" count={filtersDraft?.shapes.length ?? shapesParam.length}>
                 <MultiSelectFilter
                   title="Chọn kiểu dáng"
                   options={shapeOptions}
-                  selected={shapesParam}
-                  onChange={(next) =>
-                    setSearch({ shapes: next.length ? next : undefined })
-                  }
+                  selected={filtersDraft?.shapes ?? shapesParam}
+                  onChange={(next) => patchFiltersDraft({ shapes: next })}
                   searchable
                 />
               </FilterSection>
-              <FilterSection title={"B\u1ed9 s\u01b0u t\u1eadp"} count={effectsParam.length}>
+              <FilterSection title={"B\u1ed9 s\u01b0u t\u1eadp"} count={filtersDraft?.collections.length ?? effectsParam.length}>
                 <MultiSelectFilter
                   title={"Ch\u1ecdn b\u1ed9 s\u01b0u t\u1eadp"}
                   options={effectOptions}
-                  selected={effectsParam}
-                  onChange={(next) =>
-                    setSearch({ collections: next.length ? next : undefined })
-                  }
+                  selected={filtersDraft?.collections ?? effectsParam}
+                  onChange={(next) => patchFiltersDraft({ collections: next })}
                   searchable
                 />
               </FilterSection>
               {collectionOptions.length > 0 ? (
                 <FilterSection
                   title={"Nh\u00e0 cung c\u1ea5p"}
-                  count={collectionsParam.length}
+                  count={filtersDraft?.supplier.length ?? collectionsParam.length}
                 >
                   <MultiSelectFilter
                     title={"Ch\u1ecdn nh\u00e0 cung c\u1ea5p"}
                     options={collectionOptions}
-                    selected={collectionsParam}
-                    onChange={(next) =>
-                      setSearch({
-                        supplier: next.length ? next : undefined,
-                      })
-                    }
+                    selected={filtersDraft?.supplier ?? collectionsParam}
+                    onChange={(next) => patchFiltersDraft({ supplier: next })}
                     searchable
                   />
                 </FilterSection>
               ) : null}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
+              <button
+                type="button"
+                onClick={resetMobileFilters}
+                className="h-9 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-terracotta"
+              >
+                Đặt lại
+              </button>
               {mobileFiltersBadge > 0 ? (
                 <button
                   type="button"
                   onClick={() => {
                     clearFilters();
+                    setMoreFiltersOpen(false);
                   }}
                   className="h-9 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-terracotta"
                 >
@@ -1551,10 +1627,15 @@ function ProductsPage() {
               ) : null}
               <button
                 type="button"
-                onClick={() => setMoreFiltersOpen(false)}
-                className="h-9 px-4 rounded-lg text-sm font-medium bg-terracotta text-primary-foreground"
+                onClick={applyMobileFilters}
+                className="h-9 px-5 rounded-lg text-sm font-semibold bg-terracotta text-primary-foreground hover:bg-terracotta/90 inline-flex items-center gap-1.5"
               >
-                Xem {filtered.length} sản phẩm
+                Áp dụng bộ lọc
+                {draftFilterCount > 0 ? (
+                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem] px-1 rounded-full text-[10px] font-semibold tabular-nums bg-primary-foreground/20">
+                    {draftFilterCount}
+                  </span>
+                ) : null}
               </button>
             </DialogFooter>
           </DialogContent>
