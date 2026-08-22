@@ -1,14 +1,14 @@
 # Deployment
 
-This repo is the source of truth. The deploy loop is **not** git-triggered:
+This repo is the source of truth:
 
 - **Git (GitHub `main`)** is the source and versioned backup — every commit is a
   full snapshot of the code. Keep it in a working state; it is the only way to
   restore older source.
-- **Vercel** serves production (`nitro` preset `vercel`, linked through
-  `.vercel/project.json`). Build locally with `npm run build`, then ship the
-  prebuilt output: `npx vercel deploy --prebuilt --prod`. Pushing commits to
-  `main` does **not** itself trigger a deploy.
+- **Vercel** serves production via its GitHub integration (`nitro` framework
+  preset → `npm run build`, project linked through `.vercel/project.json`).
+  Every push to `main` is built and deployed automatically by Vercel — no
+  manual deploy step.
 - Never rewrite published git history (force-push, rebase/amend/squash of pushed
   commits) — it destroys the version history that git alone preserves.
 
