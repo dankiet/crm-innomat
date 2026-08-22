@@ -77,6 +77,11 @@ export function pushHistoryLayer(close: () => void): () => void {
   const id = nextId();
   layers.push({ id, close });
 
+  // URL at open time. If it changed by dispose time a client navigation
+  // consumed/replaced entries — rewinding then would undo the navigation
+  // (mobile drawer tap: menu closed but route never changed).
+  const hrefAtOpen = window.location.href;
+
   const prev = window.history.state;
   const prevObj =
     prev != null && typeof prev === "object"
@@ -108,12 +113,15 @@ export function pushHistoryLayer(close: () => void): () => void {
     const isTop = idx === layers.length - 1;
     layers.splice(idx, 1);
 
-    // Only rewind when we are still the active history entry (topmost layer
-    // and no client navigation replaced state). Buried layers only drop
-    // tracking so a still-open child keeps its Back handler.
-    if (isTop && stateLayerId(window.history.state) === id) {
+    // Only rewind when we are still the active history entry (topmost layer,
+    // no client navigation replaced state, same URL as when opened). Buried
+    // layers only drop tracking so a still-open child keeps its Back handler.
+    if (isTop && window.location.href === hrefAtOpen && stateLayerId(window.history.state) === id) {
       skipPop += 1;
       window.history.back();
     }
+    // Else: navigation happened while the layer was open — leave the stale
+    // entry in place (Back from the new page lands on the previous page URL,
+    // which reads as normal Back). Never rewind across a navigation.
   };
 }

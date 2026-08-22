@@ -18,7 +18,7 @@ import {
   Images,
   ChevronRight,
 } from "lucide-react";
-import { PRODUCT_GROUPS } from "@/lib/product-categories";
+import { ALL_PRODUCTS_SLUG, PRODUCT_GROUPS } from "@/lib/product-categories";
 import { useEffect } from "react";
 import type { SessionUser } from "@/lib/auth-types";
 import { ROLE_LABEL, initialsFromName } from "@/lib/auth-types";
@@ -64,7 +64,28 @@ type Props = {
   onMobileClose?: () => void;
 };
 
-type NavItem = { to: string; label: string; icon: typeof LayoutGrid };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutGrid;
+  search?: { nhom: string };
+};
+
+/**
+ * True when activating this item cannot change pathname/search (already on the
+ * exact target). Those taps must close the drawer themselves — the
+ * [pathname, search] close-effect will not fire. Taps that DO navigate must
+ * NOT close here: closing in the same click races the router commit and can
+ * cancel the navigation (mobile "Sản phẩm" did nothing).
+ */
+function closesWithoutNavigation(
+  item: { to: string; search?: { nhom?: string } },
+  pathname: string,
+  nhom?: string,
+): boolean {
+  if (pathname !== item.to) return false;
+  return (item.search?.nhom ?? undefined) === (nhom ?? undefined);
+}
 
 function NavLink({
   item,
@@ -79,6 +100,7 @@ function NavLink({
   return (
     <Link
       to={item.to}
+      {...(item.search ? { search: item.search } : {})}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={`group flex items-center gap-3 rounded-xl border-l-2 px-3 py-2.5 text-sm transition-all duration-150 ${
@@ -117,6 +139,8 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   }, [mobileOpen]);
 
   useEffect(() => {
+    // The closer for taps that navigate: fires after the router has committed
+    // (pathname/search changed), never in the same tick as the click.
     onMobileClose?.();
   }, [pathname, search?.nhom]);
 
@@ -132,6 +156,10 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const displayName = user.display_name || user.username;
   const isCatalogActive = pathname === "/san-pham";
   const isLibraryActive = pathname === "/thu-vien";
+  const currentNhom = search?.nhom;
+  /** Close drawer on tap only when the tap cannot navigate (already there). */
+  const linkCloseHandler = (item: { to: string; search?: { nhom?: string } }) =>
+    closesWithoutNavigation(item, pathname, currentNhom) ? onMobileClose : undefined;
 
   const nav = (
     <>
@@ -160,7 +188,12 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">{group.label}</p>
             <div className="space-y-1">
               {group.items.map((item) => (
-                <NavLink key={item.to} item={item} active={pathname === item.to} onClick={onMobileClose} />
+                <NavLink
+                  key={item.to}
+                  item={item}
+                  active={pathname === item.to}
+                  onClick={linkCloseHandler(item)}
+                />
               ))}
             </div>
           </section>
@@ -169,7 +202,16 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
         <section>
           <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">Catalog</p>
           <div className="space-y-1">
-            <NavLink item={{ to: "/san-pham", label: "Sản phẩm", icon: LayoutGrid }} active={isCatalogActive} onClick={onMobileClose} />
+            <NavLink
+              item={{
+                to: "/san-pham",
+                label: "Sản phẩm",
+                icon: LayoutGrid,
+                search: { nhom: ALL_PRODUCTS_SLUG },
+              }}
+              active={isCatalogActive}
+              onClick={linkCloseHandler({ to: "/san-pham", search: { nhom: ALL_PRODUCTS_SLUG } })}
+            />
             <div className={`ml-4 border-l pl-3 ${isCatalogActive ? "border-primary/30" : "border-border/70"}`}>
               {PRODUCT_GROUPS.map((group) => {
                 const Icon = productIcons[group.slug] ?? LayoutGrid;
@@ -179,7 +221,7 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                     key={group.slug}
                     to="/san-pham"
                     search={{ nhom: group.slug }}
-                    onClick={onMobileClose}
+                    onClick={active ? onMobileClose : undefined}
                     className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
                       active ? "font-semibold text-primary" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                     }`}
@@ -190,7 +232,11 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                 );
               })}
             </div>
-            <NavLink item={{ to: "/thu-vien", label: "Thư viện", icon: Images }} active={isLibraryActive} onClick={onMobileClose} />
+            <NavLink
+              item={{ to: "/thu-vien", label: "Thư viện", icon: Images }}
+              active={isLibraryActive}
+              onClick={linkCloseHandler({ to: "/thu-vien" })}
+            />
           </div>
         </section>
 
@@ -199,7 +245,12 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">Quản trị</p>
             <div className="space-y-1">
               {adminNav.map((item) => (
-                <NavLink key={item.to} item={item} active={pathname === item.to} onClick={onMobileClose} />
+                <NavLink
+                  key={item.to}
+                  item={item}
+                  active={pathname === item.to}
+                  onClick={linkCloseHandler(item)}
+                />
               ))}
             </div>
           </section>
