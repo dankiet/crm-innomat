@@ -5,9 +5,10 @@ This repo is the source of truth. The deploy loop is **not** git-triggered:
 - **Git (GitHub `main`)** is the source and versioned backup — every commit is a
   full snapshot of the code. Keep it in a working state; it is the only way to
   restore older source.
-- **Vercel deploys are triggered from Lovable via the Vercel CLI/API**
-  (linked through `.vercel/project.json`, `nitro` preset `vercel`). Pushing
-  commits to `main` syncs to Lovable but does **not** itself trigger a deploy.
+- **Vercel** serves production (`nitro` preset `vercel`, linked through
+  `.vercel/project.json`). Build locally with `npm run build`, then ship the
+  prebuilt output: `npx vercel deploy --prebuilt --prod`. Pushing commits to
+  `main` does **not** itself trigger a deploy.
 - Never rewrite published git history (force-push, rebase/amend/squash of pushed
   commits) — it destroys the version history that git alone preserves.
 
