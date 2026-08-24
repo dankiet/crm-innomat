@@ -88,11 +88,27 @@ type Line = {
   /** Tên hiển thị trên BG (có thể khác tên catalog) */
   product_name: string;
   quantity_m2: number;
+  /** Chuỗi thô đang gõ trong ô SL — giữ được "0", "0." khi nhập thập phân */
+  quantity_raw: string;
   discount_pct: number;
   /** Đơn giá bán / m² — có thể nhập tay */
   unit_price: number;
   area: string;
 };
+
+/** Chỉ giữ chữ số + 1 dấu thập phân; nhận cả dấu phẩy kiểu VN ("0,12" → "0.12"). */
+function sanitizeQuantityInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.,]/g, "").replace(/,/g, ".");
+  const [head, ...rest] = cleaned.split(".");
+  return rest.length ? `${head}.${rest.join("")}` : head;
+}
+
+/** Số m² từ chuỗi thô — rỗng hoặc không hợp lệ = 0. */
+function parseQuantityInput(raw: string): number {
+  if (raw.trim() === "") return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
 
 function calcUnit(
   product: Product,
@@ -231,6 +247,8 @@ export function NewQuoteDialog({
               product_code: item.product_code || product.code,
               product_name: item.product_name || product.name,
               quantity_m2: item.quantity_m2,
+              quantity_raw:
+                item.quantity_m2 == null ? "" : String(item.quantity_m2),
               discount_pct: item.discount_pct,
               unit_price: item.unit_price,
               area: item.area,
@@ -274,6 +292,7 @@ export function NewQuoteDialog({
                 product_code: product.code,
                 product_name: product.name,
                 quantity_m2: 1,
+                quantity_raw: "1",
                 discount_pct: 0,
                 unit_price: calcUnit(product, "custom", 0),
                 area: "",
@@ -394,7 +413,8 @@ export function NewQuoteDialog({
       return null;
     }
     const items = lines
-      .filter((l) => l.product && l.quantity_m2 > 0)
+      // Cho phép SL = 0 (dòng tham khảo giá) — chỉ cần đã chọn sản phẩm
+      .filter((l) => l.product && l.quantity_m2 >= 0)
       .map((l) => ({
         product_id: l.product!.id,
         product_code: l.product_code.trim() || l.product!.code,
@@ -405,7 +425,7 @@ export function NewQuoteDialog({
         area: l.area,
       }));
     if (!items.length) {
-      toast.error("Thêm ít nhất 1 sản phẩm với số lượng m²");
+      toast.error("Thêm ít nhất 1 sản phẩm");
       return null;
     }
     setSaving(true);
@@ -1005,25 +1025,46 @@ export function NewQuoteDialog({
                               ) : null}
                             </div>
                             <input
-                              type="number"
-                              min={0}
-                              step={0.1}
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0"
                               className={inputCls}
-                              value={line.quantity_m2 || ""}
+                              value={line.quantity_raw}
                               disabled={locked}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const raw = sanitizeQuantityInput(
+                                  e.target.value,
+                                );
                                 setLines((prev) =>
                                   prev.map((l) =>
                                     l.key === line.key
                                       ? {
                                           ...l,
-                                          quantity_m2:
-                                            Number(e.target.value) || 0,
+                                          quantity_raw: raw,
+                                          quantity_m2: parseQuantityInput(raw),
                                         }
                                       : l,
                                   ),
-                                )
-                              }
+                                );
+                              }}
+                              onBlur={() => {
+                                setLines((prev) =>
+                                  prev.map((l) => {
+                                    if (l.key !== line.key) return l;
+                                    const qty = parseQuantityInput(
+                                      l.quantity_raw,
+                                    );
+                                    return {
+                                      ...l,
+                                      quantity_raw:
+                                        l.quantity_raw.trim() === ""
+                                          ? ""
+                                          : String(qty),
+                                      quantity_m2: qty,
+                                    };
+                                  }),
+                                );
+                              }}
                             />
                           </label>
                           <label className="block">
@@ -1122,7 +1163,7 @@ export function NewQuoteDialog({
                             <div
                               className={`${inputCls} bg-surface-strong/40 font-medium tabular-nums`}
                             >
-                              {line.quantity_m2
+                              {line.quantity_raw.trim() !== ""
                                 ? formatVND(lineTotal)
                                 : "—"}
                             </div>
@@ -1336,6 +1377,7 @@ function emptyLine(): Line {
     product_code: "",
     product_name: "",
     quantity_m2: 0,
+    quantity_raw: "",
     discount_pct: 0,
     unit_price: 0,
     area: "",
