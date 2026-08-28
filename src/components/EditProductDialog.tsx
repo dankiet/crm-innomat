@@ -63,8 +63,8 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
     color: "",
     packing_m2: "",
     packing_pcs: "",
-    retail_price: "",
-    trade_price: "",
+    packing_kg: "",
+    retail_price: "",    trade_price: "",
     b2b_price: "",
     discount_tp: "",
     discount_b2b: "",
@@ -130,6 +130,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
       color: product.color || "",
       packing_m2: product.packing_m2 != null ? String(product.packing_m2) : "",
       packing_pcs: product.packing_pcs != null ? String(product.packing_pcs) : "",
+      packing_kg: product.packing_kg != null ? String(product.packing_kg) : "",
       retail_price: String(product.retail_price ?? ""),
       trade_price:
         product.trade_price != null && product.trade_price !== undefined
@@ -203,6 +204,10 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
     if (form.packing_pcs.trim() !== "") {
       packing_pcs = Number(form.packing_pcs.trim());
     }
+    let packing_kg: number | null = null;
+    if (form.packing_kg.trim() !== "") {
+      packing_kg = Number(form.packing_kg.trim().replace(",", "."));
+    }
     setSaving(true);
     try {
       const syncedCodes = await syncProductInternalCodesFn({
@@ -224,6 +229,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
           color: form.color.trim(),
           packing_m2,
           packing_pcs,
+          packing_kg,
           retail_price: price,
           trade_price,
           b2b_price,
@@ -490,6 +496,15 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                   value={form.packing_pcs}
                   onChange={(e) => setForm((f) => ({ ...f, packing_pcs: e.target.value }))}
                   placeholder="vd. 4"
+                />
+              </Field>
+              <Field label="Kg / Thùng">
+                <input
+                  className={inputCls}
+                  inputMode="decimal"
+                  value={form.packing_kg}
+                  onChange={(e) => setForm((f) => ({ ...f, packing_kg: e.target.value }))}
+                  placeholder="vd. 17"
                 />
               </Field>
             </div>

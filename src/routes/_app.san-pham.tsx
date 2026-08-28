@@ -31,11 +31,6 @@ import { EditProductImagesDialog } from "@/components/EditProductImagesDialog";
 import { NewProductDialog } from "@/components/NewProductDialog";
 import { BulkEditFieldDialog } from "@/components/BulkEditFieldDialog";
 import { FilterChip } from "@/components/product-filter/FilterChip";
-import {
-  PriceFilter,
-  PRICE_KIND_OPTIONS,
-  type PriceKind,
-} from "@/components/product-filter/PriceFilter";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import {
   SortMenu,
@@ -134,13 +129,6 @@ function ProductCheck({
 
 type ViewMode = "grid" | "list";
 
-function formatMoneyShort(n: number): string {
-  if (n >= 1_000_000)
-    return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}tr`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
-  return String(n);
-}
-
 function parseCsv(v: unknown): string[] {
   if (typeof v !== "string" || !v.trim()) return [];
   return v
@@ -149,13 +137,8 @@ function parseCsv(v: unknown): string[] {
     .filter(Boolean);
 }
 
-function parsePriceKind(v: unknown): PriceKind | undefined {
-  if (v === "retail" || v === "tp" || v === "b2b") return v;
-  return undefined;
-}
-
 /** Nhóm facet — dùng khi tính options: loại facet của chính nhóm đó ra khỏi bộ lọc. */
-type FacetKey = "color" | "surface" | "size" | "shape" | "effect" | "collection" | "material";
+type FacetKey = "color" | "surface" | "size" | "shape" | "effect" | "collection";
 const BLANK_FILTER_VALUE = "__blank__";
 
 function matchesFacet(values: Set<string>, value: string | null | undefined): boolean {
@@ -362,34 +345,14 @@ function parseSort(v: unknown): ProductSort | undefined {
   return undefined;
 }
 
-/** Giá theo loại: lẻ / Trade (+VAT) / Partner B2B (+VAT) */
-function priceOf(p: Product, kind: PriceKind): number {
-  if (kind === "tp") {
-    if (p.trade_price != null && Number(p.trade_price) > 0) {
-      return Math.round(Number(p.trade_price));
-    }
-    const retail = Number(p.retail_price) || 0;
-    const pct = p.discount_tp != null ? Number(p.discount_tp) : 0;
-    return Math.round(retail * (1 - pct / 100));
-  }
-  if (kind === "b2b") {
-    if (p.b2b_price != null && Number(p.b2b_price) > 0) {
-      return Math.round(Number(p.b2b_price));
-    }
-    const retail = Number(p.retail_price) || 0;
-    const pct = p.discount_b2b != null ? Number(p.discount_b2b) : 0;
-    return Math.round(retail * (1 - pct / 100));
-  }
+/** Giá lẻ — dùng cho sort theo giá. */
+function priceOf(p: Product): number {
   return Number(p.retail_price) || 0;
 }
 
 type SanPhamSearch = {
   nhom?: string;
   q?: string;
-  min?: number;
-  max?: number;
-  /** Loại giá khi lọc: retail | tp | b2b */
-  priceKind?: PriceKind;
   colors?: string[];
   /** Bề mặt */
   surfaces?: string[];
@@ -401,8 +364,6 @@ type SanPhamSearch = {
   collections?: string[];
   /** Bộ sưu tập */
   supplier?: string[];
-  /** Chất liệu */
-  materials?: string[];
   hot?: boolean;
   stockLocation?: string;
   view?: ViewMode;
@@ -413,9 +374,6 @@ export const Route = createFileRoute("/_app/san-pham")({
   validateSearch: (search: Record<string, unknown>): SanPhamSearch => ({
     nhom: typeof search.nhom === "string" ? search.nhom : undefined,
     q: typeof search.q === "string" ? search.q : undefined,
-    min: typeof search.min === "number" ? search.min : undefined,
-    max: typeof search.max === "number" ? search.max : undefined,
-    priceKind: parsePriceKind(search.priceKind),
     colors: Array.isArray(search.colors)
       ? (search.colors as string[])
       : parseCsv(search.colors),
@@ -434,9 +392,6 @@ export const Route = createFileRoute("/_app/san-pham")({
     supplier: Array.isArray(search.supplier)
       ? (search.supplier as string[])
       : parseCsv(search.supplier),
-    materials: Array.isArray(search.materials)
-      ? (search.materials as string[])
-      : parseCsv(search.materials),
     hot: search.hot === true || search.hot === "1",
     view: search.view === "list" || search.view === "grid" ? search.view : undefined,
     stockLocation: typeof search.stockLocation === "string" ? search.stockLocation : undefined,
@@ -570,16 +525,12 @@ function ProductsPage() {
   const {
     nhom,
     q: qParam = "",
-    min: minParam = 0,
-    max: maxParam = 0,
-    priceKind: priceKindParam = "retail",
     colors: colorsParam = [],
     surfaces: surfacesParam = [],
     sizes: sizesParam = [],
     shapes: shapesParam = [],
     collections: effectsParam = [],
     supplier: collectionsParam = [],
-    materials: materialsParam = [],
     hot: hotParam = false,
     view: viewParam = "grid",
     stockLocation: stockLocParam,
@@ -633,13 +584,9 @@ function ProductsPage() {
     sizes: string[];
     colors: string[];
     surfaces: string[];
-    materials: string[];
     shapes: string[];
     collections: string[];
     supplier: string[];
-    min: number;
-    max: number;
-    priceKind: PriceKind;
   } | null>(null);
 
   function openMobileFilters() {
@@ -647,13 +594,9 @@ function ProductsPage() {
       sizes: sizesParam,
       colors: colorsParam,
       surfaces: surfacesParam,
-      materials: materialsParam,
       shapes: shapesParam,
       collections: effectsParam,
       supplier: collectionsParam,
-      min: minParam,
-      max: maxParam,
-      priceKind: priceKindParam,
     });
     setMoreFiltersOpen(true);
   }
@@ -667,13 +610,9 @@ function ProductsPage() {
       sizes: [],
       colors: [],
       surfaces: [],
-      materials: [],
       shapes: [],
       collections: [],
       supplier: [],
-      min: 0,
-      max: 0,
-      priceKind: "retail",
     });
   }
 
@@ -687,13 +626,9 @@ function ProductsPage() {
       sizes: d.sizes.length ? d.sizes : undefined,
       colors: d.colors.length ? d.colors : undefined,
       surfaces: d.surfaces.length ? d.surfaces : undefined,
-      materials: d.materials.length ? d.materials : undefined,
       shapes: d.shapes.length ? d.shapes : undefined,
       collections: d.collections.length ? d.collections : undefined,
       supplier: d.supplier.length ? d.supplier : undefined,
-      min: d.min || undefined,
-      max: d.max || undefined,
-      priceKind: d.priceKind !== "retail" ? d.priceKind : undefined,
     });
     setMoreFiltersOpen(false);
   }
@@ -731,10 +666,6 @@ function ProductsPage() {
     () => new Set(collectionsParam),
     [collectionsParam],
   );
-  const materialSet = useMemo(
-    () => new Set(materialsParam),
-    [materialsParam],
-  );
 
   /**
    * Lọc indexed theo toàn bộ bộ lọc đang chọn (giá + facet + hot + search).
@@ -752,18 +683,12 @@ function ProductsPage() {
         ) || /^\d{3,4}\s*x\s*\d{3,4}/i.test(deferredSearch.trim());
 
       return indexed.filter(({ p, codeHay, nameHay, collectionHay, searchRow }) => {
-        if (minParam || maxParam) {
-          const price = priceOf(p, priceKindParam);
-          if (minParam && price < minParam) return false;
-          if (maxParam && price > maxParam) return false;
-        }
         if (exclude !== "color" && !matchesFacet(colorSet, p.color)) return false;
         if (exclude !== "surface" && !matchesFacet(surfaceSet, p.surface)) return false;
         if (exclude !== "size" && !matchesFacet(sizeSet, p.size)) return false;
         if (exclude !== "shape" && !matchesFacet(shapeSet, p.shape)) return false;
         if (exclude !== "effect" && !matchesFacet(effectSet, p.collections)) return false;
         if (exclude !== "collection" && !matchesFacet(collectionSet, p.supplier)) return false;
-        if (exclude !== "material" && !matchesFacet(materialSet, p.material)) return false;
         if (hotParam && !p.is_hot) return false;
         if (!q) return true;
         if (isSizeQuery) return false;
@@ -775,16 +700,12 @@ function ProductsPage() {
       indexed,
       exactCodeSet,
       deferredSearch,
-      minParam,
-      maxParam,
-      priceKindParam,
       colorSet,
       surfaceSet,
       sizeSet,
       shapeSet,
       effectSet,
       collectionSet,
-      materialSet,
       hotParam,
     ],
   );
@@ -849,16 +770,6 @@ function ProductsPage() {
       .map(toFacetOption);
   }, [matchIndexed]);
 
-  const materialOptions = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { p } of matchIndexed("material")) {
-      addFacetCount(map, p.material);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], "vi"))
-      .map(toFacetOption);
-  }, [matchIndexed]);
-
   const hotInScope = useMemo(
     () => indexed.filter(({ p }) => p.is_hot).length,
     [indexed],
@@ -890,12 +801,12 @@ function ProductsPage() {
         });
       case "price_asc":
         return list.sort((a, b) => {
-          const d = priceOf(a, priceKindParam) - priceOf(b, priceKindParam);
+          const d = priceOf(a) - priceOf(b);
           return d !== 0 ? d : compareProductCode(a, b);
         });
       case "price_desc":
         return list.sort((a, b) => {
-          const d = priceOf(b, priceKindParam) - priceOf(a, priceKindParam);
+          const d = priceOf(b) - priceOf(a);
           return d !== 0 ? d : compareProductCode(a, b);
         });
       case "stock_desc":
@@ -919,7 +830,6 @@ function ProductsPage() {
   }, [
     matchIndexed,
     sortParam,
-    priceKindParam,
   ]);
 
   /** Infinite scroll: hiện dần theo batch */
@@ -932,16 +842,12 @@ function ProductsPage() {
       [
         nhom,
         deferredSearch,
-        minParam,
-        maxParam,
-        priceKindParam,
         colorsParam.join(","),
         surfacesParam.join(","),
         sizesParam.join(","),
         shapesParam.join(","),
         effectsParam.join(","),
         collectionsParam.join(","),
-        materialsParam.join(","),
         hotParam ? "1" : "0",
         stockLocParam,
         sortParam,
@@ -949,16 +855,12 @@ function ProductsPage() {
     [
       nhom,
       deferredSearch,
-      minParam,
-      maxParam,
-      priceKindParam,
       colorsParam,
       surfacesParam,
       sizesParam,
       shapesParam,
       effectsParam,
       collectionsParam,
-      materialsParam,
       hotParam,
       stockLocParam,
       sortParam,
@@ -1002,14 +904,12 @@ function ProductsPage() {
 
   const activeCount =
     (deferredSearch.trim() ? 1 : 0) +
-    (minParam || maxParam || priceKindParam !== "retail" ? 1 : 0) +
     colorsParam.length +
     surfacesParam.length +
     sizesParam.length +
     shapesParam.length +
     effectsParam.length +
     collectionsParam.length +
-    materialsParam.length +
     (hotParam ? 1 : 0) +
     (stockLocParam === "KHOVP" ? 1 : 0);
 
@@ -1019,10 +919,8 @@ function ProductsPage() {
   const secondaryFilterCount =
     shapesParam.length +
     effectsParam.length +
-    collectionsParam.length +
-    materialsParam.length;
+    collectionsParam.length;
   const primaryFilterCount =
-    (minParam || maxParam || priceKindParam !== "retail" ? 1 : 0) +
     colorsParam.length +
     surfacesParam.length +
     sizesParam.length;
@@ -1030,42 +928,15 @@ function ProductsPage() {
 
   /** Số lựa chọn đang chờ trong bản nháp sheet mobile (hiện trên nút Áp dụng). */
   const draftFilterCount = filtersDraft
-    ? (filtersDraft.min || filtersDraft.max || filtersDraft.priceKind !== "retail"
-        ? 1
-        : 0) +
-      filtersDraft.colors.length +
+    ? filtersDraft.colors.length +
       filtersDraft.surfaces.length +
       filtersDraft.sizes.length +
       filtersDraft.shapes.length +
       filtersDraft.collections.length +
-      filtersDraft.supplier.length +
-      filtersDraft.materials.length
+      filtersDraft.supplier.length
     : 0;
 
-  const priceKindLabel =
-    PRICE_KIND_OPTIONS.find((o) => o.value === priceKindParam)?.short ?? "Lẻ";
-  const priceSummary =
-    minParam || maxParam
-      ? `${priceKindLabel} ${minParam ? formatMoneyShort(minParam) : "…"}–${maxParam ? formatMoneyShort(maxParam) : "…"}`
-      : priceKindParam !== "retail"
-        ? priceKindLabel
-        : null;
-
-  const priceKindShort =
-    PRICE_KIND_OPTIONS.find((o) => o.value === priceKindParam)?.short ?? "Lẻ";
-  const productSortFields = useMemo(
-    (): SortFieldOption<ProductSortField>[] =>
-      PRODUCT_SORT_FIELDS.map((f) =>
-        f.field === "price"
-          ? {
-              ...f,
-              label: `Giá ${priceKindShort}`,
-              shortLabel: `Giá ${priceKindShort}`,
-            }
-          : f,
-      ),
-    [priceKindShort],
-  );
+  const productSortFields = PRODUCT_SORT_FIELDS;
 
   function setSearch(patch: Partial<SanPhamSearch>) {
     navigate({
@@ -1073,10 +944,6 @@ function ProductsPage() {
         const next: SanPhamSearch = { ...prev, ...patch };
         // Dọn field rỗng để URL gọn
         if (!next.q) delete next.q;
-        if (!next.min) delete next.min;
-        if (!next.max) delete next.max;
-        if (!next.priceKind || next.priceKind === "retail")
-          delete next.priceKind;
         if (!next.colors || next.colors.length === 0) delete next.colors;
         if (!next.surfaces || next.surfaces.length === 0)
           delete next.surfaces;
@@ -1085,7 +952,6 @@ function ProductsPage() {
         if (!next.collections || next.collections.length === 0) delete next.collections;
         if (!next.supplier || next.supplier.length === 0)
           delete next.supplier;
-        if (!next.materials || next.materials.length === 0) delete next.materials;
         if (!next.hot) delete next.hot;
         if (!next.view || next.view === "grid") delete next.view;
         if (!next.stockLocation || next.stockLocation === "ALL") delete next.stockLocation;
@@ -1104,16 +970,12 @@ function ProductsPage() {
     setSearchDraft("");
     setSearch({
       q: undefined,
-      min: undefined,
-      max: undefined,
-      priceKind: undefined,
       colors: undefined,
       surfaces: undefined,
       sizes: undefined,
       shapes: undefined,
       collections: undefined,
       supplier: undefined,
-      materials: undefined,
       hot: undefined,
       stockLocation: undefined,
     });
@@ -1397,39 +1259,10 @@ function ProductsPage() {
                 onChange={(next) =>
                   setSearch({ surfaces: next.length ? next : undefined })
                 }
-                searchable
-              />
-            </FilterChip>
-            <FilterChip label="Chất liệu" count={materialsParam.length}>
-              <MultiSelectFilter
-                title="Chọn chất liệu"
-                options={materialOptions}
-                selected={materialsParam}
-                onChange={(next) =>
-                  setSearch({ materials: next.length ? next : undefined })
-                }
-                searchable
-              />
-            </FilterChip>
-            <FilterChip label="Giá" summary={priceSummary}>
-              <PriceFilter
-                min={minParam}
-                max={maxParam}
-                priceKind={priceKindParam}
-                onChange={({ min, max, priceKind }) =>
-                  setSearch({
-                    min: min || undefined,
-                    max: max || undefined,
-                    priceKind:
-                      priceKind && priceKind !== "retail"
-                        ? priceKind
-                        : undefined,
-                  })
-                }
-              />
-            </FilterChip>
-
-            <FilterChip label="Kiểu dáng" count={shapesParam.length}>
+                 searchable
+               />
+             </FilterChip>
+             <FilterChip label="Kiểu dáng" count={shapesParam.length}>
               <MultiSelectFilter
                 title="Chọn kiểu dáng"
                 options={shapeOptions}
@@ -1448,23 +1281,10 @@ function ProductsPage() {
                 onChange={(next) =>
                   setSearch({ collections: next.length ? next : undefined })
                 }
-                searchable
-              />
-            </FilterChip>
-            {collectionOptions.length > 0 ? (
-              <FilterChip label={"Nh\u00e0 cung c\u1ea5p"} count={collectionsParam.length}>
-                <MultiSelectFilter
-                  title={"Ch\u1ecdn nh\u00e0 cung c\u1ea5p"}
-                  options={collectionOptions}
-                  selected={collectionsParam}
-                  onChange={(next) =>
-                    setSearch({ supplier: next.length ? next : undefined })
-                  }
-                  searchable
-                />
-              </FilterChip>
-            ) : null}
-          </div>
+                 searchable
+               />
+             </FilterChip>
+           </div>
 
           {/* Mobile: 1 nút mở sheet full facets */}
           <button
@@ -1544,34 +1364,6 @@ function ProductsPage() {
                   searchable
                 />
               </FilterSection>
-              <FilterSection title="Chất liệu" count={filtersDraft?.materials.length ?? materialsParam.length}>
-                <MultiSelectFilter
-                  title="Chọn chất liệu"
-                  options={materialOptions}
-                  selected={filtersDraft?.materials ?? materialsParam}
-                  onChange={(next) => patchFiltersDraft({ materials: next })}
-                  searchable
-                />
-              </FilterSection>
-              <FilterSection
-                title="Giá"
-                count={
-                  (filtersDraft
-                    ? filtersDraft.min || filtersDraft.max || filtersDraft.priceKind !== "retail"
-                    : minParam || maxParam || priceKindParam !== "retail")
-                    ? 1
-                    : 0
-                }
-              >
-                <PriceFilter
-                  min={filtersDraft?.min ?? minParam}
-                  max={filtersDraft?.max ?? maxParam}
-                  priceKind={filtersDraft?.priceKind ?? priceKindParam}
-                  onChange={({ min, max, priceKind }) =>
-                    patchFiltersDraft({ min, max, priceKind: priceKind ?? "retail" })
-                  }
-                />
-              </FilterSection>
               <FilterSection title="Kiểu dáng" count={filtersDraft?.shapes.length ?? shapesParam.length}>
                 <MultiSelectFilter
                   title="Chọn kiểu dáng"
@@ -1587,24 +1379,10 @@ function ProductsPage() {
                   options={effectOptions}
                   selected={filtersDraft?.collections ?? effectsParam}
                   onChange={(next) => patchFiltersDraft({ collections: next })}
-                  searchable
-                />
-              </FilterSection>
-              {collectionOptions.length > 0 ? (
-                <FilterSection
-                  title={"Nh\u00e0 cung c\u1ea5p"}
-                  count={filtersDraft?.supplier.length ?? collectionsParam.length}
-                >
-                  <MultiSelectFilter
-                    title={"Ch\u1ecdn nh\u00e0 cung c\u1ea5p"}
-                    options={collectionOptions}
-                    selected={filtersDraft?.supplier ?? collectionsParam}
-                    onChange={(next) => patchFiltersDraft({ supplier: next })}
-                    searchable
-                  />
-                </FilterSection>
-              ) : null}
-            </div>
+                   searchable
+                 />
+               </FilterSection>
+             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <button
                 type="button"
@@ -1646,19 +1424,6 @@ function ProductsPage() {
             {deferredSearch.trim() && (
               <ActiveTag onClear={() => setSearchDraft("")}>
                 “{deferredSearch.trim()}”
-              </ActiveTag>
-            )}
-            {priceSummary && (
-              <ActiveTag
-                onClear={() =>
-                  setSearch({
-                    min: undefined,
-                    max: undefined,
-                    priceKind: undefined,
-                  })
-                }
-              >
-                Giá {priceSummary}
               </ActiveTag>
             )}
             {colorsParam.map((c: string) => (
@@ -1719,32 +1484,6 @@ function ProductsPage() {
                 }
               >
                 {"B\u1ed9 s\u01b0u t\u1eadp"}: {e}
-              </ActiveTag>
-            ))}
-            {materialsParam.map((m: string) => (
-              <ActiveTag
-                key={`mat-${m}`}
-                onClear={() =>
-                  setSearch({
-                    materials: materialsParam.filter((x: string) => x !== m),
-                  })
-                }
-              >
-                Chất liệu: {m}
-              </ActiveTag>
-            ))}
-            {collectionsParam.map((c: string) => (
-              <ActiveTag
-                key={`bst-${c}`}
-                onClear={() =>
-                  setSearch({
-                    supplier: collectionsParam.filter(
-                      (x: string) => x !== c,
-                    ),
-                  })
-                }
-              >
-                {"Nh\u00e0 cung c\u1ea5p"}: {c}
               </ActiveTag>
             ))}
             {stockLocParam === "KHOVP" && (

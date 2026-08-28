@@ -26,6 +26,7 @@ const PRODUCT_XLSX_COLUMNS = [
   { key: "packing", header: "packing" },
   { key: "packing_m2", header: "packing_m2" },
   { key: "packing_pcs", header: "packing_pcs" },
+  { key: "packing_kg", header: "packing_kg" },
   { key: "retail_price", header: "retail_price" },
   { key: "trade_price", header: "trade_price" },
   { key: "b2b_price", header: "b2b_price" },
@@ -55,6 +56,7 @@ type ProductImportRow = {
   packing?: string;
   packing_m2?: number | null;
   packing_pcs?: number | null;
+  packing_kg?: number | null;
   retail_price?: number | null;
   trade_price?: number | null;
   b2b_price?: number | null;
@@ -128,6 +130,7 @@ function productToRow(p: Product): Record<string, string | number | null> {
     packing: p.packing || "",
     packing_m2: p.packing_m2 ?? "",
     packing_pcs: p.packing_pcs ?? "",
+    packing_kg: p.packing_kg ?? "",
     retail_price: p.retail_price ?? "",
     trade_price: p.trade_price ?? "",
     b2b_price: p.b2b_price ?? "",
@@ -173,6 +176,7 @@ export async function exportProductsXlsx(opts?: {
             packing: "",
             packing_m2: "",
             packing_pcs: "",
+            packing_kg: "",
             retail_price: 350000,
             trade_price: "",
             b2b_price: "",
@@ -266,6 +270,11 @@ function mapHeaders(headers: string[]): Map<string, ProductXlsxKey> {
     "m2/thung": "packing_m2",
     packing_pcs: "packing_pcs",
     "vien/thung": "packing_pcs",
+    packing_kg: "packing_kg",
+    "kg/thung": "packing_kg",
+    "kg/ thung": "packing_kg",
+    "khoi luong": "packing_kg",
+    "trong luong": "packing_kg",
     retail_price: "retail_price",
     "gia le": "retail_price",
     "gia ban le": "retail_price",
@@ -347,6 +356,15 @@ function mapHeaders(headers: string[]): Map<string, ProductXlsxKey> {
       {
         test: (h) => h.includes("ghi chu"),
         key: "note",
+      },
+      {
+        test: (h) =>
+          h.includes("kg/thung") ||
+          h.includes("kg/ thung") ||
+          (h.includes("kg") && h.includes("thung")) ||
+          h.includes("khoi luong") ||
+          h.includes("trong luong"),
+        key: "packing_kg",
       },
     ];
 
@@ -463,6 +481,7 @@ export function parseProductImportRows(
           break;
         case "packing_m2":
         case "packing_pcs":
+        case "packing_kg":
         case "retail_price":
         case "trade_price":
         case "b2b_price":
@@ -509,6 +528,19 @@ export async function previewProductImport(
   const byCode = new Map(
     products.map((p) => [p.code.trim().toLowerCase(), p]),
   );
+  // Fallback: map theo Mã nội bộ (product_internal_codes gộp vào multi_codes_list).
+  // Cho phép file khóa theo «Mã số» = mã nội bộ vẫn khớp đúng SP (vd: cập nhật Kg/thùng).
+  const byInternal = new Map<string, (typeof products)[number]>();
+  for (const p of products) {
+    const list = (p.multi_codes_list || "")
+      .split(/[,;]/)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    for (const ic of list) {
+      // Không ghi đè nếu mã nội bộ trùng Mã báo giá của SP khác (ưu tiên byCode khi tra cứu).
+      if (!byInternal.has(ic)) byInternal.set(ic, p);
+    }
+  }
 
   const create: ProductImportPreviewItem[] = [];
   const update: ProductImportPreviewItem[] = [];
@@ -525,7 +557,7 @@ export async function previewProductImport(
     }
     seen.add(key);
 
-    const existing = byCode.get(key);
+    const existing = byCode.get(key) ?? byInternal.get(key);
     if (!existing) {
       if (row.retail_price == null || Number(row.retail_price) <= 0) {
         errors.push({
@@ -576,6 +608,7 @@ export async function previewProductImport(
     pushStr("Hiệu ứng vân/mặt gạch", existing.collections, row.collections);
     pushNum("m²/thùng", existing.packing_m2, row.packing_m2);
     pushNum("Viên/thùng", existing.packing_pcs, row.packing_pcs);
+    pushNum("Kg/thùng", existing.packing_kg, row.packing_kg);
     pushNumRequired("Giá lẻ", existing.retail_price, row.retail_price);
     pushNum("Giá TP", existing.trade_price, row.trade_price);
     pushNum("Giá B2B", existing.b2b_price, row.b2b_price);
@@ -629,6 +662,7 @@ function rowToUpdate(row: ProductImportRow): ProductUpdate {
   if (row.packing !== undefined) u.packing = row.packing;
   if (row.packing_m2 !== undefined) u.packing_m2 = row.packing_m2;
   if (row.packing_pcs !== undefined) u.packing_pcs = row.packing_pcs;
+  if (row.packing_kg !== undefined) u.packing_kg = row.packing_kg;
   if (row.retail_price !== undefined && row.retail_price !== null) u.retail_price = Math.round(row.retail_price);
   if (row.trade_price !== undefined) u.trade_price = row.trade_price !== null ? Math.round(row.trade_price) : (null as any);
   if (row.b2b_price !== undefined) u.b2b_price = row.b2b_price !== null ? Math.round(row.b2b_price) : (null as any);
@@ -656,6 +690,7 @@ function rowToCreate(row: ProductImportRow): ProductCreateInput {
     packing: row.packing ?? "",
     packing_m2: row.packing_m2 ?? null,
     packing_pcs: row.packing_pcs ?? null,
+    packing_kg: row.packing_kg ?? null,
     retail_price: row.retail_price !== undefined && row.retail_price !== null ? Math.round(row.retail_price) : 0,
     trade_price: row.trade_price !== undefined && row.trade_price !== null ? Math.round(row.trade_price) : null,
     b2b_price: row.b2b_price !== undefined && row.b2b_price !== null ? Math.round(row.b2b_price) : null,

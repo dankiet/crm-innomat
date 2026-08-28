@@ -187,7 +187,7 @@ export function ImportExportProductsDialog({
               Xuất hoặc nhập file Excel danh mục sản phẩm (mã, tên, giá bán lẻ, giá B2B, kích thước, màu sắc...).
             </p>
             <div className="flex flex-wrap gap-2.5 pt-1">
-              <input type="file" accept=".xlsx,.xls,.csv" className="hidden" ref={inputRef} onChange={handleFileChange} />
+              <input type="file" accept=".xlsx,.xls,.xlsb,.csv" className="hidden" ref={inputRef} onChange={handleFileChange} />
               
               {/* Nút Xuất Sản Phẩm */}
               <button

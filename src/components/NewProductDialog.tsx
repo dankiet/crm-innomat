@@ -52,6 +52,7 @@ const emptyForm = {
   color: "",
   packing_m2: "",
   packing_pcs: "",
+  packing_kg: "",
   retail_price: "",
   trade_price: "",
   b2b_price: "",
@@ -196,6 +197,10 @@ export function NewProductDialog({
     if (form.packing_pcs.trim() !== "") {
       packing_pcs = Number(form.packing_pcs.trim());
     }
+    let packing_kg: number | null = null;
+    if (form.packing_kg.trim() !== "") {
+      packing_kg = Number(form.packing_kg.trim().replace(",", "."));
+    }
     setSaving(true);
     try {
       const product = await createProductFn({
@@ -212,6 +217,7 @@ export function NewProductDialog({
           color: form.color.trim(),
           packing_m2,
           packing_pcs,
+          packing_kg,
           retail_price: price,
           trade_price,
           b2b_price,
@@ -461,6 +467,15 @@ export function NewProductDialog({
                   value={form.packing_pcs}
                   onChange={(e) => setForm((f) => ({ ...f, packing_pcs: e.target.value }))}
                   placeholder="vd. 4"
+                />
+              </Field>
+              <Field label="Kg / Thùng">
+                <input
+                  className={inputCls}
+                  inputMode="decimal"
+                  value={form.packing_kg}
+                  onChange={(e) => setForm((f) => ({ ...f, packing_kg: e.target.value }))}
+                  placeholder="vd. 17"
                 />
               </Field>
             </div>

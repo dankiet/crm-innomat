@@ -1,17 +1,3 @@
-# Deployment
-
-This repo is the source of truth:
-
-- **Git (GitHub `main`)** is the source and versioned backup — every commit is a
-  full snapshot of the code. Keep it in a working state; it is the only way to
-  restore older source.
-- **Vercel** serves production via its GitHub integration (`nitro` framework
-  preset → `npm run build`, project linked through `.vercel/project.json`).
-  Every push to `main` is built and deployed automatically by Vercel — no
-  manual deploy step.
-- Never rewrite published git history (force-push, rebase/amend/squash of pushed
-  commits) — it destroys the version history that git alone preserves.
-
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
@@ -56,30 +42,3 @@ This project is indexed by GitNexus as **crm-innomat** (1519 symbols, 4338 relat
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
-
-# UI Conventions
-
-These are hard rules for the CRM UI. Follow them on every edit — do not silently
-reintroduce the old patterns.
-
-## Delete buttons — inline two-step confirm (NO `window.confirm`)
-- A delete action must NEVER use the native `window.confirm()` popup.
-- Pattern: clicking the trash icon enters a confirm state — show **"Xóa vĩnh viễn"**
-  (solid red `bg-red-600 text-white hover:bg-red-700`) plus a **"Không xóa"**
-  (neutral) button inline, next to the icon. Only the second click on
-  "Xóa vĩnh viễn" performs the delete.
-- Reset the confirm state whenever the dialog (re)opens.
-- Canonical examples to copy from:
-  - `src/components/NewCustomerDialog.tsx` (`confirmDelete` two-step)
-  - `src/components/NewQuoteDialog.tsx` (header inline confirm)
-  - `src/components/CustomerMappingDialog.tsx` (`EditorHeader` inline confirm)
-  - `src/routes/_app.khach-hang.$customerId.tsx` (`SmallBtn` danger solid)
-
-## Save in create/edit dialogs — keep popup open, no mid-save refresh
-- On save, keep the dialog open and show a success toast. Do NOT call
-  `router.invalidate()` inside the save handler (it reloads active route loaders
-  and causes a visible grid refresh while the popup is still open).
-- Refresh the underlying list only when the popup closes or via the page's
-  `onCreated` callback — never mid-save.
-- Canonical examples: `CustomerMappingDialog.tsx` (no invalidate on save),
-  `NewQuoteDialog.tsx` (`handleSubmit` does not invalidate).

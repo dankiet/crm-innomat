@@ -37,7 +37,7 @@ import {
   unitPriceForProduct,
 } from "@/lib/pricing";
 import { toast } from "sonner";
-import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Thumbnail gọn cho form BG — có ảnh thì hiện; lỗi/không có thì ô xám (không icon vỡ layout). */
@@ -536,6 +536,26 @@ export function NewQuoteDialog({
     }
   }
 
+  async function handleCopyLineCodes() {
+    const codes = [
+      ...new Set(
+        lines
+          .map((l) => (l.product_code || l.product?.code || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (!codes.length) {
+      toast.error("Không có mã sản phẩm để copy");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(codes.join(" "));
+      toast.success(`Đã copy ${codes.length} mã trong báo giá`);
+    } catch {
+      toast.error("Không copy được mã");
+    }
+  }
+
   function closeDialog(nextOpen: boolean) {
     if (!nextOpen && (saving || exporting || deleting)) return;
     onOpenChange(nextOpen);
@@ -806,6 +826,16 @@ export function NewQuoteDialog({
                   className="size-8 grid place-items-center rounded-md text-muted-foreground hover:bg-surface-strong hover:text-foreground"
                 >
                   <ChevronsUpDown className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Copy toàn bộ mã trong báo giá"
+                  aria-label="Copy toàn bộ mã trong báo giá"
+                  disabled={!lines.some((l) => l.product)}
+                  onClick={() => void handleCopyLineCodes()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-surface-strong hover:text-foreground disabled:opacity-40"
+                >
+                  <Copy className="size-3.5" /> Copy mã
                 </button>
                 <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
                   <input

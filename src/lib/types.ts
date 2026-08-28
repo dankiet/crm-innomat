@@ -21,7 +21,29 @@ export type ProductImageRow = {
   sort_order: number;
   is_primary: number;
   caption: string;
+  /** Phân loại ảnh: 'map' (ảnh gạch), 'concept' (bối cảnh), 'normal' (không gán) */
+  kind: ProductImageKind;
   created_at: string;
+};
+
+/**
+ * Phân loại ảnh sản phẩm (phục vụ front-end):
+ * - 'map': ảnh gạch (ảnh MAP) — tối đa 1 ảnh/SP
+ * - 'concept': ảnh bối cảnh (concept)
+ * - 'normal': ảnh thường, không gán
+ */
+export type ProductImageKind = "map" | "concept" | "normal";
+
+export const PRODUCT_IMAGE_KINDS: readonly ProductImageKind[] = [
+  "map",
+  "concept",
+  "normal",
+] as const;
+
+export const PRODUCT_IMAGE_KIND_LABELS: Record<ProductImageKind, string> = {
+  map: "Ảnh gạch (MAP)",
+  concept: "Ảnh bối cảnh",
+  normal: "Ảnh thường",
 };
 
 export type GalleryCollection = {
@@ -94,6 +116,8 @@ export type Product = {
   packing?: string;
   packing_m2?: number | null;
   packing_pcs?: number | null;
+  /** Khối lượng đóng gói: Kg/thùng */
+  packing_kg?: number | null;
   retail_price: number;
   /** Giá Thương Mại = Trade Price (+VAT) — dùng trực tiếp khi CK TP */
   trade_price?: number | null;

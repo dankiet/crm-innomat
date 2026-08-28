@@ -16,6 +16,7 @@ import type {
   Payment,
   Product,
   ProductImageRow,
+  ProductImageKind,
   Quote,
   QuoteItem,
   QuoteStatus,
@@ -90,9 +91,9 @@ export async function listProducts(opts?: {
   }
   if (opts?.search?.trim()) {
     where.push(
-      "(p.code LIKE ? OR pic.multi_codes_list LIKE ? OR p.name LIKE ? OR p.size LIKE ? OR p.supplier LIKE ?)",
+      "(p.code ILIKE ? OR pic.multi_codes_list ILIKE ? OR p.name ILIKE ? OR p.size ILIKE ? OR p.supplier ILIKE ?)",
     );
-    const q = `%${opts.search.trim()}%`;
+    const q = likePattern(opts.search);
     params.push(q, q, q, q, q);
   }
 
@@ -305,6 +306,7 @@ export async function addProductImage(input: {
   path: string;
   caption?: string;
   is_primary?: boolean;
+  kind?: ProductImageKind;
 }): Promise<ProductImageRow> {
   const db = getDb();
   if (!(await getProduct(input.product_id))) {
@@ -313,6 +315,8 @@ export async function addProductImage(input: {
   const pathStr = input.path.trim();
   if (!pathStr) throw new Error("Đường dẫn ảnh bắt buộc");
 
+  const kind: ProductImageKind = input.kind ?? "normal";
+
   const count = (
     (await db
       .prepare("SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?")
@@ -320,11 +324,6 @@ export async function addProductImage(input: {
   ).n;
 
   const makePrimary = input.is_primary === true || count === 0;
-  if (makePrimary) {
-    await db
-      .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ?")
-      .run(input.product_id);
-  }
 
   const maxSort = (
     (await db
@@ -332,18 +331,40 @@ export async function addProductImage(input: {
       .get<{ m: number }>(input.product_id)) as { m: number }
   ).m;
 
-  const info = await db
-    .prepare(
-      `INSERT INTO product_images
-        (product_id, path, sort_order, is_primary, caption)
-       VALUES (?, ?, ?, ?, ?)`,
-    )
-    .run(input.product_id, pathStr, maxSort + 1, makePrimary ? 1 : 0, (input.caption ?? "").trim());
+  const runTx = db.transaction(async (tx) => {
+    if (makePrimary) {
+      await tx
+        .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ?")
+        .run(input.product_id);
+    }
+    // Chỉ 1 ảnh MAP mỗi SP — hạ ảnh map cũ về 'normal' trước khi thêm map mới.
+    if (kind === "map") {
+      await tx
+        .prepare("UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map'")
+        .run(input.product_id);
+    }
+    const info = await tx
+      .prepare(
+        `INSERT INTO product_images
+          (product_id, path, sort_order, is_primary, caption, kind)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.product_id,
+        pathStr,
+        maxSort + 1,
+        makePrimary ? 1 : 0,
+        (input.caption ?? "").trim(),
+        kind,
+      );
+    return Number(info.lastInsertRowid);
+  });
+  const newId = await runTx();
 
   await syncPrimaryImagePath(input.product_id);
   return (await db
     .prepare("SELECT * FROM product_images WHERE id = ?")
-    .get<ProductImageRow>(Number(info.lastInsertRowid))) as ProductImageRow;
+    .get<ProductImageRow>(newId)) as ProductImageRow;
 }
 
 /** Chuẩn ảnh SP khi upload: cạnh dài tối đa (giữ tỉ lệ). */
@@ -360,6 +381,7 @@ export async function uploadProductImageFile(input: {
   mimeType?: string;
   caption?: string;
   is_primary?: boolean;
+  kind?: ProductImageKind;
 }): Promise<ProductImageRow> {
   if (!getProduct(input.product_id)) {
     throw new Error("Không tìm thấy sản phẩm");
@@ -382,6 +404,7 @@ export async function uploadProductImageFile(input: {
     path: publicPath,
     caption: input.caption,
     is_primary: input.is_primary,
+    kind: input.kind,
   });
 }
 
@@ -403,6 +426,35 @@ export async function setPrimaryProductImage(
   });
   await runTx();
   await syncPrimaryImagePath(productId);
+  return await listProductImages(productId);
+}
+
+/**
+ * Gán loại ('map' | 'concept' | 'normal') cho một ảnh sản phẩm.
+ * 'map' là duy nhất mỗi SP — set map mới sẽ hạ ảnh map cũ về 'normal'.
+ */
+export async function setProductImageKind(
+  productId: number,
+  imageId: number,
+  kind: ProductImageKind,
+): Promise<ProductImageRow[]> {
+  const db = getDb();
+  const row = (await db
+    .prepare("SELECT id FROM product_images WHERE id = ? AND product_id = ?")
+    .get<{ id: number }>(imageId, productId)) as { id: number } | undefined;
+  if (!row) throw new Error("Không tìm thấy ảnh của sản phẩm này");
+
+  const runTx = db.transaction(async (tx) => {
+    if (kind === "map") {
+      await tx
+        .prepare(
+          "UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?",
+        )
+        .run(productId, imageId);
+    }
+    await tx.prepare("UPDATE product_images SET kind = ? WHERE id = ?").run(kind, imageId);
+  });
+  await runTx();
   return await listProductImages(productId);
 }
 
@@ -506,7 +558,8 @@ function clampListLimit(limit: number | undefined, fallback: number): number | n
 }
 
 function likePattern(raw: string): string {
-  return `%${raw.trim().replace(/[%_\\]/g, "")}%`;
+  // NFC để khớp dữ liệu đã lưu (DB lưu NFC); một số bàn phím gõ tiếng Việt cho ra NFD.
+  return `%${raw.normalize("NFC").trim().replace(/[%_\\]/g, "")}%`;
 }
 
 /** ownerId = null → tất cả (admin); số → chỉ KH của sales đó */
@@ -530,9 +583,9 @@ export async function listCustomers(
   const q = opts?.search?.trim();
   if (q) {
     where.push(
-      `(c.name LIKE ? OR c.phone LIKE ? OR c.region LIKE ? OR c.company LIKE ?
-        OR c.short_name LIKE ? OR c.email LIKE ? OR c.source LIKE ?
-        OR u.display_name LIKE ?)`,
+      `(c.name ILIKE ? OR c.phone ILIKE ? OR c.region ILIKE ? OR c.company ILIKE ?
+        OR c.short_name ILIKE ? OR c.email ILIKE ? OR c.source ILIKE ?
+        OR u.display_name ILIKE ?)`,
     );
     const pat = likePattern(q);
     params.push(pat, pat, pat, pat, pat, pat, pat, pat);
@@ -1454,7 +1507,7 @@ async function listQuotesForCustomer(
   const q = opts?.search?.trim();
   if (q) {
     where.push(
-      `(q.code LIKE ? OR q.notes LIKE ? OR c.name LIKE ? OR c.source LIKE ? OR c.phone LIKE ?)`,
+      `(q.code ILIKE ? OR q.notes ILIKE ? OR c.name ILIKE ? OR c.source ILIKE ? OR c.phone ILIKE ?)`,
     );
     const pat = likePattern(q);
     params.push(pat, pat, pat, pat, pat);
@@ -1902,7 +1955,7 @@ async function listOrdersForCustomer(
   const q = opts?.search?.trim();
   if (q) {
     where.push(
-      `(o.code LIKE ? OR o.notes LIKE ? OR c.name LIKE ? OR c.source LIKE ? OR c.phone LIKE ?)`,
+      `(o.code ILIKE ? OR o.notes ILIKE ? OR c.name ILIKE ? OR c.source ILIKE ? OR c.phone ILIKE ?)`,
     );
     const pat = likePattern(q);
     params.push(pat, pat, pat, pat, pat);
@@ -2349,6 +2402,7 @@ export type ProductUpdate = {
   packing?: string;
   packing_m2?: number | null;
   packing_pcs?: number | null;
+  packing_kg?: number | null;
   retail_price?: number;
   trade_price?: number | null;
   b2b_price?: number | null;
@@ -2414,6 +2468,7 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
         packing = @packing,
         packing_m2 = @packing_m2,
         packing_pcs = @packing_pcs,
+        packing_kg = @packing_kg,
         retail_price = @retail_price,
         trade_price = @trade_price,
         b2b_price = @b2b_price,
@@ -2439,6 +2494,7 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       packing: (input.packing ?? existing.packing ?? "").trim(),
       packing_m2: input.packing_m2 !== undefined ? input.packing_m2 : existing.packing_m2,
       packing_pcs: input.packing_pcs !== undefined ? input.packing_pcs : existing.packing_pcs,
+      packing_kg: input.packing_kg !== undefined ? input.packing_kg : existing.packing_kg,
       retail_price: retail,
       trade_price: tradePrice,
       b2b_price: b2bPrice,
@@ -2468,6 +2524,7 @@ export type ProductCreateInput = {
   packing?: string;
   packing_m2?: number | null;
   packing_pcs?: number | null;
+  packing_kg?: number | null;
   retail_price: number;
   trade_price?: number | null;
   b2b_price?: number | null;
@@ -2509,12 +2566,12 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
     .prepare(
       `INSERT INTO products (
         code, name, size, material, surface, shape, collections, category, supplier,
-        color, packing, packing_m2, packing_pcs,
+        color, packing, packing_m2, packing_pcs, packing_kg,
         retail_price, trade_price, b2b_price, discount_tp, discount_b2b,
         note, is_hot, image_path
       ) VALUES (
         @code, @name, @size, @material, @surface, @shape, @collections, @category, @supplier,
-        @color, @packing, @packing_m2, @packing_pcs,
+        @color, @packing, @packing_m2, @packing_pcs, @packing_kg,
         @retail_price, @trade_price, @b2b_price, @discount_tp, @discount_b2b,
         @note, @is_hot, @image_path
       )`,
@@ -2538,6 +2595,10 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
       packing_pcs:
         input.packing_pcs != null && input.packing_pcs !== ("" as unknown)
           ? Number(input.packing_pcs)
+          : null,
+      packing_kg:
+        input.packing_kg != null && input.packing_kg !== ("" as unknown)
+          ? Number(input.packing_kg)
           : null,
       retail_price: retail,
       trade_price: tradePrice,

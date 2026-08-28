@@ -297,6 +297,7 @@ export const updateProductFn = createServerFn({ method: "POST" })
       packing?: string;
       packing_m2?: number | null;
       packing_pcs?: number | null;
+      packing_kg?: number | null;
       retail_price?: number;
       trade_price?: number | null;
       b2b_price?: number | null;
@@ -340,6 +341,7 @@ export const createProductFn = createServerFn({ method: "POST" })
       packing?: string;
       packing_m2?: number | null;
       packing_pcs?: number | null;
+      packing_kg?: number | null;
       retail_price: number;
       trade_price?: number | null;
       b2b_price?: number | null;
@@ -402,6 +404,7 @@ export const uploadProductImageFn = createServerFn({ method: "POST" })
       mimeType?: string;
       caption?: string;
       is_primary?: boolean;
+      kind?: import("@/lib/types").ProductImageKind;
     }) => data,
   )
   .handler(async ({ data }) => {
@@ -422,7 +425,13 @@ export const uploadProductImageFn = createServerFn({ method: "POST" })
 
 export const addProductImageByPathFn = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: { product_id: number; path: string; caption?: string; is_primary?: boolean }) => data,
+    (data: {
+      product_id: number;
+      path: string;
+      caption?: string;
+      is_primary?: boolean;
+      kind?: import("@/lib/types").ProductImageKind;
+    }) => data,
   )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
@@ -447,6 +456,30 @@ export const setPrimaryProductImageFn = createServerFn({ method: "POST" })
     await requireAdmin();
     const { setPrimaryProductImage } = await import("@/db/crm.server");
     return await setPrimaryProductImage(data.productId, data.imageId);
+  });
+
+export const setProductImageKindFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      productId: number;
+      imageId: number;
+      kind: import("@/lib/types").ProductImageKind;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { setProductImageKind } = await import("@/db/crm.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const rows = await setProductImageKind(data.productId, data.imageId, data.kind);
+    await writeAudit({
+      user: me,
+      action: "product.image.kind",
+      entity_type: "product",
+      entity_id: data.productId,
+      summary: `Gán loại ảnh #${data.imageId} → ${data.kind}`,
+    });
+    return rows;
   });
 
 export const deleteProductImageFn = createServerFn({ method: "POST" })

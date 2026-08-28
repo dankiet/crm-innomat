@@ -13,9 +13,11 @@ import {
   deleteProductImageFn,
   fetchProductImages,
   setPrimaryProductImageFn,
+  setProductImageKindFn,
   uploadProductImageFn,
 } from "@/api/functions";
-import type { Product, ProductImageRow } from "@/lib/types";
+import type { Product, ProductImageRow, ProductImageKind } from "@/lib/types";
+import { PRODUCT_IMAGE_KINDS, PRODUCT_IMAGE_KIND_LABELS } from "@/lib/types";
 import { toast } from "sonner";
 import { ImagePlus, Loader2, Star, Trash2, Upload, Link2 } from "lucide-react";
 import { readImageFileAsWebpDataUrl } from "@/lib/image-upload";
@@ -150,6 +152,23 @@ export function EditProductImagesDialog({
     }
   }
 
+  async function handleSetKind(imageId: number, kind: ProductImageKind) {
+    if (!product) return;
+    setBusy(true);
+    try {
+      const rows = await setProductImageKindFn({
+        data: { productId: product.id, imageId, kind },
+      });
+      setImages(rows);
+      toast.success(`Đã gán: ${PRODUCT_IMAGE_KIND_LABELS[kind]}`);
+      await router.invalidate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi gán loại ảnh");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleDelete(imageId: number) {
     if (!product || pendingDeleteId !== imageId || deletingImageId !== null) return;
     setBusy(true);
@@ -185,6 +204,7 @@ export function EditProductImagesDialog({
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
             Một mã có thể có nhiều ảnh. Ảnh gắn sao là ảnh đại diện trên danh mục.
+            Gán loại: <b>Ảnh gạch (MAP)</b> — tối đa 1/sản phẩm; <b>Ảnh bối cảnh</b>; hoặc <b>Ảnh thường</b>.
           </p>
 
           {/* Add controls */}
@@ -267,6 +287,15 @@ export function EditProductImagesDialog({
                         Đại diện
                       </span>
                     ) : null}
+                    {img.kind && img.kind !== "normal" ? (
+                      <span
+                        className={`absolute top-2 right-2 text-[10px] font-medium px-1.5 py-0.5 rounded text-white ${
+                          img.kind === "map" ? "bg-blue-600" : "bg-emerald-600"
+                        }`}
+                      >
+                        {PRODUCT_IMAGE_KIND_LABELS[img.kind]}
+                      </span>
+                    ) : null}
                   </div>
                   {!readOnly ? (
                     <div className="p-2 space-y-1.5">
@@ -319,6 +348,33 @@ export function EditProductImagesDialog({
                         </button>
                       </div>
                     )}
+                    {!readOnly && pendingDeleteId !== img.id ? (
+                      <div className="flex gap-1">
+                        {PRODUCT_IMAGE_KINDS.map((k) => {
+                          const active = (img.kind ?? "normal") === k;
+                          return (
+                            <button
+                              key={k}
+                              type="button"
+                              disabled={busy || active}
+                              title={PRODUCT_IMAGE_KIND_LABELS[k]}
+                              onClick={() => void handleSetKind(img.id, k)}
+                              className={`flex-1 text-[10px] font-medium py-1 rounded ring-1 disabled:opacity-100 ${
+                                active
+                                  ? k === "map"
+                                    ? "bg-blue-600 text-white ring-blue-600"
+                                    : k === "concept"
+                                      ? "bg-emerald-600 text-white ring-emerald-600"
+                                      : "bg-foreground/80 text-background ring-foreground/80"
+                                  : "ring-black/10 hover:bg-surface-strong disabled:opacity-50"
+                              }`}
+                            >
+                              {k === "map" ? "MAP" : k === "concept" ? "Bối cảnh" : "Thường"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                     </div>
                   ) : null}
                 </div>
