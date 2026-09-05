@@ -138,29 +138,6 @@ export function SpaceLookbookSection({
     return pool;
   }, [activeTab, activeColor, liveItems]);
 
-  // Color counts theo không gian hiện tại
-  const colorCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: 0 };
-    const currentSpacePool =
-      activeTab === "all"
-        ? liveItems
-        : liveItems.filter((item) => item.spaceType === activeTab);
-
-    const seenProds = new Set<string>();
-    currentSpacePool.forEach((item) => {
-      if (activeTab === "all") {
-        if (seenProds.has(item.product.id)) return;
-        seenProds.add(item.product.id);
-      }
-      counts.all = (counts.all || 0) + 1;
-      const pId = matchColorPalette(item.product.tone);
-      if (pId) {
-        counts[pId] = (counts[pId] || 0) + 1;
-      }
-    });
-
-    return counts;
-  }, [activeTab, liveItems]);
 
   // Tab counts for quick visual feedback
   const tabCounts = useMemo(() => {
@@ -229,57 +206,48 @@ export function SpaceLookbookSection({
         </div>
       </div>
 
-      {/* 2.1 Color Palette Swatch Filter Bar */}
-      <div className="space-colors-bar mt-4 pt-3 pb-1 border-t border-dashed border-[#e6decb] flex items-center gap-2 overflow-x-auto scrollbar-none">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[#788075] shrink-0 mr-1 flex items-center gap-1">
-          <Sparkles size={12} className="text-terracotta" />
-          Tông màu:
+      {/* 2.1 Color Palette Swatch Dots */}
+      <div className="flex items-center gap-2.5 py-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#788075] shrink-0 select-none">
+          Tông
         </span>
+
+        {/* Nút "Tất cả" nhỏ gọn */}
         <button
           type="button"
           onClick={() => handleColorChange("all")}
           className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer shrink-0",
+                       "h-6 px-2.5 rounded-full text-[11px] font-medium transition-all cursor-pointer shrink-0 leading-none",
             activeColor === "all"
-              ? "bg-[#141f23] text-white font-semibold shadow-xs"
-              : "bg-[#eae3d2]/60 text-[#4b575a] hover:bg-[#eae3d2] hover:text-[#141f23]",
+              ? "bg-[#141f23] text-white"
+              : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
           )}
+          aria-label="Tất cả tông màu"
         >
-          <span>Tất cả</span>
-          <span className="text-[10px] tabular-nums font-bold opacity-75">
-            {colorCounts.all || 0}
-          </span>
+          Tất cả
         </button>
 
+        {/* Dòng nút tròn hiển thị 8 gam màu */}
         {COLOR_PALETTES.map((palette) => {
           const isActive = activeColor === palette.id;
-          const count = colorCounts[palette.id] || 0;
           return (
             <button
               key={palette.id}
               type="button"
               onClick={() => handleColorChange(palette.id)}
+              aria-label={palette.label}
+              title={palette.label}
               className={cn(
-                "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer shrink-0",
+                               "size-7 rounded-full cursor-pointer shrink-0 transition-all",
                 isActive
-                  ? "bg-[#141f23] text-white font-semibold shadow-xs"
-                  : "bg-[#eae3d2]/60 text-[#4b575a] hover:bg-[#eae3d2] hover:text-[#141f23]",
+                  ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-white scale-110"
+                  : "hover:scale-110 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40",
               )}
-            >
-              <span
-                className="size-3 rounded-full shrink-0 shadow-2xs"
-                style={{
-                  backgroundColor: palette.hex,
-                  border: `1px solid ${palette.dotBorder || "rgba(0,0,0,0.15)"}`,
-                }}
-              />
-              <span>{palette.shortLabel}</span>
-              {count > 0 && (
-                <span className="text-[10px] tabular-nums font-bold opacity-75">
-                  {count}
-                </span>
-              )}
-            </button>
+              style={{
+                backgroundColor: palette.hex,
+                border: `1.5px solid ${palette.dotBorder || "rgba(0,0,0,0.15)"}`,
+              }}
+            />
           );
         })}
       </div>
