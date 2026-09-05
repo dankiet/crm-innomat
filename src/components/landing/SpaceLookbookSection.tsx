@@ -209,7 +209,7 @@ export function SpaceLookbookSection({
       {/* 2.1 Color Palette Swatch Dots */}
       <div className="flex items-center gap-2.5 py-3">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-[#788075] shrink-0 select-none">
-          Tông
+          Color
         </span>
 
         {/* Nút "Tất cả" nhỏ gọn */}
@@ -222,7 +222,7 @@ export function SpaceLookbookSection({
               ? "bg-[#141f23] text-white"
               : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
           )}
-          aria-label="Tất cả tông màu"
+          aria-label="Tất cả màu"
         >
           Tất cả
         </button>
