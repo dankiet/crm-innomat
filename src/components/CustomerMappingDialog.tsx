@@ -1,5 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
@@ -10,10 +28,12 @@ import {
   FileDown,
   FileImage,
   FileText,
+  GripVertical,
   Image,
   Loader2,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   Upload,
@@ -37,7 +57,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format";
-import type { Customer, Product } from "@/lib/types";
+import { unitPriceForProduct } from "@/lib/pricing";
+import type { Customer, DiscountType, Product } from "@/lib/types";
 import {
   buildExactCodeSet,
   codeRowFromProduct,
@@ -61,7 +82,37 @@ export type CustomerMappingItem = {
   custom_product_surface: string;
   custom_product_retail_price: number;
   custom_product_image_path: string;
+  /** null = tính theo price_basis của đề xuất; số = giá chốt tay (đ/m²) */
+  price_override: number | null;
 };
+
+/** Căn cứ giá in trên đề xuất vật liệu (mirror của server type). */
+export type MappingPriceBasis = "retail" | "tp" | "b2b";
+
+const PRICE_BASIS_OPTIONS: Array<{ value: MappingPriceBasis; label: string }> = [
+  { value: "retail", label: "Giá lẻ" },
+  { value: "tp", label: "CK TP" },
+  { value: "b2b", label: "CK B2B" },
+];
+
+function basisToDiscountType(basis: MappingPriceBasis): DiscountType {
+  return basis === "tp" ? "tp" : basis === "b2b" ? "b2b" : "none";
+}
+
+function basisLabel(basis: MappingPriceBasis): string {
+  return PRICE_BASIS_OPTIONS.find((option) => option.value === basis)?.label ?? "Giá lẻ";
+}
+
+/** Giá tự động của 1 phương án theo căn cứ giá — 0 khi chưa chọn sản phẩm. */
+function autoPriceFor(item: Draft, basis: MappingPriceBasis): number {
+  if (item.product) {
+    return unitPriceForProduct(item.product, basisToDiscountType(basis));
+  }
+  if (item.customProduct) {
+    return Number(item.customProduct.retailPrice.replace(/\D/g, "")) || 0;
+  }
+  return 0;
+}
 
 export type CustomerMapping = {
   id: number;
@@ -71,6 +122,7 @@ export type CustomerMapping = {
   name: string;
   version: string;
   note: string;
+  price_basis: MappingPriceBasis;
   created_at: string;
   updated_at: string;
   linked_quotes: Array<{
@@ -92,6 +144,8 @@ type Draft = {
   size: string;
   product: Product | null;
   customProduct: CustomProduct | null;
+  /** "" = tự tính theo căn cứ giá; chuỗi số = giá chốt tay */
+  priceOverride: string;
 };
 
 type CustomProduct = {
@@ -136,6 +190,7 @@ function blankDraft(): Draft {
     size: "",
     product: null,
     customProduct: null,
+    priceOverride: "",
   };
 }
 
@@ -182,6 +237,7 @@ export function CustomerMappingDialog({
   const [name, setName] = useState("");
   const [version, setVersion] = useState("01");
   const [note, setNote] = useState("");
+  const [priceBasis, setPriceBasis] = useState<MappingPriceBasis>("retail");
   const [items, setItems] = useState<Draft[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -216,6 +272,7 @@ export function CustomerMappingDialog({
     setName(mapping?.name || "");
     setVersion(mapping?.version || "01");
     setNote(mapping?.note ?? "");
+    setPriceBasis(mapping?.price_basis ?? "retail");
     setCustomerId(defaultCustomerId ?? mapping?.customer_id ?? "");
     void (async () => {
       setLoading(true);
@@ -255,6 +312,8 @@ export function CustomerMappingDialog({
                       imageName: "",
                     }
                   : null,
+                priceOverride:
+                  item.price_override == null ? "" : String(item.price_override),
               }))
                   : [];
         setItems(drafts);
@@ -328,6 +387,25 @@ export function CustomerMappingDialog({
     if (targetIndex < 0 || targetIndex >= areaGroups.length) return;
     const nextGroups = move(areaGroups, groupIndex, targetIndex);
     setItems(nextGroups.flatMap((group) => group.items));
+  }
+
+  /**
+   * Đổi thứ tự phương án trong một khu vực. Ghi lại đúng các vị trí mà khu vực
+   * đó đang chiếm trong mảng phẳng `items`, nên thứ tự các khu vực không đổi.
+   * `sort_order` được gán lại theo chỉ số khi lưu (xem handleSave).
+   */
+  function reorderOptions(groupKey: string, activeKey: string, overKey: string) {
+    setItems((current) => {
+      const inGroup = current.filter((item) => item.areaGroupKey === groupKey);
+      const from = inGroup.findIndex((item) => item.key === activeKey);
+      const to = inGroup.findIndex((item) => item.key === overKey);
+      if (from < 0 || to < 0 || from === to) return current;
+      const reordered = arrayMove(inGroup, from, to);
+      let cursor = 0;
+      return current.map((item) =>
+        item.areaGroupKey === groupKey ? reordered[cursor++]! : item,
+      );
+    });
   }
 
   async function replaceAreaImage(itemKey: string, file?: File) {
@@ -436,6 +514,7 @@ export function CustomerMappingDialog({
       size: "",
       product: null,
       customProduct: null,
+      priceOverride: "",
     }));
     setItems((current) => {
       const withoutEmpty = current.filter(
@@ -508,6 +587,10 @@ export function CustomerMappingDialog({
             (item.customProduct?.retailPrice || "").replace(/\D/g, ""),
           ),
           custom_product_image_path: customProductImagePath,
+          price_override:
+            item.priceOverride.trim() === ""
+              ? null
+              : Number(item.priceOverride.replace(/\D/g, "")) || 0,
         });
       }
       const saved = await saveCustomerMappingFn({
@@ -517,6 +600,7 @@ export function CustomerMappingDialog({
           name: name.trim(),
           version: version.trim() || "01",
           note: note.trim(),
+          price_basis: priceBasis,
           items: output,
         },
       });
@@ -707,7 +791,7 @@ export function CustomerMappingDialog({
               ) : null}
 
               <section>
-                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_140px] gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_140px_150px] gap-3">
                   <label>
                     <FieldLabel>Tên công trình</FieldLabel>
                     <input
@@ -726,6 +810,23 @@ export function CustomerMappingDialog({
                       placeholder="01"
                       maxLength={30}
                     />
+                  </label>
+                  <label>
+                    <FieldLabel>Căn cứ giá</FieldLabel>
+                    <select
+                      className={cn(inputClass, "mt-1")}
+                      value={priceBasis}
+                      onChange={(event) =>
+                        setPriceBasis(event.target.value as MappingPriceBasis)
+                      }
+                      title="Giá in trên đề xuất lấy theo căn cứ này; giá sửa tay vẫn được giữ."
+                    >
+                      {PRICE_BASIS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
               </section>
@@ -790,7 +891,11 @@ export function CustomerMappingDialog({
                       groupIndex={groupIndex}
                       groupCount={areaGroups.length}
                       inputClass={inputClass}
+                      priceBasis={priceBasis}
                       onMoveGroup={(delta) => moveAreaGroup(groupIndex, delta)}
+                      onReorderOptions={(activeKey, overKey) =>
+                        reorderOptions(group.key, activeKey, overKey)
+                      }
                       onPatch={patchItem}
                       onPatchGroup={(patch) =>
                         setItems((current) =>
@@ -826,6 +931,7 @@ export function CustomerMappingDialog({
                             size: "",
                             product: null,
                             customProduct: null,
+                            priceOverride: "",
                           };
                           const lastGroupIndex =
                             current.length -
@@ -918,6 +1024,7 @@ export function CustomerMappingDialog({
           <ProductPicker
             products={filteredProducts}
             search={productSearch}
+            priceBasis={priceBasis}
             onSearchChange={setProductSearch}
             onClose={() => setActivePickerKey(null)}
             onSelect={(product) => {
@@ -1032,7 +1139,9 @@ function AreaGroup({
   groupIndex,
   groupCount,
   inputClass,
+  priceBasis,
   onMoveGroup,
+  onReorderOptions,
   onPatch,
   onPatchGroup,
   onReplaceImage,
@@ -1046,7 +1155,9 @@ function AreaGroup({
   groupIndex: number;
   groupCount: number;
   inputClass: string;
+  priceBasis: MappingPriceBasis;
   onMoveGroup: (delta: number) => void;
+  onReorderOptions: (activeKey: string, overKey: string) => void;
   onPatch: (key: string, patch: Partial<Draft>) => void;
   onPatchGroup: (patch: Partial<Draft>) => void;
   onReplaceImage: (key: string, file?: File) => void;
@@ -1058,6 +1169,18 @@ function AreaGroup({
 }) {
   const area = group.items[0];
   const areaImageInputRef = useRef<HTMLInputElement | null>(null);
+  const canReorder = group.items.length > 1;
+  // TouchSensor có delay để vuốt trong dialog vẫn scroll được, giữ 0.18s mới kéo.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    if (event.over == null || event.active.id === event.over.id) return;
+    onReorderOptions(String(event.active.id), String(event.over.id));
+  }
   return (
     <section className="rounded-2xl border border-border/80 bg-surface-strong/20 overflow-hidden">
       <div className="min-h-12 px-3 sm:px-4 flex items-center gap-2 bg-surface-strong/55 border-b border-border">
@@ -1165,18 +1288,32 @@ function AreaGroup({
           ) : null}
         </div>
         <div className="space-y-2 min-w-0">
-          {group.items.map((item, optionIndex) => (
-            <AreaCard
-              key={item.key}
-              item={item}
-              index={optionIndex}
-              inputClass={inputClass}
-              onPatch={(patch) => onPatch(item.key, patch)}
-              onPickProduct={() => onPickProduct(item.key)}
-              onManualProduct={() => onManualProduct(item.key)}
-              onRemove={() => onRemove(item.key)}
-            />
-          ))}
+          {/* Mỗi khu vực một DndContext riêng → không kéo phương án sang khu vực khác. */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={group.items.map((item) => item.key)}
+              strategy={verticalListSortingStrategy}
+            >
+              {group.items.map((item, optionIndex) => (
+                <AreaCard
+                  key={item.key}
+                  item={item}
+                  index={optionIndex}
+                  inputClass={inputClass}
+                  priceBasis={priceBasis}
+                  canReorder={canReorder}
+                  onPatch={(patch) => onPatch(item.key, patch)}
+                  onPickProduct={() => onPickProduct(item.key)}
+                  onManualProduct={() => onManualProduct(item.key)}
+                  onRemove={() => onRemove(item.key)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
         </div>
       )}
@@ -1188,6 +1325,8 @@ function AreaCard({
   item,
   index,
   inputClass,
+  priceBasis,
+  canReorder,
   onPatch,
   onPickProduct,
   onManualProduct,
@@ -1196,16 +1335,47 @@ function AreaCard({
   item: Draft;
   index: number;
   inputClass: string;
+  priceBasis: MappingPriceBasis;
+  canReorder: boolean;
   onPatch: (patch: Partial<Draft>) => void;
   onPickProduct: () => void;
   onManualProduct: () => void;
   onRemove: () => void;
 }) {
+  const hasProduct = Boolean(item.product || item.customProduct);
+  const autoPrice = autoPriceFor(item, priceBasis);
+  const overridden = item.priceOverride.trim() !== "";
+  const shownPrice = overridden ? item.priceOverride : autoPrice ? String(autoPrice) : "";
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.key,
+    disabled: !canReorder,
+  });
   return (
-    <article className="rounded-lg ring-1 ring-black/8 bg-card p-2 flex items-center gap-2 min-w-0">
-      <span className="size-7 shrink-0 grid place-items-center rounded-md bg-surface-strong text-[11px] font-semibold text-muted-foreground tabular-nums">
+    <article
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        "rounded-lg ring-1 ring-black/8 bg-card p-2 flex items-start gap-2 min-w-0",
+        isDragging && "z-10 opacity-80 ring-2 ring-terracotta/40",
+      )}
+    >
+      {canReorder ? (
+        <button
+          type="button"
+          className="h-10 w-7 shrink-0 touch-none grid place-items-center rounded-md text-muted-foreground hover:bg-surface-strong hover:text-foreground"
+          aria-label={`Kéo để đổi thứ tự phương án ${index + 1}`}
+          title="Kéo để đổi thứ tự"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="size-3.5" />
+        </button>
+      ) : null}
+      <span className="h-10 w-7 shrink-0 grid place-items-center rounded-md bg-surface-strong text-[11px] font-semibold text-muted-foreground tabular-nums">
         {index + 1}
       </span>
+      {/* Thumb cao 40px (= h-10 của input) để hàng vẫn cân khi các ô có dòng
+          chú thích bên dưới. */}
       {item.customProduct?.imageDataUrl || item.customProduct?.imagePath ? (
         <img
           src={item.customProduct.imageDataUrl || item.customProduct.imagePath}
@@ -1224,30 +1394,80 @@ function AreaCard({
           <FileImage className="size-4 text-muted-foreground/45" />
         </div>
       )}
-      <button
-        type="button"
-        onClick={onPickProduct}
-        className={cn(inputClass, "flex-1 min-w-0 text-left flex items-center justify-between gap-2")}
-      >
-        <span className={cn("truncate", !item.product && !item.customProduct && "text-muted-foreground")}>
-          {item.customProduct
-            ? `${item.customProduct.code || "Ngoài danh mục"} — ${item.customProduct.name}`
-            : item.product
-              ? `${item.product.code} — ${item.product.name}`
-              : "Chọn sản phẩm"}
-        </span>
-        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-      </button>
-      <input
-        className={cn(inputClass, "w-24 sm:w-32 shrink-0 text-xs")}
-        placeholder="Khu vực"
-        value={item.size}
-        onChange={(event) => onPatch({ size: event.target.value })}
-      />
+      <div className="flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={onPickProduct}
+          className={cn(inputClass, "text-left flex items-center justify-between gap-2")}
+        >
+          <span className={cn("truncate", !item.product && !item.customProduct && "text-muted-foreground")}>
+            {item.customProduct
+              ? `${item.customProduct.code || "Ngoài danh mục"} — ${item.customProduct.name}`
+              : item.product
+                ? `${item.product.code} — ${item.product.name}`
+                : "Chọn sản phẩm"}
+          </span>
+          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+        </button>
+        <p className="h-3.5" aria-hidden="true" />
+      </div>
+      {/* Ô "Khu vực" và ô giá dùng chung một khung: input h-10 + một dòng chú
+          thích cao cố định. Dòng chú thích của ô giá (giá catalog) vì thế không
+          đẩy input lên so với các ô còn lại trong hàng. */}
+      <div className="w-24 sm:w-32 shrink-0">
+        <input
+          className={cn(inputClass, "text-xs")}
+          placeholder="Khu vực"
+          value={item.size}
+          onChange={(event) => onPatch({ size: event.target.value })}
+        />
+        <p className="h-3.5" aria-hidden="true" />
+      </div>
+      <div className="w-28 sm:w-36 shrink-0">
+        {/* Nút reset nằm đè trong ô giá (absolute) — hiện/ẩn không đổi bề rộng ô,
+            và pr-8 luôn được giữ nên con số không nhảy khi nút xuất hiện. */}
+        <div className="relative">
+          <input
+            className={cn(
+              inputClass,
+              "pr-8 text-xs text-right tabular-nums",
+              overridden && "ring-terracotta/45 font-semibold text-terracotta",
+            )}
+            inputMode="numeric"
+            disabled={!hasProduct}
+            placeholder={hasProduct ? "Giá" : "—"}
+            title={`Giá in trên đề xuất (đ/m²) · ${basisLabel(priceBasis)}`}
+            aria-label={`Giá phương án ${index + 1}`}
+            value={shownPrice === "" ? "" : Number(shownPrice).toLocaleString("vi-VN")}
+            onChange={(event) =>
+              onPatch({ priceOverride: event.target.value.replace(/\D/g, "") })
+            }
+          />
+          {overridden ? (
+            <button
+              type="button"
+              onClick={() => onPatch({ priceOverride: "" })}
+              className="absolute right-1 top-1/2 -translate-y-1/2 size-7 grid place-items-center rounded-md text-terracotta/70 hover:bg-terracotta/10 hover:text-terracotta"
+              aria-label={`Trả giá phương án ${index + 1} về ${basisLabel(priceBasis)}`}
+              title={`Về ${basisLabel(priceBasis)}: ${formatVND(autoPrice)}`}
+            >
+              <RotateCcw className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+        <p
+          className={cn(
+            "h-3.5 text-[9px] leading-3.5 text-right truncate",
+            overridden ? "text-terracotta/80" : "text-muted-foreground",
+          )}
+        >
+          {hasProduct ? `${basisLabel(priceBasis)} ${formatVND(autoPrice)}` : ""}
+        </p>
+      </div>
       <button
         type="button"
         onClick={onManualProduct}
-        className="size-8 shrink-0 grid place-items-center rounded-md text-terracotta hover:bg-terracotta/5"
+        className="h-10 w-8 shrink-0 grid place-items-center rounded-md text-terracotta hover:bg-terracotta/5"
         aria-label={item.customProduct ? "Sửa sản phẩm ngoài danh mục" : "Thêm sản phẩm ngoài danh mục"}
         title={item.customProduct ? "Sửa sản phẩm ngoài danh mục" : "Sản phẩm ngoài danh mục"}
       >
@@ -1256,7 +1476,7 @@ function AreaCard({
       <button
         type="button"
         onClick={onRemove}
-        className="size-8 shrink-0 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600"
+        className="h-10 w-8 shrink-0 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600"
         aria-label={`Xóa phương án ${index + 1}`}
       >
         <Trash2 className="size-3.5" />
@@ -1268,6 +1488,7 @@ function AreaCard({
 function ProductPicker({
   products,
   search,
+  priceBasis,
   onSearchChange,
   onClose,
   onSelect,
@@ -1275,6 +1496,7 @@ function ProductPicker({
 }: {
   products: Product[];
   search: string;
+  priceBasis: MappingPriceBasis;
   onSearchChange: (value: string) => void;
   onClose: () => void;
   onSelect: (product: Product) => void;
@@ -1306,8 +1528,8 @@ function ProductPicker({
                 <p className="text-[10px] text-muted-foreground mt-1">{[product.size, product.surface].filter(Boolean).join(" · ") || "—"}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs font-semibold tabular-nums">{formatVND(product.retail_price)}</p>
-                <p className="text-[9px] text-muted-foreground">/m² · gồm VAT</p>
+                <p className="text-xs font-semibold tabular-nums">{formatVND(unitPriceForProduct(product, basisToDiscountType(priceBasis)))}</p>
+                <p className="text-[9px] text-muted-foreground">/m² · {basisLabel(priceBasis)} · gồm VAT</p>
               </div>
             </button>
           ))}

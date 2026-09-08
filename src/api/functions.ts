@@ -727,6 +727,7 @@ export const saveCustomerMappingFn = createServerFn({ method: "POST" })
       name?: string;
       version?: string;
       note?: string;
+      price_basis?: string;
       items?: Array<{
         description?: string;
         size?: string;
@@ -740,6 +741,7 @@ export const saveCustomerMappingFn = createServerFn({ method: "POST" })
         custom_product_surface?: string;
         custom_product_retail_price?: number;
         custom_product_image_path?: string;
+        price_override?: number | null;
       }>;
     }) => data,
   )

@@ -2,6 +2,7 @@ import { getDb } from "./index.server";
 import { VAT_RATE } from "@/lib/pricing";
 import { readImageBytes } from "@/lib/storage";
 import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";
+import { mapLimit } from "@/lib/image-export.server";
 
 type QuoteExportResult = {
   filename: string;
@@ -24,24 +25,6 @@ async function imageRefToDataUrl(ref: string): Promise<string> {
         ? "image/webp"
         : "image/jpeg";
   return `data:${mime};base64,${buf.toString("base64")}`;
-}
-
-/** Chạy fn trên từng phần tử với giới hạn concurrency. */
-async function mapLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++;
-      results[index] = await fn(items[index]!, index);
-    }
-  });
-  await Promise.all(workers);
-  return results;
 }
 
 /**

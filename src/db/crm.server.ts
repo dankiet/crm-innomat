@@ -970,6 +970,14 @@ export async function deleteCustomerProductSample(id: number): Promise<{ ok: tru
 
 // ─── Customer mappings (mapping mẫu gạch theo KH) ──────────────
 
+/** Căn cứ giá in trên đề xuất vật liệu. */
+export type MappingPriceBasis = "retail" | "tp" | "b2b";
+
+/** Chuẩn hóa giá trị basis đọc từ DB / client. */
+export function normalizeMappingPriceBasis(value: unknown): MappingPriceBasis {
+  return value === "tp" || value === "b2b" ? value : "retail";
+}
+
 export type CustomerMappingItem = {
   id: number;
   mapping_id: number;
@@ -985,6 +993,8 @@ export type CustomerMappingItem = {
   custom_product_surface: string;
   custom_product_retail_price: number;
   custom_product_image_path: string;
+  /** null = tính theo price_basis của mapping; số = giá chốt tay (đ/m²). */
+  price_override: number | null;
 };
 
 export type CustomerMapping = {
@@ -995,6 +1005,7 @@ export type CustomerMapping = {
   name: string;
   version: string;
   note: string;
+  price_basis: MappingPriceBasis;
   created_at: string;
   updated_at: string;
   linked_quotes: Array<{ id: number; code: string; status: QuoteStatus }>;
@@ -1015,6 +1026,7 @@ export async function listCustomerMappings(customerId: number): Promise<Customer
       name: string;
       version: string;
       note: string;
+      price_basis: string;
       created_at: string;
       updated_at: string;
     }>(customerId)) as Array<{
@@ -1025,6 +1037,7 @@ export async function listCustomerMappings(customerId: number): Promise<Customer
     name: string;
     version: string;
     note: string;
+    price_basis: string;
     created_at: string;
     updated_at: string;
   }>;
@@ -1057,6 +1070,7 @@ export async function listCustomerMappings(customerId: number): Promise<Customer
   }>;
   return maps.map((m) => ({
     ...m,
+    price_basis: normalizeMappingPriceBasis(m.price_basis),
     linked_quotes: links
       .filter((link) => link.mapping_id === m.id)
       .map(({ id, code, status }) => ({ id, code, status })),
@@ -1176,6 +1190,7 @@ export async function saveCustomerMapping(input: {
   name?: string;
   version?: string;
   note?: string;
+  price_basis?: string;
   items?: Array<{
     description?: string;
     size?: string;
@@ -1189,11 +1204,13 @@ export async function saveCustomerMapping(input: {
     custom_product_surface?: string;
     custom_product_retail_price?: number;
     custom_product_image_path?: string;
+    price_override?: number | null;
   }>;
 }): Promise<CustomerMapping> {
   const db = getDb();
   const customer = await db.prepare("SELECT id FROM customers WHERE id = ?").get(input.customer_id);
   if (!customer) throw new Error("Không tìm thấy khách hàng");
+  const priceBasis = normalizeMappingPriceBasis(input.price_basis);
 
   const runTx = db.transaction(async () => {
     let mappingId = input.id ?? 0;
@@ -1220,9 +1237,15 @@ export async function saveCustomerMapping(input: {
       ).flatMap((r) => [r.image_path, r.custom_product_image_path]);
       await db
         .prepare(
-          `UPDATE customer_mappings SET name = ?, version = ?, note = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
+          `UPDATE customer_mappings SET name = ?, version = ?, note = ?, price_basis = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
         )
-        .run(input.name ?? "", input.version?.trim() || "01", input.note ?? "", mappingId);
+        .run(
+          input.name ?? "",
+          input.version?.trim() || "01",
+          input.note ?? "",
+          priceBasis,
+          mappingId,
+        );
       await db.prepare("DELETE FROM customer_mapping_items WHERE mapping_id = ?").run(mappingId);
     } else {
       const fullCustomer = (await db
@@ -1239,8 +1262,8 @@ export async function saveCustomerMapping(input: {
       const code = await buildEntityCode("DXVL", "customer_mappings", fullCustomer);
       const info = await db
         .prepare(
-          `INSERT INTO customer_mappings (code, customer_id, name, version, note)
-           VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO customer_mappings (code, customer_id, name, version, note, price_basis)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .run(
           code,
@@ -1248,6 +1271,7 @@ export async function saveCustomerMapping(input: {
           input.name ?? "",
           input.version?.trim() || "01",
           input.note ?? "",
+          priceBasis,
         );
       mappingId = Number(info.lastInsertRowid);
     }
@@ -1256,10 +1280,15 @@ export async function saveCustomerMapping(input: {
       `INSERT INTO customer_mapping_items
          (mapping_id, sort_order, area_group_key, description, size, product_id, image_path,
           custom_product_code, custom_product_name, custom_product_size,
-          custom_product_surface, custom_product_retail_price, custom_product_image_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          custom_product_surface, custom_product_retail_price, custom_product_image_path,
+          price_override)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const [i, it] of (input.items ?? []).entries()) {
+      const override =
+        it.price_override == null || !Number.isFinite(Number(it.price_override))
+          ? null
+          : Math.max(0, Math.round(Number(it.price_override)));
       await insItem.run(
         mappingId,
         it.sort_order ?? i,
@@ -1274,6 +1303,7 @@ export async function saveCustomerMapping(input: {
         it.custom_product_surface ?? "",
         Math.max(0, Number(it.custom_product_retail_price) || 0),
         it.custom_product_image_path ?? "",
+        override,
       );
     }
 
