@@ -118,7 +118,7 @@ export const LP_VARIANTS: LpVariant[] = [
 ];
 
 export const DEFAULT_LP_SLUG = "gach-trang-tri";
-export const PUBLIC_LANDING_PATH = `/lp/${DEFAULT_LP_SLUG}`;
+export const PUBLIC_LANDING_PATH = "/";
 
 export function findLpVariant(slug: string | undefined): LpVariant | null {
   const s = (slug ?? "").trim().toLowerCase();

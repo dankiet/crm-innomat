@@ -4,7 +4,7 @@
  * Nằm ngoài `_app` nên không đi qua guard `fetchMe()`.
  * Render giao diện chuẩn Tạp chí vật liệu dành cho KTS (ArchitectLanding).
  */
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { ArchitectLanding } from "@/components/landing/ArchitectLanding";
 import { findLpVariant, DEFAULT_LP_SLUG } from "@/lib/lp-content";
 import lpCss from "../styles-lp.css?url";
@@ -41,8 +41,12 @@ export const Route = createFileRoute("/lp/$slug")({
     };
   },
   loader: async ({ params }) => {
+    // Nếu vào đúng slug mặc định thì redirect hẳn về trang chủ "/" để chuẩn hóa URL (Canonical URL)
+    if (params.slug === DEFAULT_LP_SLUG || !params.slug) {
+      throw redirect({ to: "/", statusCode: 301 });
+    }
     const variant = findLpVariant(params.slug);
-    if (!variant && params.slug !== DEFAULT_LP_SLUG) {
+    if (!variant) {
       throw notFound();
     }
     const { getHeroImageSetting } = await import("@/db/lp.server");
