@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Eye,
+  EyeOff,
   Globe,
   Grid,
   Image as ImageIcon,
@@ -34,7 +36,7 @@ import {
   setProductImageKindFn,
   setProductImageRoomTagsFn,
 } from "@/api/functions";
-import { fetchLpHeroImageFn, setLpHeroImageFn, setFeaturedSlotFn, toggleProductPublicFn } from "@/api/lp";
+import { fetchLpHeroImageFn, setLpHeroImageFn, setFeaturedSlotFn, toggleProductPublicFn, bulkSetProductsPublicFn } from "@/api/lp";
 import type { ProductImageRow, ProductImageKind, ImageRoomTagSlug } from "@/lib/types";
 import { IMAGE_ROOM_TAGS } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
@@ -434,11 +436,11 @@ function MediaStoragePage() {
   const [tab, setTab] = useState<FlatMediaTab>("all");
   const [category, setCategory] = useState<string>("all");
   const [roomSlug, setRoomSlug] = useState<ImageRoomTagSlug | "all">("all");
+  const [publicFilter, setPublicFilter] = useState<"all" | "public" | "hidden">("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState<FlatMediaSort>("newest");
   const [currentHeroImage, setCurrentHeroImage] = useState<string>("");
-
   useEffect(() => {
     fetchLpHeroImageFn()
       .then((res) => {
@@ -478,9 +480,8 @@ function MediaStoragePage() {
   const [pageSize, setPageSize] = useState<number>(24);
   const [jumpPageInput, setJumpPageInput] = useState<string>("");
 
-  const [items, setItems] = useState<FlatMediaItem[]>([]);
-  const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ all: 0, map: 0, concept: 0, featured: 0, unassigned: 0 });
+  const [publicCounts, setPublicCounts] = useState({ all: 0, public: 0, hidden: 0 });
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
@@ -488,11 +489,11 @@ function MediaStoragePage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [busyBulk, setBusyBulk] = useState(false);
   const [bulkRoomPopoverOpen, setBulkRoomPopoverOpen] = useState(false);
+  const [bulkPublicConfirmOpen, setBulkPublicConfirmOpen] = useState<null | { isPublic: number; count: number; productIds: number[] }>(null);
 
   // Two-step inline delete confirmation
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
   // Lightbox preview
   const [previewItem, setPreviewItem] = useState<FlatMediaItem | null>(null);
   // Modal xem toàn bộ gallery của 1 sản phẩm
@@ -515,13 +516,13 @@ function MediaStoragePage() {
   }, [search]);
 
   function loadData(targetPage = page, targetPageSize = pageSize) {
-    setLoading(true);
     fetchFlatMediaImagesFn({
       data: {
         tab,
         category: category === "all" ? undefined : category,
         search: debouncedSearch || undefined,
         roomSlug: roomSlug === "all" ? undefined : roomSlug,
+        publicFilter: publicFilter === "all" ? undefined : publicFilter,
         sort,
         page: targetPage,
         pageSize: targetPageSize,
@@ -531,6 +532,7 @@ function MediaStoragePage() {
         setItems(res.items);
         setTotal(res.total);
         setCounts(res.counts);
+        if (res.publicCounts) setPublicCounts(res.publicCounts);
         if (res.roomCounts) setRoomCounts(res.roomCounts);
       })
       .catch((err) => {
@@ -547,6 +549,7 @@ function MediaStoragePage() {
         tab,
         category: category === "all" ? undefined : category,
         roomSlug: roomSlug === "all" ? undefined : roomSlug,
+        publicFilter: publicFilter === "all" ? undefined : publicFilter,
         sort,
         page: 1,
         pageSize: 1,
@@ -554,6 +557,7 @@ function MediaStoragePage() {
     })
       .then((res) => {
         setCounts(res.counts);
+        if (res.publicCounts) setPublicCounts(res.publicCounts);
         if (res.roomCounts) setRoomCounts(res.roomCounts);
       })
       .catch(() => {});
@@ -564,7 +568,8 @@ function MediaStoragePage() {
     setPage(1);
     loadData(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, category, roomSlug, sort, debouncedSearch, pageSize]);
+  }, [tab, category, roomSlug, publicFilter, sort, debouncedSearch, pageSize]);
+
 
   function handlePageChange(newPage: number) {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
@@ -657,6 +662,61 @@ function MediaStoragePage() {
 
   function clearSelection() {
     setSelectedIds(new Set());
+  }
+
+  function getSelectedProductIds() {
+    const pIds = new Set<number>();
+    for (const item of items) {
+      if (selectedIds.has(item.id)) {
+        pIds.add(item.product_id);
+      }
+    }
+    return Array.from(pIds);
+  }
+
+  function requestBulkSetPublic(isPublic: number) {
+    if (selectedIds.size === 0 || busyBulk) return;
+    const productIds = getSelectedProductIds();
+    if (!productIds.length) {
+      toast.error("Không tìm thấy sản phẩm tương ứng");
+      return;
+    }
+    setBulkPublicConfirmOpen({
+      isPublic,
+      count: productIds.length,
+      productIds,
+    });
+  }
+
+  async function executeBulkSetPublic() {
+    if (!bulkPublicConfirmOpen || busyBulk) return;
+    const { isPublic, productIds } = bulkPublicConfirmOpen;
+    setBusyBulk(true);
+    try {
+      await bulkSetProductsPublicFn({
+        data: {
+          productIds,
+          is_public: isPublic,
+        },
+      });
+      toast.success(
+        isPublic === 1
+          ? `Đã BẬT hiển thị ${productIds.length} sản phẩm lên Thư viện web!`
+          : `Đã ẨN ${productIds.length} sản phẩm khỏi Thư viện web!`,
+      );
+      setItems((prev) =>
+        prev.map((i) =>
+          productIds.includes(i.product_id) ? { ...i, product_is_public: isPublic } : i,
+        ),
+      );
+      clearSelection();
+      syncCountsOnly();
+      setBulkPublicConfirmOpen(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật hiển thị hàng loạt");
+    } finally {
+      setBusyBulk(false);
+    }
   }
 
   async function handleBulkSetKind(kind: ProductImageKind) {
@@ -876,9 +936,60 @@ function MediaStoragePage() {
               );
             })}
           </div>
-
           {/* Sắp xếp & Tiện ích phân trang */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Bộ lọc trạng thái Thư viện Web */}
+            <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs items-center">
+              <button
+                type="button"
+                onClick={() => setPublicFilter("all")}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors cursor-pointer",
+                  publicFilter === "all"
+                    ? "bg-card text-foreground shadow-xs ring-1 ring-black/5 font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                )}
+              >
+                Tất cả Web
+              </button>
+              <button
+                type="button"
+                onClick={() => setPublicFilter("public")}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
+                  publicFilter === "public"
+                    ? "bg-emerald-600 text-white shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                )}
+              >
+                <Globe className="size-2.5" />
+                <span>Hiện Web</span>
+                {publicCounts.public > 0 ? (
+                  <span className={cn("text-[9px] px-1 rounded-full font-bold tabular-nums", publicFilter === "public" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground")}>
+                    {publicCounts.public}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPublicFilter("hidden")}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
+                  publicFilter === "hidden"
+                    ? "bg-card text-foreground shadow-xs ring-1 ring-black/5 font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                )}
+              >
+                <EyeOff className="size-2.5" />
+                <span>Ẩn Web</span>
+                {publicCounts.hidden > 0 ? (
+                  <span className={cn("text-[9px] px-1 rounded-full font-bold tabular-nums", publicFilter === "hidden" ? "bg-black/10 text-foreground font-bold" : "bg-muted text-muted-foreground")}>
+                    {publicCounts.hidden}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+
             {/* Sắp xếp */}
             <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs">
               {SORT_OPTIONS.map((opt) => {
@@ -1504,6 +1615,27 @@ function MediaStoragePage() {
               </span>
               <span>ảnh đã chọn</span>
             </div>
+            {/* 1. Bulk Bật Thư viện Web */}
+            <button
+              type="button"
+              disabled={busyBulk}
+              onClick={() => requestBulkSetPublic(1)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            >
+              <Globe className="size-3.5" />
+              <span>Bật Thư viện</span>
+            </button>
+
+            {/* 2. Bulk Ẩn khỏi Thư viện */}
+            <button
+              type="button"
+              disabled={busyBulk}
+              onClick={() => requestBulkSetPublic(0)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50 cursor-pointer"
+            >
+              <EyeOff className="size-3.5" />
+              <span>Ẩn Thư viện</span>
+            </button>
 
             {/* Bulk set MAP */}
             <button
@@ -1558,6 +1690,61 @@ function MediaStoragePage() {
           </div>
         </div>
       ) : null}
+      {/* Dialog Xác nhận Thao tác Hàng loạt lên Thư viện Web */}
+      <Dialog open={Boolean(bulkPublicConfirmOpen)} onOpenChange={(o) => !o && setBulkPublicConfirmOpen(null)}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              {bulkPublicConfirmOpen?.isPublic === 1 ? (
+                <>
+                  <Globe className="size-5 text-emerald-600" />
+                  <span>Xác nhận Bật Thư viện web</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="size-5 text-amber-600" />
+                  <span>Xác nhận Ẩn khỏi Thư viện web</span>
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mt-2">
+            {bulkPublicConfirmOpen?.isPublic === 1 ? (
+              <>
+                Bạn có chắc chắn muốn <b>BẬT hiển thị {bulkPublicConfirmOpen?.count} sản phẩm</b> đã chọn lên Thư viện mã gạch công khai?
+              </>
+            ) : (
+              <>
+                Bạn có chắc chắn muốn <b>ẨN {bulkPublicConfirmOpen?.count} sản phẩm</b> đã chọn khỏi Thư viện mã gạch công khai?
+              </>
+            )}
+          </p>
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={busyBulk}
+              onClick={() => setBulkPublicConfirmOpen(null)}
+              className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              disabled={busyBulk}
+              onClick={executeBulkSetPublic}
+              className={cn(
+                "rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer inline-flex items-center gap-1.5",
+                bulkPublicConfirmOpen?.isPublic === 1 ? "bg-emerald-600" : "bg-red-600",
+              )}
+            >
+              {busyBulk ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              <span>
+                {bulkPublicConfirmOpen?.isPublic === 1 ? "Đồng ý Bật Thư viện" : "Đồng ý Ẩn Thư viện"}
+              </span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Lightbox Preview Dialog */}
       <Dialog open={Boolean(previewItem)} onOpenChange={(o) => !o && setPreviewItem(null)}>

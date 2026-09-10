@@ -2784,6 +2784,7 @@ export async function listFlatMediaImages(opts?: {
   category?: string;
   search?: string;
   roomSlug?: ImageRoomTagSlug;
+  publicFilter?: "all" | "public" | "hidden";
   sort?: FlatMediaSort;
   page?: number;
   pageSize?: number;
@@ -2791,6 +2792,7 @@ export async function listFlatMediaImages(opts?: {
   items: FlatMediaItem[];
   total: number;
   counts: { all: number; map: number; concept: number; featured: number; unassigned: number };
+  publicCounts: { all: number; public: number; hidden: number };
   roomCounts: Record<string, number>;
 }> {
   const db = getDb();
@@ -2821,9 +2823,11 @@ export async function listFlatMediaImages(opts?: {
     );
     baseParams.push(opts.roomSlug);
   }
+  if (opts?.publicFilter && opts.publicFilter !== "all") {
+    baseWhere.push(opts.publicFilter === "public" ? "p.is_public = 1" : "p.is_public = 0");
+  }
 
   const baseWhereSql = `WHERE ${baseWhere.join(" AND ")}`;
-
   // 2. Counts trên các Tabs (Đếm chính xác theo số lượng Ảnh)
   const statsSql = `
     SELECT
@@ -2859,6 +2863,54 @@ export async function listFlatMediaImages(opts?: {
     unassigned: Number(countRow.unassigned_count) || 0,
   };
 
+  // 2.1 Public counts (Thống kê trạng thái Thư viện Web)
+  // Tạo query đếm trạng thái web dựa trên base filters trừ publicFilter
+  const publicStatsWhere: string[] = ["i.path <> ''"];
+  const publicStatsParams: SqlValue[] = [];
+  if (opts?.category && opts.category !== "all") {
+    publicStatsWhere.push("p.category = ?");
+    publicStatsParams.push(opts.category);
+  }
+  if (opts?.search?.trim()) {
+    const q = `%${opts.search.trim()}%`;
+    publicStatsWhere.push("(p.code ILIKE ? OR p.name ILIKE ? OR i.caption ILIKE ?)");
+    publicStatsParams.push(q, q, q);
+  }
+  if (opts?.roomSlug) {
+    publicStatsWhere.push(
+      "EXISTS (SELECT 1 FROM product_image_room_tags rt WHERE rt.product_image_id = i.id AND rt.room_slug = ?)",
+    );
+    publicStatsParams.push(opts.roomSlug);
+  }
+  if (tab === "map") {
+    publicStatsWhere.push("i.kind = 'map'");
+  } else if (tab === "concept") {
+    publicStatsWhere.push("i.kind = 'concept'");
+  } else if (tab === "featured") {
+    publicStatsWhere.push("p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12");
+  } else if (tab === "unassigned") {
+    publicStatsWhere.push("(i.kind = 'normal' OR i.kind IS NULL OR i.kind = '')");
+  }
+  const publicStatsSql = `
+    SELECT
+      COUNT(*)::int AS all_count,
+      COUNT(CASE WHEN p.is_public = 1 THEN 1 END)::int AS public_count,
+      COUNT(CASE WHEN p.is_public = 0 OR p.is_public IS NULL THEN 1 END)::int AS hidden_count
+    FROM product_images i
+    JOIN products p ON p.id = i.product_id
+    WHERE ${publicStatsWhere.join(" AND ")}
+  `;
+  const publicCountRow = (await db.prepare(publicStatsSql).get<{
+    all_count: number;
+    public_count: number;
+    hidden_count: number;
+  }>(...publicStatsParams)) ?? { all_count: 0, public_count: 0, hidden_count: 0 };
+
+  const publicCounts = {
+    all: Number(publicCountRow.all_count) || 0,
+    public: Number(publicCountRow.public_count) || 0,
+    hidden: Number(publicCountRow.hidden_count) || 0,
+  };
 
   // 2.2 Room counts (đếm số lượng ảnh cho từng tag không gian)
   const roomCountsSql = `
