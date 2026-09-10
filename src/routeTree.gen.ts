@@ -12,11 +12,18 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LpSlugRouteImport } from './routes/lp.$slug'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppTongQuanRouteImport } from './routes/_app.tong-quan'
 import { Route as AppThuVienRouteImport } from './routes/_app.thu-vien'
 import { Route as AppSanPhamRouteImport } from './routes/_app.san-pham'
 import { Route as AppNhatKyRouteImport } from './routes/_app.nhat-ky'
 import { Route as AppNguoiDungRouteImport } from './routes/_app.nguoi-dung'
+import { Route as AppMauTrangChuRouteImport } from './routes/_app.mau-trang-chu'
+import { Route as AppMauThuVienRouteImport } from './routes/_app.mau-thu-vien'
+import { Route as AppLuuTruRouteImport } from './routes/_app.luu-tru'
+import { Route as AppLeadsRouteImport } from './routes/_app.leads'
+import { Route as AppKhongGianRouteImport } from './routes/_app.khong-gian'
 import { Route as AppKhachHangRouteImport } from './routes/_app.khach-hang'
 import { Route as AppGhiChuRouteImport } from './routes/_app.ghi-chu'
 import { Route as AppCongNoRouteImport } from './routes/_app.cong-no'
@@ -37,6 +44,16 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LpSlugRoute = LpSlugRouteImport.update({
+  id: '/lp/$slug',
+  path: '/lp/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppTongQuanRoute = AppTongQuanRouteImport.update({
@@ -62,6 +79,31 @@ const AppNhatKyRoute = AppNhatKyRouteImport.update({
 const AppNguoiDungRoute = AppNguoiDungRouteImport.update({
   id: '/nguoi-dung',
   path: '/nguoi-dung',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMauTrangChuRoute = AppMauTrangChuRouteImport.update({
+  id: '/mau-trang-chu',
+  path: '/mau-trang-chu',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMauThuVienRoute = AppMauThuVienRouteImport.update({
+  id: '/mau-thu-vien',
+  path: '/mau-thu-vien',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLuuTruRoute = AppLuuTruRouteImport.update({
+  id: '/luu-tru',
+  path: '/luu-tru',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLeadsRoute = AppLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppKhongGianRoute = AppKhongGianRouteImport.update({
+  id: '/khong-gian',
+  path: '/khong-gian',
   getParentRoute: () => AppRoute,
 } as any)
 const AppKhachHangRoute = AppKhachHangRouteImport.update({
@@ -108,11 +150,18 @@ export interface FileRoutesByFullPath {
   '/cong-no': typeof AppCongNoRoute
   '/ghi-chu': typeof AppGhiChuRoute
   '/khach-hang': typeof AppKhachHangRouteWithChildren
+  '/khong-gian': typeof AppKhongGianRoute
+  '/leads': typeof AppLeadsRoute
+  '/luu-tru': typeof AppLuuTruRoute
+  '/mau-thu-vien': typeof AppMauThuVienRoute
+  '/mau-trang-chu': typeof AppMauTrangChuRoute
   '/nguoi-dung': typeof AppNguoiDungRoute
   '/nhat-ky': typeof AppNhatKyRoute
   '/san-pham': typeof AppSanPhamRoute
   '/thu-vien': typeof AppThuVienRoute
   '/tong-quan': typeof AppTongQuanRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/lp/$slug': typeof LpSlugRoute
   '/khach-hang/$customerId': typeof AppKhachHangCustomerIdRoute
   '/khach-hang/': typeof AppKhachHangIndexRoute
 }
@@ -123,11 +172,18 @@ export interface FileRoutesByTo {
   '/co-hoi': typeof AppCoHoiRoute
   '/cong-no': typeof AppCongNoRoute
   '/ghi-chu': typeof AppGhiChuRoute
+  '/khong-gian': typeof AppKhongGianRoute
+  '/leads': typeof AppLeadsRoute
+  '/luu-tru': typeof AppLuuTruRoute
+  '/mau-thu-vien': typeof AppMauThuVienRoute
+  '/mau-trang-chu': typeof AppMauTrangChuRoute
   '/nguoi-dung': typeof AppNguoiDungRoute
   '/nhat-ky': typeof AppNhatKyRoute
   '/san-pham': typeof AppSanPhamRoute
   '/thu-vien': typeof AppThuVienRoute
   '/tong-quan': typeof AppTongQuanRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/lp/$slug': typeof LpSlugRoute
   '/khach-hang/$customerId': typeof AppKhachHangCustomerIdRoute
   '/khach-hang': typeof AppKhachHangIndexRoute
 }
@@ -141,11 +197,18 @@ export interface FileRoutesById {
   '/_app/cong-no': typeof AppCongNoRoute
   '/_app/ghi-chu': typeof AppGhiChuRoute
   '/_app/khach-hang': typeof AppKhachHangRouteWithChildren
+  '/_app/khong-gian': typeof AppKhongGianRoute
+  '/_app/leads': typeof AppLeadsRoute
+  '/_app/luu-tru': typeof AppLuuTruRoute
+  '/_app/mau-thu-vien': typeof AppMauThuVienRoute
+  '/_app/mau-trang-chu': typeof AppMauTrangChuRoute
   '/_app/nguoi-dung': typeof AppNguoiDungRoute
   '/_app/nhat-ky': typeof AppNhatKyRoute
   '/_app/san-pham': typeof AppSanPhamRoute
   '/_app/thu-vien': typeof AppThuVienRoute
   '/_app/tong-quan': typeof AppTongQuanRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/lp/$slug': typeof LpSlugRoute
   '/_app/khach-hang/$customerId': typeof AppKhachHangCustomerIdRoute
   '/_app/khach-hang/': typeof AppKhachHangIndexRoute
 }
@@ -159,11 +222,18 @@ export interface FileRouteTypes {
     | '/cong-no'
     | '/ghi-chu'
     | '/khach-hang'
+    | '/khong-gian'
+    | '/leads'
+    | '/luu-tru'
+    | '/mau-thu-vien'
+    | '/mau-trang-chu'
     | '/nguoi-dung'
     | '/nhat-ky'
     | '/san-pham'
     | '/thu-vien'
     | '/tong-quan'
+    | '/auth/callback'
+    | '/lp/$slug'
     | '/khach-hang/$customerId'
     | '/khach-hang/'
   fileRoutesByTo: FileRoutesByTo
@@ -174,11 +244,18 @@ export interface FileRouteTypes {
     | '/co-hoi'
     | '/cong-no'
     | '/ghi-chu'
+    | '/khong-gian'
+    | '/leads'
+    | '/luu-tru'
+    | '/mau-thu-vien'
+    | '/mau-trang-chu'
     | '/nguoi-dung'
     | '/nhat-ky'
     | '/san-pham'
     | '/thu-vien'
     | '/tong-quan'
+    | '/auth/callback'
+    | '/lp/$slug'
     | '/khach-hang/$customerId'
     | '/khach-hang'
   id:
@@ -191,11 +268,18 @@ export interface FileRouteTypes {
     | '/_app/cong-no'
     | '/_app/ghi-chu'
     | '/_app/khach-hang'
+    | '/_app/khong-gian'
+    | '/_app/leads'
+    | '/_app/luu-tru'
+    | '/_app/mau-thu-vien'
+    | '/_app/mau-trang-chu'
     | '/_app/nguoi-dung'
     | '/_app/nhat-ky'
     | '/_app/san-pham'
     | '/_app/thu-vien'
     | '/_app/tong-quan'
+    | '/auth/callback'
+    | '/lp/$slug'
     | '/_app/khach-hang/$customerId'
     | '/_app/khach-hang/'
   fileRoutesById: FileRoutesById
@@ -204,6 +288,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  LpSlugRoute: typeof LpSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -227,6 +313,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lp/$slug': {
+      id: '/lp/$slug'
+      path: '/lp/$slug'
+      fullPath: '/lp/$slug'
+      preLoaderRoute: typeof LpSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/tong-quan': {
@@ -262,6 +362,41 @@ declare module '@tanstack/react-router' {
       path: '/nguoi-dung'
       fullPath: '/nguoi-dung'
       preLoaderRoute: typeof AppNguoiDungRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/mau-trang-chu': {
+      id: '/_app/mau-trang-chu'
+      path: '/mau-trang-chu'
+      fullPath: '/mau-trang-chu'
+      preLoaderRoute: typeof AppMauTrangChuRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/mau-thu-vien': {
+      id: '/_app/mau-thu-vien'
+      path: '/mau-thu-vien'
+      fullPath: '/mau-thu-vien'
+      preLoaderRoute: typeof AppMauThuVienRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/luu-tru': {
+      id: '/_app/luu-tru'
+      path: '/luu-tru'
+      fullPath: '/luu-tru'
+      preLoaderRoute: typeof AppLuuTruRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/leads': {
+      id: '/_app/leads'
+      path: '/leads'
+      fullPath: '/leads'
+      preLoaderRoute: typeof AppLeadsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/khong-gian': {
+      id: '/_app/khong-gian'
+      path: '/khong-gian'
+      fullPath: '/khong-gian'
+      preLoaderRoute: typeof AppKhongGianRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/khach-hang': {
@@ -336,6 +471,11 @@ interface AppRouteChildren {
   AppCongNoRoute: typeof AppCongNoRoute
   AppGhiChuRoute: typeof AppGhiChuRoute
   AppKhachHangRoute: typeof AppKhachHangRouteWithChildren
+  AppKhongGianRoute: typeof AppKhongGianRoute
+  AppLeadsRoute: typeof AppLeadsRoute
+  AppLuuTruRoute: typeof AppLuuTruRoute
+  AppMauThuVienRoute: typeof AppMauThuVienRoute
+  AppMauTrangChuRoute: typeof AppMauTrangChuRoute
   AppNguoiDungRoute: typeof AppNguoiDungRoute
   AppNhatKyRoute: typeof AppNhatKyRoute
   AppSanPhamRoute: typeof AppSanPhamRoute
@@ -349,6 +489,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppCongNoRoute: AppCongNoRoute,
   AppGhiChuRoute: AppGhiChuRoute,
   AppKhachHangRoute: AppKhachHangRouteWithChildren,
+  AppKhongGianRoute: AppKhongGianRoute,
+  AppLeadsRoute: AppLeadsRoute,
+  AppLuuTruRoute: AppLuuTruRoute,
+  AppMauThuVienRoute: AppMauThuVienRoute,
+  AppMauTrangChuRoute: AppMauTrangChuRoute,
   AppNguoiDungRoute: AppNguoiDungRoute,
   AppNhatKyRoute: AppNhatKyRoute,
   AppSanPhamRoute: AppSanPhamRoute,
@@ -362,6 +507,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  LpSlugRoute: LpSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

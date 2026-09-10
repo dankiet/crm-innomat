@@ -4,9 +4,16 @@
  * Every private handler requires a session; mutations enforce role/owner.
  */
 import { createServerFn } from "@tanstack/react-start";
-import type { CustomerStatus, DiscountType, OrderStatus, QuoteStatus } from "@/lib/types";
+import type {
+  CustomerStatus,
+  DiscountType,
+  OrderStatus,
+  QuoteStatus,
+  ProductImageKind,
+  ImageRoomTagSlug,
+} from "@/lib/types";
 import type { Role } from "@/lib/auth-types";
-
+import type { FlatMediaTab, FlatMediaSort } from "@/db/crm.server";
 // ─── Auth ───────────────────────────────────────────────────
 
 export const fetchMe = createServerFn({ method: "GET" }).handler(async () => {
@@ -53,6 +60,53 @@ export const logoutFn = createServerFn({ method: "POST" }).handler(async () => {
       summary: `${me.display_name} đăng xuất`,
     });
   }
+  return { ok: true as const };
+});
+
+// ─── Public Landing Auth (Supabase Google) ────────────────────
+
+export const authGoogleStart = createServerFn({ method: "POST" })
+  .inputValidator((data?: { returnTo?: string; origin?: string }) => data ?? {})
+  .handler(async ({ data }) => {
+    const { getGoogleOAuthUrl } = await import("@/db/auth-public.server");
+    const { getRequestHeader } = await import("@tanstack/react-start/server");
+    const host = getRequestHeader("host") || "";
+    const proto =
+      getRequestHeader("x-forwarded-proto") ||
+      (host.includes("localhost") ? "http" : "https");
+    const headerOrigin = host ? `${proto}://${host}` : "";
+    const origin = data?.origin || headerOrigin || "";
+    return getGoogleOAuthUrl(data?.returnTo || "/", origin);
+  });
+
+export const authGoogleCallback = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      code?: string;
+      accessToken?: string;
+      returnTo?: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { handleSupabaseCallback } = await import("@/db/auth-public.server");
+    const { getRequestHeader } = await import("@tanstack/react-start/server");
+    const userAgent = getRequestHeader("user-agent") || "";
+    return await handleSupabaseCallback({
+      code: data.code,
+      accessToken: data.accessToken,
+      userAgent,
+      returnTo: data.returnTo,
+    });
+  });
+
+export const fetchPublicMeFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { getCurrentPublicUser } = await import("@/db/auth-public.server");
+  return await getCurrentPublicUser();
+});
+
+export const logoutPublicFn = createServerFn({ method: "POST" }).handler(async () => {
+  const { logoutPublicSession } = await import("@/db/auth-public.server");
+  await logoutPublicSession();
   return { ok: true as const };
 });
 
@@ -209,13 +263,14 @@ export const fetchProductFieldValues = createServerFn({ method: "GET" })
         | "shape"
         | "material"
         | "size";
+      category?: string;
     }) => data,
   )
   .handler(async ({ data }) => {
     const { requireUser } = await import("@/db/auth.server");
     await requireUser();
     const { listProductFieldValues } = await import("@/db/crm.server");
-    return await listProductFieldValues(data.field);
+    return await listProductFieldValues(data.field, data.category);
   });
 
 export const bulkUpdateProductFieldFn = createServerFn({ method: "POST" })
@@ -305,6 +360,8 @@ export const updateProductFn = createServerFn({ method: "POST" })
       discount_b2b?: number | null;
       note?: string;
       is_hot?: number;
+      is_public?: number;
+      featured_rank?: number | null;
       image_path?: string;
     }) => data,
   )
@@ -349,6 +406,8 @@ export const createProductFn = createServerFn({ method: "POST" })
       discount_b2b?: number | null;
       note?: string;
       is_hot?: number;
+      is_public?: number;
+      featured_rank?: number | null;
       image_path?: string;
     }) => data,
   )
@@ -482,6 +541,40 @@ export const setProductImageKindFn = createServerFn({ method: "POST" })
     return rows;
   });
 
+export const fetchProductImageRoomTagsFn = createServerFn({ method: "GET" })
+  .inputValidator((data: { imageId: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { listProductImageRoomTags } = await import("@/db/crm.server");
+    return await listProductImageRoomTags(data.imageId);
+  });
+
+export const setProductImageRoomTagsFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      productId: number;
+      imageId: number;
+      roomSlugs: ImageRoomTagSlug[];
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { setProductImageRoomTags } = await import("@/db/crm.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const rows = await setProductImageRoomTags(data.productId, data.imageId, data.roomSlugs);
+    await writeAudit({
+      user: me,
+      action: "product.image.room_tags",
+      entity_type: "product_image",
+      entity_id: data.imageId,
+      summary: `Gán bối cảnh ảnh #${data.imageId}`,
+      meta: { room_slugs: data.roomSlugs },
+    });
+    return rows;
+  });
+
 export const deleteProductImageFn = createServerFn({ method: "POST" })
   .inputValidator((data: { imageId: number }) => data)
   .handler(async ({ data }) => {
@@ -518,12 +611,14 @@ export const fetchGalleryCollection = createServerFn({ method: "GET" })
     return await getGalleryCollection(data.id);
   });
 
-export const fetchGalleryImageCandidates = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireUser } = await import("@/db/auth.server");
-  await requireUser();
-  const { listGalleryImageCandidates } = await import("@/db/gallery.server");
-  return await listGalleryImageCandidates();
-});
+export const fetchGalleryImageCandidates = createServerFn({ method: "GET" })
+  .inputValidator((data?: { kind?: import("@/lib/types").ProductImageKind }) => data ?? {})
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { listGalleryImageCandidates } = await import("@/db/gallery.server");
+    return await listGalleryImageCandidates(data);
+  });
 
 export const createGalleryCollectionFn = createServerFn({ method: "POST" })
   .inputValidator((data: { name: string; description?: string }) => data)
@@ -1611,6 +1706,95 @@ export const importStockUpdateFn = createServerFn({ method: "POST" })
         updated += Number(result.changes) || 0;
       }
     });
-    await runTx();
     return { updated, skipped };
+  });
+
+export const fetchFlatMediaImagesFn = createServerFn({ method: "GET" })
+  .inputValidator(
+    (data?: {
+      tab?: FlatMediaTab;
+      category?: string;
+      search?: string;
+      roomSlug?: ImageRoomTagSlug;
+      sort?: FlatMediaSort;
+      page?: number;
+      pageSize?: number;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { listFlatMediaImages } = await import("@/db/crm.server");
+    return await listFlatMediaImages(data);
+  });
+
+export const bulkSetProductImageKindFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      imageIds: number[];
+      kind: ProductImageKind;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { bulkSetProductImageKind } = await import("@/db/crm.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const result = await bulkSetProductImageKind(data.imageIds, data.kind);
+    await writeAudit({
+      user: me,
+      action: "product.image.bulk_kind",
+      entity_type: "product_image",
+      summary: `Gán loại ${data.kind} cho ${result.updated} ảnh sản phẩm`,
+      meta: { image_ids: data.imageIds, kind: data.kind, updated: result.updated },
+    });
+    return result;
+  });
+
+export const setImageRoomTagsDirectFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      imageId: number;
+      roomSlugs: ImageRoomTagSlug[];
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { setImageRoomTagsDirect } = await import("@/db/crm.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const tags = await setImageRoomTagsDirect(data.imageId, data.roomSlugs);
+    await writeAudit({
+      user: me,
+      action: "product.image.room_tags_direct",
+      entity_type: "product_image",
+      entity_id: data.imageId,
+      summary: `Cập nhật bối cảnh cho ảnh #${data.imageId}`,
+      meta: { image_id: data.imageId, room_slugs: data.roomSlugs },
+    });
+    return tags;
+  });
+
+export const bulkSetProductImageRoomTagsFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      imageIds: number[];
+      roomSlugs: ImageRoomTagSlug[];
+      mode?: "replace" | "add" | "remove";
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { bulkSetProductImageRoomTags } = await import("@/db/crm.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const result = await bulkSetProductImageRoomTags(data.imageIds, data.roomSlugs, data.mode);
+    await writeAudit({
+      user: me,
+      action: "product.image.bulk_room_tags",
+      entity_type: "product_image",
+      summary: `Cập nhật bối cảnh hàng loạt cho ${result.updated} ảnh`,
+      meta: { image_ids: data.imageIds, room_slugs: data.roomSlugs, mode: data.mode },
+    });
+    return result;
   });

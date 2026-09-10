@@ -46,3 +46,7 @@ Stock.xlsx
 
 # Vercel build output (generated; deploy happens via Vercel)
 .vercel/
+
+# Temporary pipeline outputs, logs & dev drafts
+tmp/
+em-ban-gach/

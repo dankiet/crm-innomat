@@ -14,14 +14,15 @@ import {
   fetchProductImages,
   setPrimaryProductImageFn,
   setProductImageKindFn,
+  setProductImageRoomTagsFn,
   uploadProductImageFn,
 } from "@/api/functions";
-import type { Product, ProductImageRow, ProductImageKind } from "@/lib/types";
+import type { Product, ProductImageRow, ProductImageKind, ImageRoomTagSlug } from "@/lib/types";
 import { PRODUCT_IMAGE_KINDS, PRODUCT_IMAGE_KIND_LABELS } from "@/lib/types";
 import { toast } from "sonner";
 import { ImagePlus, Loader2, Star, Trash2, Upload, Link2 } from "lucide-react";
 import { readImageFileAsWebpDataUrl } from "@/lib/image-upload";
-
+import { ImageRoomTagPicker } from "@/components/ImageRoomTagPicker";
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -164,6 +165,22 @@ export function EditProductImagesDialog({
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi gán loại ảnh");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSetRoomTags(image: ProductImageRow, roomSlugs: ImageRoomTagSlug[]) {
+    if (!product || image.kind !== "concept") return;
+    setBusy(true);
+    try {
+      const rows = await setProductImageRoomTagsFn({
+        data: { productId: product.id, imageId: image.id, roomSlugs },
+      });
+      setImages(rows);
+      toast.success("Đã cập nhật bối cảnh ảnh");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi gán bối cảnh ảnh");
     } finally {
       setBusy(false);
     }
@@ -374,6 +391,14 @@ export function EditProductImagesDialog({
                           );
                         })}
                       </div>
+                    ) : null}
+                    {img.kind === "concept" ? (
+                      <ImageRoomTagPicker
+                        value={img.room_tags?.map((tag) => tag.room_slug) ?? []}
+                        roomTags={img.room_tags}
+                        disabled={busy || readOnly}
+                        onChange={(roomSlugs) => void handleSetRoomTags(img, roomSlugs)}
+                      />
                     ) : null}
                     </div>
                   ) : null}

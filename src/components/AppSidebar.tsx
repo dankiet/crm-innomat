@@ -17,12 +17,15 @@ import {
   LogOut,
   Images,
   ChevronRight,
+  Inbox,
+  Layers3,
+  Sparkles,
 } from "lucide-react";
 import { ALL_PRODUCTS_SLUG, PRODUCT_GROUPS } from "@/lib/product-categories";
-import { useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { SessionUser } from "@/lib/auth-types";
 import { ROLE_LABEL, initialsFromName } from "@/lib/auth-types";
-import { logoutFn } from "@/api/functions";
+import { logoutFn, fetchProductFieldValues } from "@/api/functions";
 import { useHistoryLayer } from "@/hooks/useHistoryLayer";
 
 const navGroups = [
@@ -35,13 +38,21 @@ const navGroups = [
     items: [
       { to: "/khach-hang", label: "Khách hàng", icon: Users },
       { to: "/co-hoi", label: "Cơ hội", icon: Target },
-      { to: "/bao-gia", label: "Báo giá & đơn hàng", icon: FileText },
+      { to: "/bao-gia", label: "Báo giá", icon: FileText },
       { to: "/ghi-chu", label: "Ghi chú", icon: StickyNote },
     ],
   },
   {
     label: "Tài chính",
     items: [{ to: "/cong-no", label: "Công nợ", icon: Wallet }],
+  },
+  {
+    label: "Landing Page",
+    items: [
+      { to: "/leads", label: "Hộp thư Lead", icon: Inbox },
+      { to: "/khong-gian", label: "Lookbook", icon: Layers3 },
+      { to: "/luu-tru", label: "Kho ảnh", icon: Images },
+    ],
   },
 ] as const;
 
@@ -91,10 +102,14 @@ function NavLink({
   item,
   active,
   onClick,
+  expandable = false,
+  expanded = false,
 }: {
   item: NavItem;
   active: boolean;
   onClick?: () => void;
+  expandable?: boolean;
+  expanded?: boolean;
 }) {
   const Icon = item.icon;
   return (
@@ -111,7 +126,11 @@ function NavLink({
     >
       <Icon className={`size-[17px] shrink-0 ${active ? "text-primary" : "text-muted-foreground/75 group-hover:text-primary"}`} />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-      {active ? <ChevronRight className="size-3.5 text-primary/70" /> : null}
+      {expandable ? (
+        <ChevronRight className={`size-3.5 text-primary/70 transition-transform ${expanded ? "rotate-90" : ""}`} />
+      ) : active ? (
+        <ChevronRight className="size-3.5 text-primary/70" />
+      ) : null}
     </Link>
   );
 }
@@ -157,6 +176,31 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const isCatalogActive = pathname === "/san-pham";
   const isLibraryActive = pathname === "/thu-vien";
   const currentNhom = search?.nhom;
+  const [catalogExpanded, setCatalogExpanded] = useState(isCatalogActive);
+  useEffect(() => {
+    setCatalogExpanded(isCatalogActive);
+    if (!isCatalogActive) setExpandedSizeGroup(null);
+  }, [isCatalogActive]);
+  const [expandedSizeGroup, setExpandedSizeGroup] = useState<string | null>(null);
+  const [sizeOptions, setSizeOptions] = useState<string[]>([]);
+  useEffect(() => {
+    const group = PRODUCT_GROUPS.find((item) => item.slug === expandedSizeGroup);
+    if (!group || (group.slug !== "gach-bong" && group.slug !== "gach-op-lat")) {
+      setSizeOptions([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchProductFieldValues({ data: { field: "size", category: group.category } })
+      .then((values) => {
+        if (!cancelled) setSizeOptions(values);
+      })
+      .catch(() => {
+        if (!cancelled) setSizeOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expandedSizeGroup]);
   /** Close drawer on tap only when the tap cannot navigate (already there). */
   const linkCloseHandler = (item: { to: string; search?: { nhom?: string } }) =>
     closesWithoutNavigation(item, pathname, currentNhom) ? onMobileClose : undefined;
@@ -183,21 +227,27 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-5 pb-6">
-        {navGroups.map((group) => (
-          <section key={group.label}>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">{group.label}</p>
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  item={item}
-                  active={pathname === item.to}
-                  onClick={linkCloseHandler(item)}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+        {navGroups.map((group) => {
+          return (
+            <section key={group.label}>
+              <div className="mb-2 px-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">
+                  {group.label}
+                </p>
+              </div>
+              <div className="space-y-1">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    item={item}
+                    active={pathname === item.to}
+                    onClick={linkCloseHandler(item)}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
 
         <section>
           <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">Catalog</p>
@@ -210,28 +260,62 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                 search: { nhom: ALL_PRODUCTS_SLUG },
               }}
               active={isCatalogActive}
-              onClick={linkCloseHandler({ to: "/san-pham", search: { nhom: ALL_PRODUCTS_SLUG } })}
+              expandable
+              expanded={catalogExpanded}
+              onClick={() => {
+                setCatalogExpanded(true);
+                linkCloseHandler({ to: "/san-pham", search: { nhom: ALL_PRODUCTS_SLUG } })?.();
+              }}
             />
-            <div className={`ml-4 border-l pl-3 ${isCatalogActive ? "border-primary/30" : "border-border/70"}`}>
+            {catalogExpanded ? (
+              <div className={`ml-4 border-l pl-3 ${isCatalogActive ? "border-primary/30" : "border-border/70"}`}>
               {PRODUCT_GROUPS.map((group) => {
                 const Icon = productIcons[group.slug] ?? LayoutGrid;
                 const active = isCatalogActive && search?.nhom === group.slug;
                 return (
-                  <Link
-                    key={group.slug}
-                    to="/san-pham"
-                    search={{ nhom: group.slug }}
-                    onClick={active ? onMobileClose : undefined}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
-                      active ? "font-semibold text-primary" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="size-3.5 shrink-0" />
-                    <span className="truncate">{group.label}</span>
-                  </Link>
+                  <Fragment key={group.slug}>
+                    <Link
+                      to="/san-pham"
+                      search={{ nhom: group.slug }}
+                      onClick={() => {
+                        if (group.slug === "gach-bong" || group.slug === "gach-op-lat") {
+                          setExpandedSizeGroup((current) => current === group.slug ? null : group.slug);
+                        }
+                        if (active) onMobileClose?.();
+                      }}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
+                        active ? "font-semibold text-primary" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                      {group.slug === "gach-bong" || group.slug === "gach-op-lat" ? (
+                        <ChevronRight className={`size-3 transition-transform ${expandedSizeGroup === group.slug ? "rotate-90" : ""}`} />
+                      ) : null}
+                    </Link>
+                    {expandedSizeGroup === group.slug ? (
+                      <div className="ml-5 border-l border-border/70 pl-2">
+                        {sizeOptions.map((size) => (
+                          <Link
+                            key={size}
+                            to="/san-pham"
+                            search={{ nhom: group.slug, sizes: [size] }}
+                            onClick={active ? onMobileClose : undefined}
+                            className="block truncate rounded-md px-2 py-1.5 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                          >
+                            {size}
+                          </Link>
+                        ))}
+                        {!sizeOptions.length ? (
+                          <span className="block px-2 py-1.5 text-[11px] text-muted-foreground/70">Đang tải kích thước…</span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </Fragment>
                 );
               })}
-            </div>
+              </div>
+            ) : null}
             <NavLink
               item={{ to: "/thu-vien", label: "Thư viện", icon: Images }}
               active={isLibraryActive}

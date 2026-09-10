@@ -58,8 +58,15 @@ const ID_TABLES = new Set([
   "customer_mapping_items",
   "sessions",
   "audit_logs",
+  "lp_leads",
+  "public_users",
 ]);
-const TABLES_WITHOUT_ID = new Set(["customer_mapping_quote_links"]);
+const TABLES_WITHOUT_ID = new Set([
+  "customer_mapping_quote_links",
+  "lp_rate_limits",
+  "public_sessions",
+  "lp_settings",
+]);
 
 function targetInsertTable(sql: string): string | null {
   const m = /^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+["']?([A-Za-z0-9_]+)/i.exec(sql);

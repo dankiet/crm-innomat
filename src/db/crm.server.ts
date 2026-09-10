@@ -15,12 +15,16 @@ import type {
   OrderStatus,
   Payment,
   Product,
+  ProductImageRoomTag,
   ProductImageRow,
   ProductImageKind,
   Quote,
   QuoteItem,
   QuoteStatus,
+  ImageRoomTagReviewStatus,
+  ImageRoomTagSlug,
 } from "@/lib/types";
+import { IMAGE_ROOM_TAGS } from "@/lib/types";
 import { isPhoneMatchable, phonesMatch } from "@/lib/phone";
 import { statusMeta } from "@/lib/types";
 
@@ -169,15 +173,20 @@ const PRODUCT_SUGGEST_FIELDS = [
 type ProductSuggestField = (typeof PRODUCT_SUGGEST_FIELDS)[number];
 
 /** Lấy danh sách giá trị distinct đã dùng cho 1 field phân loại — dùng làm gợi ý datalist */
-export async function listProductFieldValues(field: ProductSuggestField): Promise<string[]> {
+export async function listProductFieldValues(
+  field: ProductSuggestField,
+  category?: string,
+): Promise<string[]> {
   if (!PRODUCT_SUGGEST_FIELDS.includes(field)) {
     throw new Error("Field không hợp lệ");
   }
   const db = getDb();
+  const where = category ? ` AND category = ?` : "";
+  const params = category ? [category] : [];
   return (
     (await db
-      .prepare(`SELECT DISTINCT ${field} AS v FROM products WHERE ${field} != '' ORDER BY ${field}`)
-      .all<{ v: string }>()) as { v: string }[]
+      .prepare(`SELECT DISTINCT ${field} AS v FROM products WHERE ${field} != ''${where} ORDER BY ${field}`)
+      .all<{ v: string }>(...params)) as { v: string }[]
   ).map((r) => r.v);
 }
 
@@ -291,14 +300,104 @@ async function syncPrimaryImagePath(productId: number) {
     .run(primary?.path ?? "", productId);
 }
 
+const IMAGE_ROOM_TAG_IDS = new Set<string>(IMAGE_ROOM_TAGS.map((tag) => tag.id));
+
+async function loadProductImageRoomTags(
+  imageIds: number[],
+): Promise<Map<number, ProductImageRoomTag[]>> {
+  const tagsByImage = new Map<number, ProductImageRoomTag[]>();
+  if (imageIds.length === 0) return tagsByImage;
+  const placeholders = imageIds.map(() => "?").join(", ");
+  const tagRows = await getDb()
+    .prepare(
+      `SELECT product_image_id, room_slug, source, confidence, model, model_version,
+              review_status, created_at, updated_at
+       FROM product_image_room_tags
+       WHERE product_image_id IN (${placeholders})
+       ORDER BY product_image_id ASC, room_slug ASC`,
+    )
+    .all<ProductImageRoomTag>(...imageIds);
+  for (const tag of tagRows) {
+    if (!IMAGE_ROOM_TAG_IDS.has(tag.room_slug)) continue;
+    const tags = tagsByImage.get(Number(tag.product_image_id)) ?? [];
+    tags.push(tag);
+    tagsByImage.set(Number(tag.product_image_id), tags);
+  }
+  return tagsByImage;
+}
+
+async function attachProductImageRoomTags(
+  rows: ProductImageRow[],
+): Promise<ProductImageRow[]> {
+  const tagsByImage = await loadProductImageRoomTags(rows.map((row) => row.id));
+  return rows.map((row) => ({
+    ...row,
+    room_tags: tagsByImage.get(row.id) ?? [],
+  }));
+}
+
+function normalizeRoomSlugs(roomSlugs: ImageRoomTagSlug[]): ImageRoomTagSlug[] {
+  const unique = [...new Set(roomSlugs)];
+  if (unique.some((slug) => !IMAGE_ROOM_TAG_IDS.has(slug))) {
+    throw new Error("Room tag không hợp lệ");
+  }
+  return unique;
+}
+
+export async function listProductImageRoomTags(
+  imageId: number,
+): Promise<ProductImageRoomTag[]> {
+  const row = (await getDb()
+    .prepare("SELECT * FROM product_images WHERE id = ?")
+    .get<ProductImageRow>(imageId)) as ProductImageRow | undefined;
+  if (!row) return [];
+  const [withTags] = await attachProductImageRoomTags([row]);
+  return withTags?.room_tags ?? [];
+}
+
+export async function setProductImageRoomTags(
+  productId: number,
+  imageId: number,
+  roomSlugs: ImageRoomTagSlug[],
+): Promise<ProductImageRow[]> {
+  const db = getDb();
+  const row = (await db
+    .prepare("SELECT id, kind FROM product_images WHERE id = ? AND product_id = ?")
+    .get<{ id: number; kind: ProductImageKind }>(imageId, productId)) as
+    | { id: number; kind: ProductImageKind }
+    | undefined;
+  if (!row) throw new Error("Không tìm thấy ảnh của sản phẩm này");
+  const slugs = normalizeRoomSlugs(roomSlugs);
+  if (slugs.length > 0 && row.kind !== "concept") {
+    throw new Error("Chỉ ảnh Concept mới được gán room tag");
+  }
+  const now = nowLocal();
+  await db.transaction(async (tx) => {
+    await tx
+      .prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?")
+      .run(imageId);
+    for (const roomSlug of slugs) {
+      await tx
+        .prepare(
+          `INSERT INTO product_image_room_tags
+             (product_image_id, room_slug, source, review_status, created_at, updated_at)
+           VALUES (?, ?, 'manual', 'accepted', ?, ?)`,
+        )
+        .run(imageId, roomSlug, now, now);
+    }
+  })();
+  return await listProductImages(productId);
+}
+
 export async function listProductImages(productId: number): Promise<ProductImageRow[]> {
-  return (await getDb()
+  const rows = (await getDb()
     .prepare(
       `SELECT * FROM product_images
        WHERE product_id = ?
        ORDER BY is_primary DESC, sort_order ASC, id ASC`,
     )
     .all<ProductImageRow>(productId)) as ProductImageRow[];
+  return await attachProductImageRoomTags(rows);
 }
 
 export async function addProductImage(input: {
@@ -361,10 +460,9 @@ export async function addProductImage(input: {
   });
   const newId = await runTx();
 
-  await syncPrimaryImagePath(input.product_id);
-  return (await db
-    .prepare("SELECT * FROM product_images WHERE id = ?")
-    .get<ProductImageRow>(newId)) as ProductImageRow;
+  const created = (await listProductImages(input.product_id)).find((image) => image.id === newId);
+  if (!created) throw new Error("Không thể đọc ảnh vừa thêm");
+  return created;
 }
 
 /** Chuẩn ảnh SP khi upload: cạnh dài tối đa (giữ tỉ lệ). */
@@ -453,6 +551,11 @@ export async function setProductImageKind(
         .run(productId, imageId);
     }
     await tx.prepare("UPDATE product_images SET kind = ? WHERE id = ?").run(kind, imageId);
+    if (kind !== "concept") {
+      await tx
+        .prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?")
+        .run(imageId);
+    }
   });
   await runTx();
   return await listProductImages(productId);
@@ -2440,6 +2543,10 @@ export type ProductUpdate = {
   discount_b2b?: number | null;
   note?: string;
   is_hot?: number;
+  /** Hiện trên landing page công khai (LP chỉ lấy product có ảnh). */
+  is_public?: number;
+  /** Thứ tự ưu tiên trên landing page; null = xếp sau, theo id. */
+  featured_rank?: number | null;
   image_path?: string;
 };
 
@@ -2506,6 +2613,8 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
         discount_b2b = @discount_b2b,
         note = @note,
         is_hot = @is_hot,
+        is_public = @is_public,
+        featured_rank = @featured_rank,
         image_path = @image_path
        WHERE id = @id`,
     )
@@ -2532,6 +2641,11 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       discount_b2b: discountB2b,
       note: (input.note ?? existing.note).trim(),
       is_hot: input.is_hot !== undefined ? (input.is_hot ? 1 : 0) : existing.is_hot,
+      // LP chỉ nhận product có ảnh — bật is_public mà chưa có ảnh thì vô nghĩa.
+      is_public:
+        input.is_public !== undefined ? (input.is_public ? 1 : 0) : (existing.is_public ?? 0),
+      featured_rank:
+        input.featured_rank !== undefined ? input.featured_rank : (existing.featured_rank ?? null),
       image_path: (input.image_path ?? existing.image_path).trim(),
     } as unknown as SqlValue);
 
@@ -2562,6 +2676,8 @@ export type ProductCreateInput = {
   discount_b2b?: number | null;
   note?: string;
   is_hot?: number;
+  is_public?: number;
+  featured_rank?: number | null;
   image_path?: string;
 };
 
@@ -2598,7 +2714,7 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
         code, name, size, material, surface, shape, collections, category, supplier,
         color, packing, packing_m2, packing_pcs, packing_kg,
         retail_price, trade_price, b2b_price, discount_tp, discount_b2b,
-        note, is_hot, image_path
+        note, is_hot, is_public, featured_rank, image_path
       ) VALUES (
         @code, @name, @size, @material, @surface, @shape, @collections, @category, @supplier,
         @color, @packing, @packing_m2, @packing_pcs, @packing_kg,
@@ -2636,10 +2752,395 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
       discount_tp: discountTp,
       discount_b2b: discountB2b,
       note: (input.note ?? "").trim(),
+      is_public: input.is_public ? 1 : 0,
+      featured_rank: input.featured_rank ?? null,
       is_hot: input.is_hot ? 1 : 0,
       image_path: (input.image_path ?? "").trim(),
     } as unknown as SqlValue);
 
   return (await getProduct(Number(info.lastInsertRowid)))!;
+}
+
+export type FlatMediaTab = "all" | "map" | "concept" | "featured" | "unassigned";
+export type FlatMediaSort = "newest" | "oldest" | "code_asc" | "code_desc";
+
+export type FlatMediaItem = {
+  id: number;
+  product_id: number;
+  product_code: string;
+  product_name: string;
+  product_category: string;
+  product_is_public: number;
+  featured_rank: number | null;
+  path: string;
+  caption: string;
+  is_primary: number;
+  kind: ProductImageKind;
+  room_tags: ProductImageRoomTag[];
+  created_at: string;
+};
+export async function listFlatMediaImages(opts?: {
+  tab?: FlatMediaTab;
+  category?: string;
+  search?: string;
+  roomSlug?: ImageRoomTagSlug;
+  sort?: FlatMediaSort;
+  page?: number;
+  pageSize?: number;
+}): Promise<{
+  items: FlatMediaItem[];
+  total: number;
+  counts: { all: number; map: number; concept: number; featured: number; unassigned: number };
+  roomCounts: Record<string, number>;
+}> {
+  const db = getDb();
+  const tab = opts?.tab ?? "all";
+  const sort = opts?.sort ?? "newest";
+  const page = Math.max(opts?.page ?? 1, 1);
+  const pageSize = Math.min(Math.max(opts?.pageSize ?? 48, 12), 120);
+  const offset = (page - 1) * pageSize;
+
+  // 1. Base filters (danh mục & search) dùng chung cho cả counts và items
+  const baseWhere: string[] = ["i.path <> ''"];
+  const baseParams: SqlValue[] = [];
+
+  if (opts?.category && opts.category !== "all") {
+    baseWhere.push("p.category = ?");
+    baseParams.push(opts.category);
+  }
+
+  if (opts?.search?.trim()) {
+    const q = `%${opts.search.trim()}%`;
+    baseWhere.push("(p.code ILIKE ? OR p.name ILIKE ? OR i.caption ILIKE ?)");
+    baseParams.push(q, q, q);
+  }
+
+  if (opts?.roomSlug) {
+    baseWhere.push(
+      "EXISTS (SELECT 1 FROM product_image_room_tags rt WHERE rt.product_image_id = i.id AND rt.room_slug = ?)",
+    );
+    baseParams.push(opts.roomSlug);
+  }
+
+  const baseWhereSql = `WHERE ${baseWhere.join(" AND ")}`;
+
+  // 2. Counts trên các Tabs (Đếm chính xác theo số lượng Ảnh)
+  const statsSql = `
+    SELECT
+      COUNT(*)::int AS all_count,
+      COUNT(CASE WHEN i.kind = 'map' THEN 1 END)::int AS map_count,
+      COUNT(CASE WHEN i.kind = 'concept' THEN 1 END)::int AS concept_count,
+      COUNT(DISTINCT CASE WHEN p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12 THEN p.featured_rank END)::int AS featured_count,
+      COUNT(CASE WHEN i.kind = 'normal' OR i.kind IS NULL OR i.kind = '' THEN 1 END)::int AS unassigned_count
+    FROM product_images i
+    JOIN products p ON p.id = i.product_id
+    ${baseWhereSql}
+  `;
+
+  const countRow = (await db.prepare(statsSql).get<{
+    all_count: number;
+    map_count: number;
+    concept_count: number;
+    featured_count: number;
+    unassigned_count: number;
+  }>(...baseParams)) ?? {
+    all_count: 0,
+    map_count: 0,
+    concept_count: 0,
+    featured_count: 0,
+    unassigned_count: 0,
+  };
+
+  const counts = {
+    all: Number(countRow.all_count) || 0,
+    map: Number(countRow.map_count) || 0,
+    concept: Number(countRow.concept_count) || 0,
+    featured: Number(countRow.featured_count) || 0,
+    unassigned: Number(countRow.unassigned_count) || 0,
+  };
+
+
+  // 2.2 Room counts (đếm số lượng ảnh cho từng tag không gian)
+  const roomCountsSql = `
+    SELECT
+      rt.room_slug,
+      COUNT(DISTINCT i.id)::int AS count
+    FROM product_images i
+    JOIN products p ON p.id = i.product_id
+    JOIN product_image_room_tags rt ON rt.product_image_id = i.id
+    ${baseWhereSql}
+    GROUP BY rt.room_slug
+  `;
+
+  const roomCountRows = (await db.prepare(roomCountsSql).all<{
+    room_slug: string;
+    count: number | string;
+  }>(...baseParams)) ?? [];
+
+  const roomCounts: Record<string, number> = {};
+  for (const r of roomCountRows) {
+    roomCounts[r.room_slug] = Number(r.count) || 0;
+  }
+  // 3. Filter theo Tab (Chỉ trả về ĐÚNG loại ảnh được chọn)
+  const listWhere = [...baseWhere];
+  const listParams = [...baseParams];
+
+  if (tab === "map") {
+    listWhere.push("i.kind = 'map'");
+  } else if (tab === "concept") {
+    listWhere.push("i.kind = 'concept'");
+  } else if (tab === "featured") {
+    listWhere.push("p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12");
+  } else if (tab === "unassigned") {
+    listWhere.push("(i.kind = 'normal' OR i.kind IS NULL OR i.kind = '')");
+  }
+
+  const listWhereSql = `WHERE ${listWhere.join(" AND ")}`;
+
+  const total =
+    tab === "map"
+      ? counts.map
+      : tab === "concept"
+        ? counts.concept
+        : tab === "featured"
+          ? counts.featured
+          : tab === "unassigned"
+            ? counts.unassigned
+            : counts.all;
+  // 4. Sort
+  let orderBySql = "i.id DESC";
+  if (tab === "featured") {
+    orderBySql = "p.featured_rank ASC, i.is_primary DESC, i.id ASC";
+  } else if (sort === "oldest") {
+    orderBySql = "i.id ASC";
+  } else if (sort === "code_asc") {
+    orderBySql = "p.code ASC, i.is_primary DESC, i.sort_order ASC, i.id ASC";
+  } else if (sort === "code_desc") {
+    orderBySql = "p.code DESC, i.is_primary DESC, i.sort_order ASC, i.id ASC";
+  }
+
+  // 5. Query danh sách ảnh phân trang theo Ảnh
+  // Featured tab: DISTINCT ON (p.featured_rank) — 1 representative image per slot
+  let items: FlatMediaItem[];
+  if (tab === "featured") {
+    items = await db
+      .prepare(
+        `SELECT DISTINCT ON (p.featured_rank)
+          i.id,
+          i.product_id,
+          p.code AS product_code,
+          p.name AS product_name,
+          p.category AS product_category,
+          p.is_public AS product_is_public,
+          p.featured_rank,
+          i.path,
+          i.caption,
+          i.is_primary,
+          CASE WHEN i.kind = 'map' THEN 'map' WHEN i.kind = 'concept' THEN 'concept' ELSE 'normal' END AS kind,
+          i.created_at
+        FROM product_images i
+        JOIN products p ON p.id = i.product_id
+        ${listWhereSql}
+        ORDER BY p.featured_rank ASC, (i.kind = 'map') DESC, i.is_primary DESC, i.id ASC
+        LIMIT ? OFFSET ?`,
+      )
+      .all<FlatMediaItem>(...listParams, pageSize, offset);
+  } else {
+    items = await db
+      .prepare(
+        `SELECT
+          i.id,
+          i.product_id,
+          p.code AS product_code,
+          p.name AS product_name,
+          p.category AS product_category,
+          p.is_public AS product_is_public,
+          p.featured_rank,
+          i.path,
+          i.caption,
+          i.is_primary,
+          CASE WHEN i.kind = 'map' THEN 'map' WHEN i.kind = 'concept' THEN 'concept' ELSE 'normal' END AS kind,
+          i.created_at
+        FROM product_images i
+        JOIN products p ON p.id = i.product_id
+        ${listWhereSql}
+        ORDER BY ${orderBySql}
+        LIMIT ? OFFSET ?`,
+      )
+      .all<FlatMediaItem>(...listParams, pageSize, offset);
+  }
+  const tagsByImage = await loadProductImageRoomTags(items.map((item) => item.id));
+  const itemsWithTags = items.map((item) => ({
+    ...item,
+    room_tags: tagsByImage.get(item.id) ?? [],
+  }));
+
+  return { items: itemsWithTags, total, counts, roomCounts };
+}
+
+export async function bulkSetProductImageKind(
+  imageIds: number[],
+  kind: ProductImageKind,
+): Promise<{ updated: number }> {
+  const cleanIds = [...new Set(imageIds.filter((id) => Number.isSafeInteger(id) && id > 0))];
+  if (!cleanIds.length) return { updated: 0 };
+
+  const db = getDb();
+  let updated = 0;
+
+  await db.transaction(async (tx) => {
+    if (kind === "map") {
+      // Map yêu cầu mỗi SP chỉ có tối đa 1 ảnh MAP.
+      // Lấy danh sách ảnh cùng product_id
+      const placeholders = cleanIds.map(() => "?").join(", ");
+      const rows = await tx
+        .prepare(`SELECT id, product_id FROM product_images WHERE id IN (${placeholders}) ORDER BY id ASC`)
+        .all<{ id: number; product_id: number }>(...cleanIds);
+
+      // Nếu cùng 1 SP có nhiều ảnh được chọn, lấy ảnh cuối cùng làm MAP
+      const targetImageByProduct = new Map<number, number>();
+      for (const row of rows) {
+        targetImageByProduct.set(row.product_id, row.id);
+      }
+
+      for (const [productId, targetImgId] of targetImageByProduct.entries()) {
+        // Hạ các ảnh MAP cũ của SP này về normal
+        await tx
+          .prepare("UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?")
+          .run(productId, targetImgId);
+        // Set ảnh được chọn thành MAP
+        const res = await tx.prepare("UPDATE product_images SET kind = 'map' WHERE id = ?").run(targetImgId);
+        updated += Number(res.changes) || 0;
+      }
+    } else {
+      // Gán concept hoặc normal (blank) hàng loạt
+      const chunkSize = 400;
+      for (let i = 0; i < cleanIds.length; i += chunkSize) {
+        const chunk = cleanIds.slice(i, i + chunkSize);
+        const placeholders = chunk.map(() => "?").join(", ");
+        const res = await tx
+          .prepare(`UPDATE product_images SET kind = ? WHERE id IN (${placeholders})`)
+          .run(kind, ...chunk);
+        updated += Number(res.changes) || 0;
+      }
+    }
+    await tx
+      .prepare(
+        `DELETE FROM product_image_room_tags
+         WHERE product_image_id IN (
+           SELECT id FROM product_images WHERE kind <> 'concept'
+         )`,
+      )
+      .run();
+  })();
+
+  return { updated };
+}
+
+export async function setImageRoomTagsDirect(
+  imageId: number,
+  roomSlugs: ImageRoomTagSlug[],
+): Promise<ProductImageRoomTag[]> {
+  const db = getDb();
+  const row = (await db
+    .prepare("SELECT id, kind, product_id FROM product_images WHERE id = ?")
+    .get<{ id: number; kind: ProductImageKind; product_id: number }>(imageId));
+  if (!row) throw new Error("Không tìm thấy ảnh này");
+  const slugs = normalizeRoomSlugs(roomSlugs);
+  const now = nowLocal();
+  await db.transaction(async (tx) => {
+    if (slugs.length > 0 && row.kind !== "concept") {
+      await tx.prepare("UPDATE product_images SET kind = 'concept' WHERE id = ?").run(imageId);
+    }
+    await tx
+      .prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?")
+      .run(imageId);
+    for (const roomSlug of slugs) {
+      await tx
+        .prepare(
+          `INSERT INTO product_image_room_tags
+             (product_image_id, room_slug, source, review_status, created_at, updated_at)
+           VALUES (?, ?, 'manual', 'accepted', ?, ?)
+           ON CONFLICT (product_image_id, room_slug) DO UPDATE SET
+             source = 'manual',
+             review_status = 'accepted',
+             updated_at = EXCLUDED.updated_at`,
+        )
+        .run(imageId, roomSlug, now, now);
+    }
+  })();
+  const tags = await loadProductImageRoomTags([imageId]);
+  return tags.get(imageId) ?? [];
+}
+
+export async function bulkSetProductImageRoomTags(
+  imageIds: number[],
+  roomSlugs: ImageRoomTagSlug[],
+  mode: "replace" | "add" | "remove" = "replace",
+): Promise<{ updated: number }> {
+  const cleanIds = [...new Set(imageIds.filter((id) => Number.isSafeInteger(id) && id > 0))];
+  if (!cleanIds.length) return { updated: 0 };
+  const slugs = normalizeRoomSlugs(roomSlugs);
+  const db = getDb();
+  const now = nowLocal();
+  let updated = 0;
+
+  await db.transaction(async (tx) => {
+    if (slugs.length > 0 && mode !== "remove") {
+      const placeholders = cleanIds.map(() => "?").join(", ");
+      await tx
+        .prepare(`UPDATE product_images SET kind = 'concept' WHERE id IN (${placeholders}) AND kind <> 'concept'`)
+        .run(...cleanIds);
+    }
+
+    if (mode === "replace") {
+      const placeholders = cleanIds.map(() => "?").join(", ");
+      await tx
+        .prepare(`DELETE FROM product_image_room_tags WHERE product_image_id IN (${placeholders})`)
+        .run(...cleanIds);
+      for (const imgId of cleanIds) {
+        for (const slug of slugs) {
+          await tx
+            .prepare(
+              `INSERT INTO product_image_room_tags
+                 (product_image_id, room_slug, source, review_status, created_at, updated_at)
+               VALUES (?, ?, 'manual', 'accepted', ?, ?)
+               ON CONFLICT (product_image_id, room_slug) DO NOTHING`,
+            )
+            .run(imgId, slug, now, now);
+        }
+      }
+      updated = cleanIds.length;
+    } else if (mode === "add") {
+      for (const imgId of cleanIds) {
+        for (const slug of slugs) {
+          const res = await tx
+            .prepare(
+              `INSERT INTO product_image_room_tags
+                 (product_image_id, room_slug, source, review_status, created_at, updated_at)
+               VALUES (?, ?, 'manual', 'accepted', ?, ?)
+               ON CONFLICT (product_image_id, room_slug) DO NOTHING`,
+            )
+            .run(imgId, slug, now, now);
+          if (res.changes) updated++;
+        }
+      }
+    } else if (mode === "remove") {
+      if (slugs.length > 0) {
+        const idPlaceholders = cleanIds.map(() => "?").join(", ");
+        const slugPlaceholders = slugs.map(() => "?").join(", ");
+        const res = await tx
+          .prepare(
+            `DELETE FROM product_image_room_tags
+             WHERE product_image_id IN (${idPlaceholders})
+               AND room_slug IN (${slugPlaceholders})`,
+          )
+          .run(...cleanIds, ...slugs);
+        updated = Number(res.changes) || 0;
+      }
+    }
+  })();
+
+  return { updated };
 }
 

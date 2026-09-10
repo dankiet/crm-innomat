@@ -13,17 +13,55 @@ export type QuoteStatus = "draft" | "sent" | "accepted" | "expired";
 export type OrderStatus = "preparing" | "shipping" | "delivered";
 export type DiscountType = "none" | "tp" | "b2b" | "custom";
 
+export const SPACE_TYPES = [
+  { id: "living_room", label: "Phòng khách & Lounge" },
+  { id: "kitchen_dining", label: "Bếp & Dining" },
+  { id: "bathroom_spa", label: "Phòng tắm & Spa" },
+  { id: "bedroom", label: "Phòng ngủ & Suite" },
+  { id: "outdoor_balcony", label: "Ban công & Sân trong" },
+  { id: "fnb_hospitality", label: "F&B / Khách sạn / Resort" },
+] as const;
+
+export type SpaceType = (typeof SPACE_TYPES)[number]["id"];
+export type ImageRoomTagSlug = SpaceType | "office_workspace" | "other" | "unknown";
+export type ImageRoomTagSource = "manual" | "vision";
+export type ImageRoomTagReviewStatus = "pending" | "accepted" | "rejected";
+
+export const IMAGE_ROOM_TAGS = [
+  ...SPACE_TYPES,
+  { id: "office_workspace", label: "Văn phòng / Workspace", imageOnly: true },
+  { id: "other", label: "Không gian khác", imageOnly: true },
+  { id: "unknown", label: "Chưa xác định", imageOnly: true },
+] as const;
+
+export type ProductImageRoomTag = {
+  product_image_id: number;
+  room_slug: ImageRoomTagSlug;
+  source: ImageRoomTagSource;
+  confidence: number | null;
+  model: string;
+  model_version: string;
+  review_status: ImageRoomTagReviewStatus;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ProductImageRow = {
   id: number;
   product_id: number;
   gallery_collection_ids: number[];
+  room_tags: ProductImageRoomTag[];
   path: string;
   sort_order: number;
   is_primary: number;
   caption: string;
   /** Phân loại ảnh: 'map' (ảnh gạch), 'concept' (bối cảnh), 'normal' (không gán) */
   kind: ProductImageKind;
+  /** Hiển thị trên Landing Page Lookbook (1 = hiện, 0 = ẩn) */
+  is_public?: number;
   created_at: string;
+  /** Mô tả chi tiết không gian/bối cảnh thị giác do AI Vision sinh ra */
+  ai_description?: string;
 };
 
 /**
@@ -79,6 +117,7 @@ export type GalleryImageCandidate = {
   product_id: number;
   path: string;
   caption: string;
+  kind?: ProductImageKind;
   is_primary: number;
   sort_order: number;
   code: string;
@@ -133,6 +172,10 @@ export type Product = {
   collections?: string;
   unit?: string;
   is_hot: number;
+  /** Hiện trên landing page công khai (LP chỉ lấy product có ảnh) */
+  is_public?: number;
+  /** Thứ tự ưu tiên trên landing page; null = xếp sau, theo id */
+  featured_rank?: number | null;
   /** Ảnh đại diện (primary) — đồng bộ từ product_images */
   image_path: string;
   /** Số ảnh (optional, join) */

@@ -2,7 +2,7 @@ import { getDb, type AsyncDb, type SqlValue } from "./driver";
 import { isPublicImagePathReferenced } from "./crm.server";
 import { saveBase64Image } from "@/lib/image-upload.server";
 import { deleteImageRef, isManagedImageRef } from "@/lib/storage";
-import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate } from "@/lib/types";
+import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate, ProductImageKind } from "@/lib/types";
 
 const MAX_BULK_IMAGE_IDS = 5_000;
 const BULK_CHUNK_SIZE = 400;
@@ -149,12 +149,21 @@ export async function updateGalleryCollection(input: {
   return updatedCollection;
 }
 
-export async function listGalleryImageCandidates(): Promise<GalleryImageCandidate[]> {
+export async function listGalleryImageCandidates(opts?: {
+  kind?: ProductImageKind;
+}): Promise<GalleryImageCandidate[]> {
+  const where = ["i.path <> ''"];
+  const params: SqlValue[] = [];
+  if (opts?.kind) {
+    where.push("i.kind = ?");
+    params.push(opts.kind);
+  }
+
   return await getDb()
     .prepare(
       `SELECT i.id AS product_image_id, i.product_id, i.path, i.caption,
         COALESCE(gallery_links.collection_ids, ARRAY[]::BIGINT[]) AS gallery_collection_ids,
-        i.is_primary, i.sort_order, p.code, p.name,
+        i.is_primary, i.sort_order, i.kind, p.code, p.name,
         COALESCE(codes.internal_codes, '') AS internal_codes,
         p.category, p.supplier, p.color, p.surface, p.size, p.shape,
         p.collections, p.material
@@ -171,10 +180,10 @@ export async function listGalleryImageCandidates(): Promise<GalleryImageCandidat
          WHERE product_id IS NOT NULL
          GROUP BY product_id
        ) gallery_links ON gallery_links.product_id = p.id
-       WHERE i.path <> ''
+       WHERE ${where.join(" AND ")}
        ORDER BY p.code, i.is_primary DESC, i.sort_order, i.id`,
     )
-    .all<GalleryImageCandidate>();
+    .all<GalleryImageCandidate>(...params);
 }
 
 export async function addGalleryProductImages(input: {

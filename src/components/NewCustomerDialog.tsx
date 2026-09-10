@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
   Dialog,
@@ -54,24 +54,35 @@ const emptyForm = {
   note: "",
 };
 
+type CustomerForm = typeof emptyForm;
+
 export function NewCustomerDialog({
   open,
   onOpenChange,
   onCreated,
-  customer = null,
+  customer,
 }: Props) {
-  const router = useRouter();
-  const isEdit = Boolean(customer?.id);
+  const isEdit = Boolean(customer);
+  const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [me, setMe] = useState<SessionUser | null>(null);
-  const [conflict, setConflict] = useState<PhoneConflict | null>(null);
   const [checkingPhone, setCheckingPhone] = useState(false);
-  const [users, setUsers] = useState<AppUser[]>([]);
-  const [transferOwnerId, setTransferOwnerId] = useState<number | "">("");
-  const [transferring, setTransferring] = useState(false);
+  const [conflict, setConflict] = useState<PhoneConflict | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [transferOwnerId, setTransferOwnerId] = useState<number | "">("");
+  const [transferring, setTransferring] = useState(false);
+  const [me, setMe] = useState<SessionUser | null>(null);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const router = useRouter();
+  const savedSinceOpenRef = useRef(false);
+
+  const handleOpenChange = async (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen && savedSinceOpenRef.current) {
+      savedSinceOpenRef.current = false;
+      await router.invalidate();
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -167,9 +178,8 @@ export function NewCustomerDialog({
         await saveCustomer({ data: form });
         toast.success("Đã thêm khách hàng mới");
       }
-      onOpenChange(false);
+      savedSinceOpenRef.current = true;
       onCreated?.();
-      await router.invalidate();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Lỗi lưu khách hàng";
       toast.error(msg, { duration: 8000 });
@@ -235,7 +245,7 @@ export function NewCustomerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -501,7 +511,7 @@ export function NewCustomerDialog({
                 type="button"
                 onClick={() => {
                   setConfirmDelete(false);
-                  onOpenChange(false);
+                  handleOpenChange(false);
                 }}
                 className="text-xs font-medium px-3 py-1.5 rounded ring-1 ring-black/5 bg-card hover:bg-surface-strong"
               >

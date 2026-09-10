@@ -37,7 +37,8 @@ import {
   type SortDir,
   type SortFieldOption,
 } from "@/components/SortMenu";
-import { deleteProductFn, fetchProducts } from "@/api/functions";
+import { deleteProductFn, fetchProducts, updateProductFn } from "@/api/functions";
+import { bulkSetProductsPublicFn } from "@/api/lp";
 import type { Product } from "@/lib/types";
 import { formatVND } from "@/lib/format";
 import {
@@ -57,6 +58,9 @@ import {
   Copy,
   FilePlus2,
   Flame,
+  Globe,
+  Eye,
+  EyeOff,
   Images,
   LayoutGrid,
   List,
@@ -366,6 +370,7 @@ type SanPhamSearch = {
   supplier?: string[];
   hot?: boolean;
   stockLocation?: string;
+  web?: "all" | "public" | "hidden";
   view?: ViewMode;
   sort?: ProductSort;
 };
@@ -393,6 +398,7 @@ export const Route = createFileRoute("/_app/san-pham")({
       ? (search.supplier as string[])
       : parseCsv(search.supplier),
     hot: search.hot === true || search.hot === "1",
+    web: search.web === "public" || search.web === "hidden" ? search.web : undefined,
     view: search.view === "list" || search.view === "grid" ? search.view : undefined,
     stockLocation: typeof search.stockLocation === "string" ? search.stockLocation : undefined,
     sort: parseSort(search.sort),
@@ -532,6 +538,7 @@ function ProductsPage() {
     collections: effectsParam = [],
     supplier: collectionsParam = [],
     hot: hotParam = false,
+    web: webParam,
     view: viewParam = "grid",
     stockLocation: stockLocParam,
     sort: sortParam = "default",
@@ -540,6 +547,7 @@ function ProductsPage() {
   const viewMode: ViewMode = viewParam === "list" ? "list" : "grid";
 
   const category = categoryFromSlug(nhom);
+  const supportsSizeTab = category === "Gạch bông" || category === "Gạch Ốp Lát";
   const groupLabel = labelFromSlug(nhom);
 
   // Input search dùng local state + debounce vào URL để đỡ giật
@@ -690,6 +698,8 @@ function ProductsPage() {
         if (exclude !== "effect" && !matchesFacet(effectSet, p.collections)) return false;
         if (exclude !== "collection" && !matchesFacet(collectionSet, p.supplier)) return false;
         if (hotParam && !p.is_hot) return false;
+        if (webParam === "public" && p.is_public !== 1) return false;
+        if (webParam === "hidden" && p.is_public === 1) return false;
         if (!q) return true;
         if (isSizeQuery) return false;
         const searchable = [codeHay, nameHay, collectionHay].filter(Boolean).join(" ");
@@ -707,6 +717,7 @@ function ProductsPage() {
       effectSet,
       collectionSet,
       hotParam,
+      webParam,
     ],
   );
 
@@ -730,15 +741,6 @@ function ProductsPage() {
       .map(toFacetOption);
   }, [matchIndexed]);
 
-  const sizeOptions = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { p } of matchIndexed("size")) {
-      addFacetCount(map, p.size);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], "vi", { numeric: true }))
-      .map(toFacetOption);
-  }, [matchIndexed]);
 
   const shapeOptions = useMemo(() => {
     const map = new Map<string, number>();
@@ -849,6 +851,7 @@ function ProductsPage() {
         effectsParam.join(","),
         collectionsParam.join(","),
         hotParam ? "1" : "0",
+        webParam ?? "all",
         stockLocParam,
         sortParam,
       ].join("|"),
@@ -862,6 +865,7 @@ function ProductsPage() {
       effectsParam,
       collectionsParam,
       hotParam,
+      webParam,
       stockLocParam,
       sortParam,
     ],
@@ -911,6 +915,7 @@ function ProductsPage() {
     effectsParam.length +
     collectionsParam.length +
     (hotParam ? 1 : 0) +
+    (webParam ? 1 : 0) +
     (stockLocParam === "KHOVP" ? 1 : 0);
 
   const hasActiveFilter = activeCount > 0;
@@ -961,6 +966,12 @@ function ProductsPage() {
       replace: true,
     });
   }
+  useEffect(() => {
+    if (!supportsSizeTab && sizesParam.length > 0) {
+      setSearch({ sizes: undefined });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportsSizeTab, sizesParam]);
 
   function setViewMode(v: ViewMode) {
     setSearch({ view: v === "grid" ? undefined : v });
@@ -984,7 +995,6 @@ function ProductsPage() {
   const onEditProduct = useCallback((p: Product) => setEditProduct(p), []);
   const onImagesProduct = useCallback((p: Product) => setImagesProduct(p), []);
 
-  /** Multi-select (list view) */
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
@@ -1048,6 +1058,66 @@ function ProductsPage() {
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
+  const onTogglePublic = useCallback(
+    async (product: Product) => {
+      const next = product.is_public === 1 ? 0 : 1;
+      try {
+        await updateProductFn({
+          data: {
+            id: product.id,
+            is_public: next,
+          },
+        });
+        toast.success(
+          next === 1
+            ? `Đã hiện mã ${product.code} trên Thư viện web`
+            : `Đã ẩn mã ${product.code} khỏi Thư viện web`,
+        );
+        await router.invalidate();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
+      }
+    },
+    [router],
+  );
+
+  async function bulkPublish() {
+    if (!selectedProducts.length || bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      await bulkSetProductsPublicFn({
+        data: {
+          productIds: selectedProducts.map((p) => p.id),
+          is_public: 1,
+        },
+      });
+      toast.success(`Đã xuất bản ${selectedProducts.length} sản phẩm lên Thư viện web`);
+      await router.invalidate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkUnpublish() {
+    if (!selectedProducts.length || bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      await bulkSetProductsPublicFn({
+        data: {
+          productIds: selectedProducts.map((p) => p.id),
+          is_public: 0,
+        },
+      });
+      toast.success(`Đã ẩn ${selectedProducts.length} sản phẩm khỏi Thư viện web`);
+      await router.invalidate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
   async function bulkCopyCodes() {
     if (!selectedProducts.length) return;
     const text = [...new Set(selectedProducts.map((product) => product.code.trim()).filter(Boolean))].join(" ");
@@ -1227,19 +1297,8 @@ function ProductsPage() {
 
         {/* Hàng 3: facets — desktop primary chips; mobile gọn + sheet */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Desktop: Size · Màu · Bề mặt · Giá */}
+          {/* Desktop: facets */}
           <div className="hidden md:contents">
-            <FilterChip label="Kích thước" count={sizesParam.length}>
-              <MultiSelectFilter
-                title="Chọn kích thước"
-                options={sizeOptions}
-                selected={sizesParam}
-                onChange={(next) =>
-                  setSearch({ sizes: next.length ? next : undefined })
-                }
-                searchable
-              />
-            </FilterChip>
             <FilterChip label="Màu" count={colorsParam.length}>
               <MultiSelectFilter
                 title="Chọn màu"
@@ -1259,10 +1318,10 @@ function ProductsPage() {
                 onChange={(next) =>
                   setSearch({ surfaces: next.length ? next : undefined })
                 }
-                 searchable
-               />
-             </FilterChip>
-             <FilterChip label="Kiểu dáng" count={shapesParam.length}>
+                searchable
+              />
+            </FilterChip>
+            <FilterChip label="Kiểu dáng" count={shapesParam.length}>
               <MultiSelectFilter
                 title="Chọn kiểu dáng"
                 options={shapeOptions}
@@ -1281,10 +1340,10 @@ function ProductsPage() {
                 onChange={(next) =>
                   setSearch({ collections: next.length ? next : undefined })
                 }
-                 searchable
-               />
-             </FilterChip>
-           </div>
+                searchable
+              />
+            </FilterChip>
+          </div>
 
           {/* Mobile: 1 nút mở sheet full facets */}
           <button
@@ -1328,6 +1387,48 @@ function ProductsPage() {
               {hotInScope}
             </span>
           </button>
+
+          {/* Bộ lọc trạng thái Web / Thư viện */}
+          <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 h-9 items-center">
+            <button
+              type="button"
+              onClick={() => setSearch({ web: undefined })}
+              className={cn(
+                "px-2.5 py-1 text-xs font-medium rounded-full transition-colors",
+                !webParam || webParam === "all"
+                  ? "bg-card text-foreground shadow-sm ring-1 ring-black/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+              )}
+            >
+              Tất cả Web
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearch({ web: "public" })}
+              className={cn(
+                "px-2.5 py-1 text-xs font-medium rounded-full transition-colors inline-flex items-center gap-1",
+                webParam === "public"
+                  ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-700/30 font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+              )}
+            >
+              <Globe className="size-3" />
+              Hiện Web
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearch({ web: "hidden" })}
+              className={cn(
+                "px-2.5 py-1 text-xs font-medium rounded-full transition-colors inline-flex items-center gap-1",
+                webParam === "hidden"
+                  ? "bg-card text-foreground shadow-sm ring-1 ring-black/5 font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+              )}
+            >
+              <EyeOff className="size-3" />
+              Ẩn Web
+            </button>
+          </div>
         </div>
 
         {/* Mobile / tablet sheet: tất cả facet */}
@@ -1337,15 +1438,6 @@ function ProductsPage() {
               <DialogTitle>Bộ lọc sản phẩm</DialogTitle>
             </DialogHeader>
             <div className="space-y-2 py-1">
-              <FilterSection title="Kích thước" count={filtersDraft?.sizes.length ?? sizesParam.length}>
-                <MultiSelectFilter
-                  title="Chọn kích thước"
-                  options={sizeOptions}
-                  selected={filtersDraft?.sizes ?? sizesParam}
-                  onChange={(next) => patchFiltersDraft({ sizes: next })}
-                  searchable
-                />
-              </FilterSection>
               <FilterSection title="Màu" count={filtersDraft?.colors.length ?? colorsParam.length}>
                 <MultiSelectFilter
                   title="Chọn màu"
@@ -1448,18 +1540,6 @@ function ProductsPage() {
                 }
               >
                 {s}
-              </ActiveTag>
-            ))}
-            {sizesParam.map((s: string) => (
-              <ActiveTag
-                key={`size-${s}`}
-                onClear={() =>
-                  setSearch({
-                    sizes: sizesParam.filter((x: string) => x !== s),
-                  })
-                }
-              >
-                Size: {s}
               </ActiveTag>
             ))}
             {shapesParam.map((s: string) => (
@@ -1586,13 +1666,14 @@ function ProductsPage() {
       </div>
 
       {viewMode === "grid" ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5">
           {visibleItems.map((t) => (
             <ProductCard
               key={t.id}
               product={t}
               selected={selectedIds.has(t.id)}
               onToggleSelect={toggleSelect}
+              onTogglePublic={canEditProducts ? onTogglePublic : undefined}
               onEdit={canEditProducts ? onEditProduct : undefined}
               onImages={onImagesProduct}
             />
@@ -1620,6 +1701,7 @@ function ProductsPage() {
               product={t}
               selected={selectedIds.has(t.id)}
               onToggleSelect={toggleSelect}
+              onTogglePublic={canEditProducts ? onTogglePublic : undefined}
               onEdit={canEditProducts ? onEditProduct : undefined}
               onImages={onImagesProduct}
             />
@@ -1627,99 +1709,54 @@ function ProductsPage() {
         </div>
       )}
 
-      {/* Bulk action bar — gọn, nổi đáy khi có SP được tick */}
+      {/* Quick actions — giữ trực tiếp trên thanh nổi, compact như catalog ban đầu */}
       {selectedCount > 0 ? (
-        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-[min(96vw,28rem)] safe-pb">
-          <div className="flex items-center gap-1 rounded-full bg-foreground/95 text-background shadow-lg ring-1 ring-white/10 backdrop-blur-sm pl-3 pr-1.5 py-1.5">
-            <span className="text-xs font-semibold tabular-nums text-primary-foreground min-w-[1.25rem] text-center">
+        <div className="fixed bottom-3 left-1/2 z-40 max-w-[min(96vw,28rem)] -translate-x-1/2 safe-pb">
+          <div className="flex flex-wrap items-center justify-center gap-1 rounded-full bg-foreground/95 px-2 py-1.5 text-background shadow-lg ring-1 ring-white/10 backdrop-blur-sm sm:flex-nowrap">
+            <span className="min-w-[1.25rem] text-center text-xs font-semibold tabular-nums text-primary-foreground">
               {selectedCount}
             </span>
-            <span className="text-[11px] text-background/70 pr-1 hidden sm:inline">
-              đã chọn
-            </span>
-            <span className="w-px h-4 bg-white/15 mx-0.5" aria-hidden />
-            <button
-              type="button"
-              onClick={selectAllFiltered}
-              disabled={bulkBusy || allFilteredSelected}
-              title={`Chọn hết ${filtered.length} SP`}
-              className="h-7 px-2 rounded-full text-[11px] font-medium text-background/90 hover:bg-white/10 disabled:opacity-35 transition-colors"
-            >
-              Hết
-              <span className="tabular-nums text-background/50 ml-0.5">
-                {filtered.length}
-              </span>
+            <span className="hidden pr-1 text-[11px] text-background/70 sm:inline">đã chọn</span>
+            <span className="mx-0.5 h-4 w-px bg-white/15" aria-hidden />
+            <button type="button" onClick={selectAllFiltered} disabled={bulkBusy || allFilteredSelected} title={`Chọn hết ${filtered.length} SP`} className="h-7 rounded-full px-2 text-[11px] font-medium text-background/90 transition-colors hover:bg-white/10 disabled:opacity-35">
+              Hết <span className="ml-0.5 tabular-nums text-background/50">{filtered.length}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setQuoteFromSelection(true)}
-              disabled={bulkBusy}
-              title={`Tạo báo giá (${selectedCount} SP)`}
-              className="h-7 px-2 rounded-full text-[11px] font-medium bg-terracotta text-primary-foreground hover:opacity-90 inline-flex items-center gap-1 disabled:opacity-35 transition-opacity"
-            >
+            <button type="button" onClick={() => setQuoteFromSelection(true)} disabled={bulkBusy} title={`Tạo báo giá (${selectedCount} SP)`} className="inline-flex h-7 items-center gap-1 rounded-full bg-terracotta px-2 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-35">
               <FilePlus2 className="size-3.5" />
-              <span className="hidden xs:inline sm:inline">Báo giá</span>
-            </button>
-            <button
-              type="button"
-              onClick={bulkCopyCodes}
-              disabled={bulkBusy}
-              title="Copy mã đã chọn"
-              className="size-7 grid place-items-center rounded-full hover:bg-white/10 disabled:opacity-35 transition-colors"
-            >
-              <Copy className="size-3.5" />
+              <span>Báo giá</span>
             </button>
             {canEditProducts ? (
-              <button
-                type="button"
-                onClick={() => setBulkEditOpen(true)}
-                disabled={bulkBusy}
-                title="Gán giá trị hàng loạt (màu, bộ sưu tập, danh mục...)"
-                className="size-7 grid place-items-center rounded-full hover:bg-white/10 disabled:opacity-35 transition-colors"
-              >
+              <button type="button" onClick={() => setBulkEditOpen(true)} disabled={bulkBusy} title="Gán giá trị hàng loạt" className="grid size-7 place-items-center rounded-full transition-colors hover:bg-white/10 disabled:opacity-35">
                 <Tags className="size-3.5" />
               </button>
             ) : null}
             {canEditProducts ? (
+              <>
+                <button type="button" onClick={bulkPublish} disabled={bulkBusy} title={`Hiện ${selectedCount} SP lên Thư viện web`} className="grid size-7 place-items-center rounded-full bg-emerald-600 text-white transition-colors hover:bg-emerald-500 disabled:opacity-35">
+                  <Globe className="size-3.5" />
+                </button>
+                <button type="button" onClick={bulkUnpublish} disabled={bulkBusy} title={`Ẩn ${selectedCount} SP khỏi Thư viện web`} className="grid size-7 place-items-center rounded-full transition-colors hover:bg-white/10 disabled:opacity-35">
+                  <EyeOff className="size-3.5" />
+                </button>
+              </>
+            ) : null}
+            <button type="button" onClick={bulkCopyCodes} disabled={bulkBusy} title="Copy mã đã chọn" className="grid size-7 place-items-center rounded-full transition-colors hover:bg-white/10 disabled:opacity-35">
+              <Copy className="size-3.5" />
+            </button>
+            {canEditProducts ? (
               pendingBulkDelete ? (
                 <div className="flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 ring-1 ring-red-400/30">
-                  <span className="text-[11px] text-red-200 font-medium">Xóa {selectedCount} SP?</span>
-                  <button
-                    type="button"
-                    onClick={bulkDelete}
-                    disabled={bulkBusy}
-                    className="size-6 grid place-items-center rounded-full bg-red-500 text-white hover:opacity-90 disabled:opacity-50"
-                  >
-                    {bulkBusy ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={bulkBusy}
-                    onClick={() => setPendingBulkDelete(false)}
-                    className="size-6 grid place-items-center rounded-full hover:bg-white/10 disabled:opacity-50"
-                  >
-                    <X className="size-3" />
-                  </button>
+                  <span className="text-[11px] font-medium text-red-200">Xóa {selectedCount} SP?</span>
+                  <button type="button" onClick={bulkDelete} disabled={bulkBusy} className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-red-500 disabled:opacity-50">Xóa vĩnh viễn</button>
+                  <button type="button" onClick={() => setPendingBulkDelete(false)} disabled={bulkBusy} className="grid size-6 place-items-center rounded-full hover:bg-white/10 disabled:opacity-50" title="Không xóa"><X className="size-3" /></button>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={bulkDelete}
-                  disabled={bulkBusy}
-                  title="Xóa đã chọn"
-                  className="size-7 grid place-items-center rounded-full text-red-300 hover:bg-red-500/25 disabled:opacity-35 transition-colors"
-                >
+                <button type="button" onClick={() => setPendingBulkDelete(true)} disabled={bulkBusy} title="Xóa đã chọn" className="grid size-7 place-items-center rounded-full text-red-300 transition-colors hover:bg-red-500/25 disabled:opacity-35">
                   <Trash2 className="size-3.5" />
                 </button>
               )
             ) : null}
-            <button
-              type="button"
-              onClick={clearSelection}
-              disabled={bulkBusy}
-              title="Bỏ chọn"
-              className="size-7 grid place-items-center rounded-full hover:bg-white/10 disabled:opacity-35 transition-colors"
-            >
+            <button type="button" onClick={clearSelection} disabled={bulkBusy} title="Bỏ chọn" className="grid size-7 place-items-center rounded-full transition-colors hover:bg-white/10 disabled:opacity-35">
               <X className="size-3.5" />
             </button>
           </div>
@@ -1915,12 +1952,14 @@ const ProductCard = memo(function ProductCard({
   product: t,
   selected,
   onToggleSelect,
+  onTogglePublic,
   onEdit,
   onImages,
 }: {
   product: Product;
   selected: boolean;
   onToggleSelect: (id: number) => void;
+  onTogglePublic?: (p: Product) => void;
   onEdit?: (p: Product) => void;
   onImages?: (p: Product) => void;
 }) {
@@ -1964,6 +2003,16 @@ const ProductCard = memo(function ProductCard({
         {t.is_hot ? (
           <span className="absolute top-2.5 left-10 z-[1] text-[10px] font-semibold tracking-wide uppercase bg-terracotta text-primary-foreground px-2 py-0.5 rounded-full pointer-events-none">
             Hot
+          </span>
+        ) : null}
+        {t.is_public === 1 ? (
+          <span
+            className={cn(
+              "absolute top-2.5 z-[1] inline-flex items-center gap-1 rounded-full bg-emerald-600/90 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white pointer-events-none",
+              t.is_hot ? "left-20" : "left-10",
+            )}
+          >
+            <Globe className="size-2.5" /> Web
           </span>
         ) : null}
         {(t.image_count ?? 0) > 1 ? (
@@ -2049,12 +2098,14 @@ const ProductListRow = memo(function ProductListRow({
   product: t,
   selected,
   onToggleSelect,
+  onTogglePublic,
   onEdit,
   onImages,
 }: {
   product: Product;
   selected: boolean;
   onToggleSelect: (id: number) => void;
+  onTogglePublic?: (p: Product) => void;
   onEdit?: (p: Product) => void;
   onImages?: (p: Product) => void;
 }) {
@@ -2082,96 +2133,129 @@ const ProductListRow = memo(function ProductListRow({
 
   return (
     <article
-      className={
+      className={cn(
+        "rounded-2xl bg-card transition-all duration-150 p-3 sm:p-4 border",
         selected
-          ? "rounded-xl border-2 border-terracotta bg-card px-3 sm:px-4 py-3 shadow-sm transition-colors"
-          : "rounded-xl border border-border/70 bg-card px-3 sm:px-4 py-3 hover:border-border hover:shadow-sm transition-colors"
-      }
+          ? "border-2 border-terracotta shadow-xs ring-2 ring-terracotta/10 bg-terracotta/[0.015]"
+          : "border-border/80 hover:border-border hover:shadow-xs",
+      )}
     >
-      <div className="flex gap-3 sm:gap-4 items-start">
-        <ProductCheck
-          checked={selected}
-          onChange={() => onToggleSelect(t.id)}
-          label={`Chọn ${t.code}`}
-          className="mt-1 flex-shrink-0"
-        />
-
-        <div className="size-16 sm:size-[4.5rem] rounded-xl overflow-hidden bg-[#f7f6f4] ring-1 ring-black/5 flex-shrink-0 relative">
-          <ProductImage
-            src={t.image_path}
-            alt={t.name}
-            code={t.code}
-            fit="contain"
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 sm:gap-5 justify-between">
+        {/* Left column: Checkbox + Square Image + Details */}
+        <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1">
+          <ProductCheck
+            checked={selected}
+            onChange={() => onToggleSelect(t.id)}
+            label={`Chọn ${t.code}`}
+            className="shrink-0 mt-0.5 sm:mt-0"
           />
-          {t.is_hot ? (
-            <span className="absolute top-1 left-1 text-[8px] font-bold uppercase tracking-wide bg-terracotta text-primary-foreground px-1.5 py-0.5 rounded-full">
-              Hot
-            </span>
-          ) : null}
-          {(t.image_count ?? 0) > 1 ? (
-            <span className="absolute bottom-1 right-1 text-[9px] font-medium tabular-nums bg-black/50 text-white px-1 rounded">
-              {t.image_count}
-            </span>
-          ) : null}
-        </div>
 
-        <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <p className="font-mono text-xs sm:text-sm font-semibold text-foreground">
-              {t.code}
-            </p>
-            {t.multi_codes_list ? (
-              <p className="text-[11px] text-muted-foreground">
-                NB: {t.multi_codes_list}
-              </p>
+          <div className="size-16 sm:size-[4.25rem] rounded-xl overflow-hidden bg-[#f7f6f4] ring-1 ring-black/5 shrink-0 relative">
+            <ProductImage
+              src={t.image_path}
+              alt={t.name}
+              code={t.code}
+              fit="contain"
+            />
+            {t.is_hot ? (
+              <span className="absolute top-1 left-1 text-[8px] font-bold uppercase tracking-wide bg-terracotta text-primary-foreground px-1.5 py-0.5 rounded-full">
+                Hot
+              </span>
+            ) : null}
+            {(t.image_count ?? 0) > 1 ? (
+              <span className="absolute bottom-1 right-1 text-[9px] font-medium tabular-nums bg-black/50 text-white px-1 rounded">
+                {t.image_count}
+              </span>
             ) : null}
           </div>
-          <h3 className="text-sm sm:text-[15px] font-medium leading-snug text-foreground line-clamp-2">
-            {t.name}
-          </h3>
-          {metaTags.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {metaTags.map((m) => (
-                <MetaTag key={m.kind} kind={m.kind} value={m.value} />
-              ))}
+
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="font-mono text-xs sm:text-sm font-bold text-foreground">
+                {t.code}
+              </span>
+              {t.multi_codes_list ? (
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  · NB: {t.multi_codes_list}
+                </span>
+              ) : null}
+              <span className="rounded bg-surface-strong px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {t.category}
+              </span>
             </div>
+
+            <h3 className="text-sm font-semibold leading-snug text-foreground truncate">
+              {t.name}
+            </h3>
+
+            {metaTags.length > 0 ? (
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {metaTags.map((m) => (
+                  <MetaTag key={m.kind} kind={m.kind} value={m.value} size="sm" />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Right column: Price/Stock + Actions */}
+        <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-border/50">
+          {/* Price & Stock */}
+          <div className="text-left sm:text-right min-w-[6.5rem]">
+            <p className="text-sm sm:text-base font-bold tabular-nums tracking-tight text-foreground">
+              {formatVND(t.retail_price)}
+              <span className="text-[10px] font-normal text-muted-foreground ml-0.5">/m²</span>
+            </p>
+            <p
+              className={cn(
+                "text-xs font-semibold tabular-nums mt-0.5",
+                stock != null && Number(t.total_stock) > 0
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-muted-foreground",
+              )}
+            >
+              {stock != null ? `Tồn: ${stock} m²` : "Tồn: —"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+          {/* Compact status badge; web mutations live in the multi-action dialog. */}
+          {t.is_public === 1 ? (
+            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+              <Globe className="size-3 text-emerald-600" /> Web
+            </span>
           ) : null}
 
-          <div className="flex flex-wrap items-end justify-between gap-2 mt-1 pt-1">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <div>
-                <p className="text-sm sm:text-base font-semibold tabular-nums tracking-tight text-foreground">
-                  {formatVND(t.retail_price)}
-                </p>
-                <p className="text-[10px] text-muted-foreground">/m² lẻ</p>
-              </div>
-              <p
-                className={
-                  stock != null && Number(t.total_stock) > 0
-                    ? "text-xs font-medium tabular-nums text-emerald-700"
-                    : "text-xs tabular-nums text-muted-foreground"
-                }
+            {onImages ? (
+              <button
+                type="button"
+                onClick={() => onImages(t)}
+                className="size-8 grid place-items-center rounded-xl bg-surface-strong hover:bg-accent text-muted-foreground hover:text-foreground transition-colors border border-border/70"
+                title="Quản lý hình ảnh"
               >
-                Tồn: {stock != null ? `${stock} m²` : "—"}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {onEdit ? (
-                <QuickBtn onClick={() => onEdit(t)} icon={Pencil} label="Sửa" />
-              ) : null}
-              {onImages ? (
-                <QuickBtn
-                  onClick={() => onImages(t)}
-                  icon={Images}
-                  label="Hình"
-                />
-              ) : null}
-              <QuickBtn
-                onClick={copyCode}
-                icon={copied ? Check : Copy}
-                label={copied ? "OK" : "Copy mã"}
-              />
-            </div>
+                <Images className="size-3.5" />
+              </button>
+            ) : null}
+
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={() => onEdit(t)}
+                className="size-8 grid place-items-center rounded-xl bg-surface-strong hover:bg-accent text-muted-foreground hover:text-foreground transition-colors border border-border/70"
+                title="Sửa thông tin sản phẩm"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={copyCode}
+              className="size-8 grid place-items-center rounded-xl bg-surface-strong hover:bg-accent text-muted-foreground hover:text-foreground transition-colors border border-border/70"
+              title={copied ? "Đã copy!" : "Copy mã sản phẩm"}
+            >
+              {copied ? <Check className="size-3.5 text-emerald-600 stroke-[2.5]" /> : <Copy className="size-3.5" />}
+            </button>
           </div>
         </div>
       </div>
@@ -2179,26 +2263,6 @@ const ProductListRow = memo(function ProductListRow({
   );
 });
 
-function QuickBtn({
-  onClick,
-  icon: Icon,
-  label,
-}: {
-  onClick: () => void;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="h-8 px-2 sm:px-2.5 rounded-lg text-[11px] font-medium inline-flex items-center gap-1 ring-1 ring-black/5 bg-card hover:bg-surface-strong text-foreground transition-colors"
-    >
-      <Icon className="size-3.5 opacity-80" />
-      <span>{label}</span>
-    </button>
-  );
-}
 
 
 

@@ -1181,6 +1181,8 @@ function AreaGroup({
     if (event.over == null || event.active.id === event.over.id) return;
     onReorderOptions(String(event.active.id), String(event.over.id));
   }
+
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(false);
   return (
     <section className="rounded-2xl border border-border/80 bg-surface-strong/20 overflow-hidden">
       <div className="min-h-12 px-3 sm:px-4 flex items-center gap-2 bg-surface-strong/55 border-b border-border">
@@ -1222,19 +1224,38 @@ function AreaGroup({
           <button type="button" onClick={() => onMoveGroup(-1)} disabled={groupIndex === 0} className="size-8 grid place-items-center rounded-md hover:bg-surface-strong disabled:opacity-25" aria-label="Đưa khu vực lên"><ChevronUp className="size-3.5" /></button>
           <button type="button" onClick={() => onMoveGroup(1)} disabled={groupIndex === groupCount - 1} className="size-8 grid place-items-center rounded-md hover:bg-surface-strong disabled:opacity-25" aria-label="Đưa khu vực xuống"><ChevronDown className="size-3.5" /></button>
         </div>
-        <button
-          type="button"
-          onClick={() =>
-            window.confirm(
-              `Xóa khu vực ${groupIndex + 1} và ${group.items.length} phương án bên trong?`,
-            ) && onRemoveGroup(group.key)
-          }
-          title="Xóa khu vực"
-          aria-label="Xóa khu vực"
-          className="size-8 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
+        {confirmDeleteGroup ? (
+          <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/40 p-0.5 rounded-lg border border-red-200 dark:border-red-900/50 text-[10px]">
+            <span className="px-1 font-medium text-red-700 dark:text-red-300">Xóa KV {groupIndex + 1}?</span>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmDeleteGroup(false);
+                onRemoveGroup(group.key);
+              }}
+              className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white font-medium shadow-xs"
+            >
+              Xóa vĩnh viễn
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteGroup(false)}
+              className="px-1.5 py-0.5 rounded text-muted-foreground hover:bg-black/5"
+            >
+              Không xóa
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteGroup(true)}
+            title="Xóa khu vực"
+            aria-label="Xóa khu vực"
+            className="size-8 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        )}
       </div>
       {area.collapsed ? null : (
         <div className="grid grid-cols-1 md:grid-cols-[190px_minmax(0,1fr)] gap-3 p-3 bg-card">

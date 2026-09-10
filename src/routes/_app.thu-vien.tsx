@@ -84,8 +84,8 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** Chip lọc danh mục trên list Thư viện (3 nhóm chính) — thứ tự: Thẻ, Bông, Mosaic. */
-const LIBRARY_CATEGORY_SLUGS = ["gach-the", "gach-bong", "gach-mosaic"] as const;
+/** Chip lọc danh mục trên list Thư viện (4 nhóm chính) — thứ tự: Thẻ, Bông, Mosaic, Ốp Lát. */
+const LIBRARY_CATEGORY_SLUGS = ["gach-the", "gach-bong", "gach-mosaic", "gach-op-lat"] as const;
 type LibraryCategorySlug = (typeof LIBRARY_CATEGORY_SLUGS)[number];
 
 const LIBRARY_CATEGORY_CHIPS = LIBRARY_CATEGORY_SLUGS.map((slug) => {
