@@ -3027,7 +3027,7 @@ export async function listFlatMediaImages(opts?: {
     room_tags: tagsByImage.get(item.id) ?? [],
   }));
 
-  return { items: itemsWithTags, total, counts, roomCounts };
+  return { items: itemsWithTags, total, counts, publicCounts, roomCounts };
 }
 
 export async function bulkSetProductImageKind(

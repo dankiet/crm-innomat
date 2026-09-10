@@ -575,7 +575,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
 
           {/* ── Tồn & ghi chú ── */}
           <FormSection title="Tồn kho & ghi chú">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 gap-2.5">
               <div className="flex items-end pb-1">
                 <button
                   type="button"
@@ -591,7 +591,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                   <span
                     className={
                       form.is_hot
-                        ? "size-4 rounded grid place-items-center bg-terracotta text-primary-foreground"
+                        ? "size-4 rounded grid place-items-center bg-terracotta text-white"
                         : "size-4 rounded grid place-items-center bg-card ring-1 ring-black/10"
                     }
                     aria-hidden
@@ -611,48 +611,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                   Đánh dấu bán chạy
                 </button>
               </div>
-              {/* Cờ hiển thị trên landing page. Không có ảnh thì LP bỏ qua product này */}
-              <div className="flex items-end pb-1">
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={form.is_public}
-                  onClick={() => setForm((f) => ({ ...f, is_public: !f.is_public }))}
-                  className={
-                    form.is_public
-                      ? "inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-medium bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/25 transition-colors"
-                      : "inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-medium text-muted-foreground bg-surface-strong/50 ring-1 ring-black/5 hover:text-foreground transition-colors"
-                  }
-                >
-                  <span
-                    className={
-                      form.is_public
-                        ? "size-4 rounded grid place-items-center bg-emerald-600 text-white"
-                        : "size-4 rounded grid place-items-center bg-card ring-1 ring-black/10"
-                    }
-                    aria-hidden
-                  >
-                    {form.is_public ? (
-                      <svg
-                        viewBox="0 0 16 16"
-                        className="size-2.5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                      >
-                        <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
-                      </svg>
-                    ) : null}
-                  </span>
-                  Hiện trên Landing page
-                </button>
-              </div>
             </div>
-            {form.is_public && !form.image_path.trim() ? (
-              <p className="mt-2 text-xs text-amber-700">
-                Sản phẩm chưa có ảnh nên sẽ không xuất hiện trên landing page.
-              </p>
-            ) : null}
             <div className="mt-2.5">
               <Field label="Ghi chú">
                 <textarea

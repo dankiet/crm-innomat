@@ -1387,48 +1387,6 @@ function ProductsPage() {
               {hotInScope}
             </span>
           </button>
-
-          {/* Bộ lọc trạng thái Web / Thư viện */}
-          <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 h-9 items-center">
-            <button
-              type="button"
-              onClick={() => setSearch({ web: undefined })}
-              className={cn(
-                "px-2.5 py-1 text-xs font-medium rounded-full transition-colors",
-                !webParam || webParam === "all"
-                  ? "bg-card text-foreground shadow-sm ring-1 ring-black/5"
-                  : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-              )}
-            >
-              Tất cả Web
-            </button>
-            <button
-              type="button"
-              onClick={() => setSearch({ web: "public" })}
-              className={cn(
-                "px-2.5 py-1 text-xs font-medium rounded-full transition-colors inline-flex items-center gap-1",
-                webParam === "public"
-                  ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-700/30 font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-              )}
-            >
-              <Globe className="size-3" />
-              Hiện Web
-            </button>
-            <button
-              type="button"
-              onClick={() => setSearch({ web: "hidden" })}
-              className={cn(
-                "px-2.5 py-1 text-xs font-medium rounded-full transition-colors inline-flex items-center gap-1",
-                webParam === "hidden"
-                  ? "bg-card text-foreground shadow-sm ring-1 ring-black/5 font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-              )}
-            >
-              <EyeOff className="size-3" />
-              Ẩn Web
-            </button>
-          </div>
         </div>
 
         {/* Mobile / tablet sheet: tất cả facet */}
@@ -1729,16 +1687,6 @@ function ProductsPage() {
               <button type="button" onClick={() => setBulkEditOpen(true)} disabled={bulkBusy} title="Gán giá trị hàng loạt" className="grid size-7 place-items-center rounded-full transition-colors hover:bg-white/10 disabled:opacity-35">
                 <Tags className="size-3.5" />
               </button>
-            ) : null}
-            {canEditProducts ? (
-              <>
-                <button type="button" onClick={bulkPublish} disabled={bulkBusy} title={`Hiện ${selectedCount} SP lên Thư viện web`} className="grid size-7 place-items-center rounded-full bg-emerald-600 text-white transition-colors hover:bg-emerald-500 disabled:opacity-35">
-                  <Globe className="size-3.5" />
-                </button>
-                <button type="button" onClick={bulkUnpublish} disabled={bulkBusy} title={`Ẩn ${selectedCount} SP khỏi Thư viện web`} className="grid size-7 place-items-center rounded-full transition-colors hover:bg-white/10 disabled:opacity-35">
-                  <EyeOff className="size-3.5" />
-                </button>
-              </>
             ) : null}
             <button type="button" onClick={bulkCopyCodes} disabled={bulkBusy} title="Copy mã đã chọn" className="grid size-7 place-items-center rounded-full transition-colors hover:bg-white/10 disabled:opacity-35">
               <Copy className="size-3.5" />
