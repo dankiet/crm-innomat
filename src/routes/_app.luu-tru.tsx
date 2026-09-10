@@ -946,58 +946,59 @@ function MediaStoragePage() {
           </div>
           {/* Sắp xếp & Tiện ích phân trang */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Bộ lọc trạng thái Thư viện Web */}
-            <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs items-center">
-              <button
-                type="button"
-                onClick={() => setPublicFilter("all")}
-                className={cn(
-                  "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors cursor-pointer",
-                  publicFilter === "all"
-                    ? "bg-card text-foreground shadow-xs ring-1 ring-black/5 font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                )}
-              >
-                Tất cả Web
-              </button>
-              <button
-                type="button"
-                onClick={() => setPublicFilter("public")}
-                className={cn(
-                  "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
-                  publicFilter === "public"
-                    ? "bg-emerald-600 text-white shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                )}
-              >
-                <Globe className="size-2.5" />
-                <span>Hiện Web</span>
-                {publicCounts.public > 0 ? (
-                  <span className={cn("text-[9px] px-1 rounded-full font-bold tabular-nums", publicFilter === "public" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground")}>
-                    {publicCounts.public}
-                  </span>
-                ) : null}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPublicFilter("hidden")}
-                className={cn(
-                  "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
-                  publicFilter === "hidden"
-                    ? "bg-card text-foreground shadow-xs ring-1 ring-black/5 font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                )}
-              >
-                <EyeOff className="size-2.5" />
-                <span>Ẩn Web</span>
-                {publicCounts.hidden > 0 ? (
-                  <span className={cn("text-[9px] px-1 rounded-full font-bold tabular-nums", publicFilter === "hidden" ? "bg-black/10 text-foreground font-bold" : "bg-muted text-muted-foreground")}>
-                    {publicCounts.hidden}
-                  </span>
-                ) : null}
-              </button>
-            </div>
-
+            {/* Bộ lọc trạng thái Thư viện Web — Chỉ hiển thị khi đang ở tab "Chỉ ảnh MAP" */}
+            {tab === "map" ? (
+              <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs items-center animate-in fade-in-0 duration-150">
+                <button
+                  type="button"
+                  onClick={() => setPublicFilter("all")}
+                  className={cn(
+                    "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors cursor-pointer",
+                    publicFilter === "all"
+                      ? "bg-card text-foreground shadow-xs ring-1 ring-black/5 font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                  )}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPublicFilter("public")}
+                  className={cn(
+                    "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
+                    publicFilter === "public"
+                      ? "bg-emerald-600 text-white shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                  )}
+                >
+                  <Globe className="size-2.5" />
+                  <span>Hiện Web</span>
+                  {publicCounts.public > 0 ? (
+                    <span className={cn("text-[9px] px-1 rounded-full font-bold tabular-nums", publicFilter === "public" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground")}>
+                      {publicCounts.public}
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPublicFilter("hidden")}
+                  className={cn(
+                    "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
+                    publicFilter === "hidden"
+                      ? "bg-card text-foreground shadow-xs ring-1 ring-black/5 font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                  )}
+                >
+                  <EyeOff className="size-2.5" />
+                  <span>Ẩn Web</span>
+                  {publicCounts.hidden > 0 ? (
+                    <span className={cn("text-[9px] px-1 rounded-full font-bold tabular-nums", publicFilter === "hidden" ? "bg-black/10 text-foreground font-bold" : "bg-muted text-muted-foreground")}>
+                      {publicCounts.hidden}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+            ) : null}
             {/* Sắp xếp */}
             <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs">
               {SORT_OPTIONS.map((opt) => {
@@ -1623,28 +1624,31 @@ function MediaStoragePage() {
               </span>
               <span>ảnh đã chọn</span>
             </div>
-            {/* 1. Bulk Bật Thư viện Web */}
-            <button
-              type="button"
-              disabled={busyBulk}
-              onClick={() => requestBulkSetPublic(1)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-            >
-              <Globe className="size-3.5" />
-              <span>Bật Thư viện</span>
-            </button>
+            {/* 1. Bulk Bật Thư viện Web (Chỉ hiện khi ở tab MAP hoặc khi có ảnh MAP) */}
+            {tab === "map" ? (
+              <>
+                <button
+                  type="button"
+                  disabled={busyBulk}
+                  onClick={() => requestBulkSetPublic(1)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                >
+                  <Globe className="size-3.5" />
+                  <span>Bật Thư viện</span>
+                </button>
 
-            {/* 2. Bulk Ẩn khỏi Thư viện */}
-            <button
-              type="button"
-              disabled={busyBulk}
-              onClick={() => requestBulkSetPublic(0)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50 cursor-pointer"
-            >
-              <EyeOff className="size-3.5" />
-              <span>Ẩn Thư viện</span>
-            </button>
-
+                {/* 2. Bulk Ẩn khỏi Thư viện */}
+                <button
+                  type="button"
+                  disabled={busyBulk}
+                  onClick={() => requestBulkSetPublic(0)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50 cursor-pointer"
+                >
+                  <EyeOff className="size-3.5" />
+                  <span>Ẩn Thư viện</span>
+                </button>
+              </>
+            ) : null}
             {/* Bulk set MAP */}
             <button
               type="button"
