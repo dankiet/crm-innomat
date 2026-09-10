@@ -49,6 +49,16 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export const Route = createFileRoute("/_app/luu-tru")({
+  loader: async () => {
+    const initialData = await fetchFlatMediaImagesFn({
+      data: {
+        tab: "all",
+        page: 1,
+        pageSize: 24,
+      },
+    });
+    return { initialData };
+  },
   component: MediaStoragePage,
 });
 
@@ -433,6 +443,15 @@ function BulkRoomTagPopover({
 }
 
 function MediaStoragePage() {
+  const { initialData } = Route.useLoaderData() as {
+    initialData?: {
+      items: FlatMediaItem[];
+      total: number;
+      counts: { all: number; map: number; concept: number; featured: number; unassigned: number };
+      publicCounts: { all: number; public: number; hidden: number };
+      roomCounts: Record<string, number>;
+    };
+  };
   const [tab, setTab] = useState<FlatMediaTab>("all");
   const [category, setCategory] = useState<string>("all");
   const [roomSlug, setRoomSlug] = useState<ImageRoomTagSlug | "all">("all");
@@ -474,16 +493,16 @@ function MediaStoragePage() {
       toast.error(err instanceof Error ? err.message : "Lỗi cập nhật hiển thị");
     }
   }
-
-  // Pagination state
-  const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(24);
-  const [jumpPageInput, setJumpPageInput] = useState<string>("");
-
-  const [counts, setCounts] = useState({ all: 0, map: 0, concept: 0, featured: 0, unassigned: 0 });
-  const [publicCounts, setPublicCounts] = useState({ all: 0, public: 0, hidden: 0 });
-  const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<FlatMediaItem[]>(initialData?.items ?? []);
+  const [total, setTotal] = useState(initialData?.total ?? 0);
+  const [counts, setCounts] = useState(
+    initialData?.counts ?? { all: 0, map: 0, concept: 0, featured: 0, unassigned: 0 },
+  );
+  const [publicCounts, setPublicCounts] = useState(
+    initialData?.publicCounts ?? { all: 0, public: 0, hidden: 0 },
+  );
+  const [roomCounts, setRoomCounts] = useState<Record<string, number>>(initialData?.roomCounts ?? {});
+  const [loading, setLoading] = useState(!initialData);
 
   // Multi-select for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());

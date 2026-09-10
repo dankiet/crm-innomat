@@ -4,12 +4,9 @@ import { loginFn, fetchMe } from "@/api/functions";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
-    try {
-      const me = await fetchMe();
-      if (me) throw redirect({ to: "/tong-quan" });
-    } catch (e) {
-      // ignore non-redirect errors (not logged in)
-      if (e && typeof e === "object" && "to" in e) throw e;
+    const me = await fetchMe();
+    if (me) {
+      throw redirect({ to: "/tong-quan" });
     }
   },
   component: LoginPage,
