@@ -480,6 +480,12 @@ function MediaStoragePage() {
       toast.error(err instanceof Error ? err.message : "Lỗi cập nhật hiển thị");
     }
   }
+
+  // Pagination state
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(24);
+  const [jumpPageInput, setJumpPageInput] = useState<string>("");
+
   const [items, setItems] = useState<FlatMediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ all: 0, map: 0, concept: 0, featured: 0, unassigned: 0 });
