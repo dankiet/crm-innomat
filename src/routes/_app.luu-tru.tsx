@@ -49,6 +49,12 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export const Route = createFileRoute("/_app/luu-tru")({
+  errorComponent: ({ error }) => (
+    <div className="p-8 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300">
+      <h2 className="text-base font-bold">Lỗi tải Kho ảnh</h2>
+      <pre className="mt-2 text-xs font-mono whitespace-pre-wrap">{error instanceof Error ? error.stack || error.message : String(error)}</pre>
+    </div>
+  ),
   component: MediaStoragePage,
 });
 

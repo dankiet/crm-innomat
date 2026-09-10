@@ -1953,16 +1953,6 @@ const ProductCard = memo(function ProductCard({
             Hot
           </span>
         ) : null}
-        {t.is_public === 1 ? (
-          <span
-            className={cn(
-              "absolute top-2.5 z-[1] inline-flex items-center gap-1 rounded-full bg-emerald-600/90 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white pointer-events-none",
-              t.is_hot ? "left-20" : "left-10",
-            )}
-          >
-            <Globe className="size-2.5" /> Web
-          </span>
-        ) : null}
         {(t.image_count ?? 0) > 1 ? (
           <span className="absolute top-2.5 right-2.5 z-[1] text-[10px] font-medium tabular-nums bg-black/50 backdrop-blur-sm text-white px-1.5 py-0.5 rounded-md pointer-events-none">
             {t.image_count}
@@ -2167,12 +2157,6 @@ const ProductListRow = memo(function ProductListRow({
           </div>
 
           <div className="flex items-center gap-1.5">
-          {/* Compact status badge; web mutations live in the multi-action dialog. */}
-          {t.is_public === 1 ? (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-              <Globe className="size-3 text-emerald-600" /> Web
-            </span>
-          ) : null}
 
             {onImages ? (
               <button
