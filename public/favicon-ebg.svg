@@ -1,0 +1,22 @@
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="14" fill="#1F2B33"/>
+  <g transform="translate(2, 0) scale(0.64)">
+    <!-- Floor Triangle Plane -->
+    <polygon points="20.0,92.0 53.0,71.8 57.3,74.2 57.3,92.0" fill="#F6EFE9" />
+    
+    <!-- Central Dark Vertical Slot -->
+    <polygon points="53.0,28.2 57.3,25.8 57.3,74.2 53.0,71.8" fill="#1A333B" />
+    <polygon points="53.0,28.2 56.6,26.2 56.6,20.0 53.0,28.2" fill="#1A333B" />
+    <rect x="56.6" y="19.8" width="0.7" height="8.4" fill="#1A333B" />
+
+    <!-- Left Terracotta Slab -->
+    <polygon points="20.0,46.2 53.0,28.2 53.0,71.8 20.0,92.0" fill="#D04A2B" />
+
+    <!-- Right Terracotta Slab -->
+    <polygon points="57.3,20.8 80.5,7.8 80.5,92.0 57.3,92.0" fill="#D04A2B" />
+
+    <!-- Architectural Construction Drafting Lines -->
+    <line x1="19.6" y1="46.0" x2="53.2" y2="27.9" stroke="#5B9B72" stroke-width="1.2" stroke-linecap="round" />
+    <line x1="56.9" y1="20.6" x2="80.7" y2="7.6" stroke="#5B9B72" stroke-width="1.2" stroke-linecap="round" />
+  </g>
+</svg>
