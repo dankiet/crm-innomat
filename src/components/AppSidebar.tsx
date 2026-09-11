@@ -183,19 +183,34 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   }, [isCatalogActive]);
   const [expandedSizeGroup, setExpandedSizeGroup] = useState<string | null>(null);
   const [sizeOptions, setSizeOptions] = useState<string[]>([]);
+  const [loadingSizes, setLoadingSizes] = useState(false);
   useEffect(() => {
     const group = PRODUCT_GROUPS.find((item) => item.slug === expandedSizeGroup);
-    if (!group || (group.slug !== "gach-bong" && group.slug !== "gach-op-lat")) {
+    if (!group || group.slug === "tat-ca") {
       setSizeOptions([]);
       return;
     }
     let cancelled = false;
+    setLoadingSizes(true);
     void fetchProductFieldValues({ data: { field: "size", category: group.category } })
       .then((values) => {
-        if (!cancelled) setSizeOptions(values);
+        if (!cancelled) {
+          // Sort sizes thông minh: theo diện tích / số học
+          const sorted = [...values].sort((a, b) => {
+            const area = (s: string) => {
+              const m = /^(\d+)[x×X*](\d+)/.exec(s.trim());
+              return m ? Number(m[1]) * Number(m[2]) : 999999;
+            };
+            return area(a) - area(b) || a.localeCompare(b, "vi", { numeric: true });
+          });
+          setSizeOptions(sorted);
+        }
       })
       .catch(() => {
         if (!cancelled) setSizeOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSizes(false);
       });
     return () => {
       cancelled = true;
@@ -274,40 +289,54 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                 const active = isCatalogActive && search?.nhom === group.slug;
                 return (
                   <Fragment key={group.slug}>
-                    <Link
-                      to="/san-pham"
-                      search={{ nhom: group.slug }}
-                      onClick={() => {
-                        if (group.slug === "gach-bong" || group.slug === "gach-op-lat") {
-                          setExpandedSizeGroup((current) => current === group.slug ? null : group.slug);
-                        }
-                        if (active) onMobileClose?.();
-                      }}
-                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
-                        active ? "font-semibold text-primary" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                      }`}
-                    >
-                      <Icon className="size-3.5 shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">{group.label}</span>
-                      {group.slug === "gach-bong" || group.slug === "gach-op-lat" ? (
-                        <ChevronRight className={`size-3 transition-transform ${expandedSizeGroup === group.slug ? "rotate-90" : ""}`} />
+                    <div className="flex items-center justify-between rounded-lg hover:bg-accent/60 transition-colors">
+                      <Link
+                        to="/san-pham"
+                        search={{ nhom: group.slug }}
+                        onClick={active ? onMobileClose : undefined}
+                        className={`flex flex-1 items-center gap-2 px-2.5 py-2 text-xs transition-colors ${
+                          active ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="size-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                      </Link>
+                      {group.slug !== "tat-ca" ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setExpandedSizeGroup((current) => (current === group.slug ? null : group.slug));
+                          }}
+                          aria-label={`Mở danh sách kích thước ${group.label}`}
+                          className="p-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          <ChevronRight
+                            className={`size-3 transition-transform ${
+                              expandedSizeGroup === group.slug ? "rotate-90 text-primary" : ""
+                            }`}
+                          />
+                        </button>
                       ) : null}
-                    </Link>
+                    </div>
                     {expandedSizeGroup === group.slug ? (
-                      <div className="ml-5 border-l border-border/70 pl-2">
+                      <div className="ml-5 border-l border-border/70 pl-2 py-0.5 space-y-0.5 animate-in fade-in-0 duration-150">
                         {sizeOptions.map((size) => (
                           <Link
                             key={size}
                             to="/san-pham"
                             search={{ nhom: group.slug, sizes: [size] }}
-                            onClick={active ? onMobileClose : undefined}
-                            className="block truncate rounded-md px-2 py-1.5 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                            onClick={onMobileClose}
+                            className="block truncate rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground transition-colors"
                           >
                             {size}
                           </Link>
                         ))}
-                        {!sizeOptions.length ? (
-                          <span className="block px-2 py-1.5 text-[11px] text-muted-foreground/70">Đang tải kích thước…</span>
+                        {loadingSizes ? (
+                          <span className="block px-2 py-1 text-[11px] text-muted-foreground/70 italic">Đang tải kích thước…</span>
+                        ) : !sizeOptions.length ? (
+                          <span className="block px-2 py-1 text-[11px] text-muted-foreground/70 italic">Không có kích thước</span>
                         ) : null}
                       </div>
                     ) : null}

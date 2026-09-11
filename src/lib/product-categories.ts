@@ -22,7 +22,7 @@ export const PRODUCT_GROUPS = [
   },
   {
     slug: "gach-op-lat",
-    category: "Gạch Ốp Lát",
+    category: "Gạch ốp lát",
     label: "Gạch Ốp Lát",
   },
 ] as const;

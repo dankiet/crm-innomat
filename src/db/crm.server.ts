@@ -181,8 +181,8 @@ export async function listProductFieldValues(
     throw new Error("Field không hợp lệ");
   }
   const db = getDb();
-  const where = category ? ` AND category = ?` : "";
-  const params = category ? [category] : [];
+  const where = category && category !== "all" ? ` AND LOWER(category) = LOWER(?)` : "";
+  const params = category && category !== "all" ? [category] : [];
   return (
     (await db
       .prepare(`SELECT DISTINCT ${field} AS v FROM products WHERE ${field} != ''${where} ORDER BY ${field}`)
