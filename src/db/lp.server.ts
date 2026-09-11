@@ -12,6 +12,8 @@
  */
 import { createHash } from "node:crypto";
 import { getDb, type SqlValue } from "./index.server";
+import { createCustomer } from "./crm.server";
+import { normalizePhone, isPhoneMatchable } from "@/lib/phone";
 import type {
   CatalogFacetOption,
   LpCatalogResult,
