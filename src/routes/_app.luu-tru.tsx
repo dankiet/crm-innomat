@@ -37,8 +37,15 @@ import {
   setProductImageKindFn,
   setProductImageRoomTagsFn,
 } from "@/api/functions";
-import { fetchLpHeroImageFn, setLpHeroImageFn, setFeaturedSlotFn, toggleProductPublicFn, bulkSetProductsPublicFn } from "@/api/lp";
-import type { ProductImageRow, ProductImageKind, ImageRoomTagSlug } from "@/lib/types";
+import {
+  fetchLpHeroImageFn,
+  setLpHeroImageFn,
+  setFeaturedSlotFn,
+  fetchFeaturedSlotsFn,
+  toggleProductPublicFn,
+  bulkSetProductsPublicFn,
+} from "@/api/lp";
+import type { FeaturedSlotInfo } from "@/db/lp.server";
 import { IMAGE_ROOM_TAGS } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -226,6 +233,31 @@ function QuickFeaturedRankPopover({
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [occupiedSlots, setOccupiedSlots] = useState<Record<number, FeaturedSlotInfo>>({});
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoadingSlots(true);
+    void fetchFeaturedSlotsFn()
+      .then((slots) => {
+        if (!cancelled) {
+          const map: Record<number, FeaturedSlotInfo> = {};
+          for (const s of slots) {
+            map[s.rank] = s;
+          }
+          setOccupiedSlots(map);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   async function handleAssign(rank: number) {
     setBusy(true);
@@ -278,38 +310,95 @@ function QuickFeaturedRankPopover({
           <span>{item.featured_rank ? `★ #${item.featured_rank}` : "Tuyển chọn"}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-3 text-foreground" align="start" side="top">
-        <div className="space-y-2.5">
-          <div className="border-b border-border/60 pb-1.5">
+      <PopoverContent className="w-80 p-3.5 text-foreground" align="start" side="top">
+        <div className="space-y-3">
+          <div className="border-b border-border/60 pb-2">
             <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
               <Sparkles className="size-3.5 text-terracotta" />
               <span>Gán vào Tuyển chọn Trang chủ</span>
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              Chọn 1 trong 12 ô hiển thị tại Section 02 (Trang chủ)
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Chọn 1 trong 12 ô hiển thị tại Section 02 (Trang chủ).
             </p>
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5">
+          {/* Grid 12 vị trí */}
+          <div className="grid grid-cols-3 gap-2">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((rank) => {
-              const isCurrent = item.featured_rank === rank;
+              const occupant = occupiedSlots[rank];
+              const isCurrent = item.featured_rank === rank || (occupant && Number(occupant.product_id) === Number(item.product_id));
+              const isOccupiedByOther = occupant && !isCurrent;
+
               return (
                 <button
                   key={rank}
                   type="button"
                   disabled={busy}
                   onClick={() => void handleAssign(rank)}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer",
+                  title={
                     isCurrent
-                      ? "bg-terracotta text-white border-terracotta shadow-xs"
-                      : "bg-card border-border text-foreground hover:border-terracotta/60 hover:bg-terracotta/5",
+                      ? `Vị trí #${rank}: Đang chọn cho sản phẩm này (${item.product_code})`
+                      : isOccupiedByOther
+                        ? `Vị trí #${rank}: Đã có ${occupant.product_code} (${occupant.product_name}). Click để thay thế bằng ${item.product_code}.`
+                        : `Vị trí #${rank}: Đang trống. Click để gán.`
+                  }
+                  className={cn(
+                    "flex flex-col items-start justify-between p-2 rounded-lg border text-left transition-all cursor-pointer relative min-h-[52px]",
+                    isCurrent
+                      ? "bg-terracotta text-white border-terracotta shadow-xs ring-2 ring-terracotta/30"
+                      : isOccupiedByOther
+                        ? "bg-amber-500/10 border-amber-400/80 text-foreground hover:bg-amber-500/20 hover:border-amber-500"
+                        : "bg-card border-border text-foreground hover:border-terracotta/60 hover:bg-terracotta/5",
                   )}
                 >
-                  <span>#{rank}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <span className={cn("text-xs font-extrabold", isCurrent ? "text-white" : "text-foreground")}>
+                      #{rank}
+                    </span>
+                    {isCurrent ? (
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-white/20 px-1 py-0.5 rounded text-white">
+                        Đang chọn
+                      </span>
+                    ) : isOccupiedByOther ? (
+                      <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground/60 font-medium">
+                        Trống
+                      </span>
+                    )}
+                  </div>
+                  {isOccupiedByOther ? (
+                    <span className="mt-1 block truncate w-full text-[10px] font-semibold text-amber-900 dark:text-amber-200">
+                      {occupant.product_code}
+                    </span>
+                  ) : isCurrent ? (
+                    <span className="mt-1 block truncate w-full text-[10px] font-medium text-white/90">
+                      {item.product_code}
+                    </span>
+                  ) : (
+                    <span className="mt-1 block text-[10px] text-muted-foreground/50 italic">
+                      Chưa gán
+                    </span>
+                  )}
                 </button>
               );
             })}
+          </div>
+
+          {/* Chú thích màu sắc */}
+          <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground border-t border-border/50">
+            <div className="flex items-center gap-1">
+              <span className="size-2 rounded-sm bg-terracotta" />
+              <span>Hiện tại</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="size-2 rounded-sm bg-amber-400" />
+              <span>Đã có SP khác</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="size-2 rounded-sm border border-border bg-card" />
+              <span>Trống</span>
+            </div>
           </div>
 
           {item.featured_rank ? (
@@ -318,7 +407,7 @@ function QuickFeaturedRankPopover({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleRemove()}
-                className="w-full text-center text-xs font-semibold text-red-600 hover:text-red-700 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                className="w-full text-center text-xs font-semibold text-red-600 hover:text-red-700 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
               >
                 Gỡ khỏi Vị trí #{item.featured_rank}
               </button>

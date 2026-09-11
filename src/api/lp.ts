@@ -246,6 +246,14 @@ export const setFeaturedSlotFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const fetchFeaturedSlotsFn = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { listFeaturedSlots } = await import("@/db/lp.server");
+    return await listFeaturedSlots();
+  });
+
 // ─── CRM Admin: Concept Manager / Lookbook Hub ────────────────
 
 export const fetchCrmConceptImagesFn = createServerFn({ method: "GET" })

@@ -27,14 +27,11 @@ import type { SessionUser } from "@/lib/auth-types";
 import { ROLE_LABEL, initialsFromName } from "@/lib/auth-types";
 import { logoutFn, fetchProductFieldValues } from "@/api/functions";
 import { useHistoryLayer } from "@/hooks/useHistoryLayer";
+const SIZE_SUBTAB_SLUGS = new Set(["gach-bong", "gach-op-lat"]);
 
 const navGroups = [
   {
     label: "Workspace",
-    items: [{ to: "/tong-quan", label: "Tổng quan", icon: LayoutDashboard }],
-  },
-  {
-    label: "Bán hàng",
     items: [
       { to: "/khach-hang", label: "Khách hàng", icon: Users },
       { to: "/co-hoi", label: "Cơ hội", icon: Target },
@@ -176,9 +173,6 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const isCatalogActive = pathname === "/san-pham";
   const isLibraryActive = pathname === "/thu-vien";
   const currentNhom = search?.nhom;
-
-  const SIZE_SUBTAB_SLUGS = new Set(["gach-bong", "gach-op-lat"]);
-
   const [catalogExpanded, setCatalogExpanded] = useState(isCatalogActive);
   const [expandedSizeGroup, setExpandedSizeGroup] = useState<string | null>(() => {
     return isCatalogActive && currentNhom && SIZE_SUBTAB_SLUGS.has(currentNhom) ? currentNhom : null;
@@ -188,7 +182,7 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
     setCatalogExpanded(isCatalogActive);
     if (isCatalogActive && currentNhom && SIZE_SUBTAB_SLUGS.has(currentNhom)) {
       setExpandedSizeGroup(currentNhom);
-    } else if (!isCatalogActive || (currentNhom && !SIZE_SUBTAB_SLUGS.has(currentNhom))) {
+    } else {
       setExpandedSizeGroup(null);
     }
   }, [isCatalogActive, currentNhom]);
@@ -308,44 +302,34 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
 
                 return (
                   <Fragment key={group.slug}>
-                    <div className="flex items-center justify-between rounded-lg hover:bg-accent/60 transition-colors">
+                    <div className="rounded-lg hover:bg-accent/60 transition-colors">
                       <Link
                         to="/san-pham"
                         search={{ nhom: group.slug }}
                         onClick={() => {
                           if (canHaveSizes) {
-                            setExpandedSizeGroup(group.slug);
+                            setExpandedSizeGroup((prev) => (prev === group.slug && active ? null : group.slug));
                           } else {
                             setExpandedSizeGroup(null);
                           }
                           if (active) onMobileClose?.();
                         }}
-                        className={`flex flex-1 items-center gap-2 px-2.5 py-2 text-xs transition-colors ${
+                        className={`flex items-center justify-between gap-2 px-2.5 py-2 text-xs transition-colors ${
                           active ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        <Icon className="size-3.5 shrink-0" />
-                        <span className="min-w-0 flex-1 truncate">{group.label}</span>
-                      </Link>
-                      {canHaveSizes ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setExpandedSizeGroup((current) => (current === group.slug ? null : group.slug));
-                          }}
-                          aria-label={`Mở danh sách kích thước ${group.label}`}
-                          aria-expanded={isExpanded}
-                          className="p-2 text-muted-foreground hover:text-foreground cursor-pointer"
-                        >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Icon className="size-3.5 shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                        </div>
+                        {canHaveSizes ? (
                           <ChevronRight
-                            className={`size-3 transition-transform ${
-                              isExpanded ? "rotate-90 text-primary" : ""
+                            className={`size-3 shrink-0 transition-transform ${
+                              isExpanded ? "rotate-90 text-primary" : "text-muted-foreground/60"
                             }`}
                           />
-                        </button>
-                      ) : null}
+                        ) : null}
+                      </Link>
                     </div>
                     {canHaveSizes && isExpanded ? (
                       <div className="ml-5 border-l border-border/70 pl-2 py-0.5 space-y-0.5 animate-in fade-in-0 duration-150">

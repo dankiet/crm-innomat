@@ -75,6 +75,36 @@ export async function listPublicMaterials(opts?: {
     )
     .all<LpMaterial>(...params)) as LpMaterial[];
 }
+export type FeaturedSlotInfo = {
+  rank: number;
+  product_id: number;
+  product_code: string;
+  product_name: string;
+  product_category: string;
+  image: string;
+};
+
+/**
+ * Lấy danh sách 12 Vị trí Tuyển chọn hiện tại (đã gán sản phẩm nào).
+ */
+export async function listFeaturedSlots(): Promise<FeaturedSlotInfo[]> {
+  const db = getDb();
+  const rows = await db
+    .prepare(
+      `SELECT p.featured_rank AS rank,
+              p.id AS product_id,
+              p.code AS product_code,
+              p.name AS product_name,
+              p.category AS product_category,
+              COALESCE(p.image_path, '') AS image
+         FROM products p
+        WHERE p.featured_rank IS NOT NULL
+          AND p.featured_rank BETWEEN 1 AND 12
+        ORDER BY p.featured_rank ASC`,
+    )
+    .all<FeaturedSlotInfo>();
+  return rows;
+}
 
 /**
  * Gán 1 sản phẩm vào 1 trong 12 Vị trí Tuyển chọn trang chủ.
