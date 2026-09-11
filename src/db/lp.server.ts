@@ -12,8 +12,6 @@
  */
 import { createHash } from "node:crypto";
 import { getDb, type SqlValue } from "./index.server";
-import { createCustomer } from "./crm.server";
-import { normalizePhone, isPhoneMatchable } from "@/lib/phone";
 import type {
   CatalogFacetOption,
   LpCatalogResult,
@@ -161,10 +159,14 @@ export async function setFeaturedSlot(rankInput: number, productIdInput: number 
 export async function listPublicCatalog(opts?: {
   category?: string | null;
   color?: string | null;
+  colors?: string[] | null;
   surface?: string | null;
+  surfaces?: string[] | null;
   size?: string | null;
+  sizes?: string[] | null;
   shape?: string | null;
-  collections?: string | null;
+  shapes?: string[] | null;
+  collections?: string | string[] | null;
   search?: string | null;
   page?: number;
   limit?: number;
@@ -179,32 +181,56 @@ export async function listPublicCatalog(opts?: {
     params.push(cat.toLowerCase());
   }
 
-  if (opts?.color?.trim()) {
-    where.push("LOWER(p.color) LIKE ?");
-    params.push(`%${opts.color.trim().toLowerCase()}%`);
+  const rawColors = (opts?.colors?.filter(Boolean) ?? []).length > 0
+    ? (opts?.colors?.filter(Boolean) ?? [])
+    : (opts?.color?.trim() ? [opts.color.trim()] : []);
+  if (rawColors.length > 0) {
+    const placeholders = rawColors.map(() => "?").join(", ");
+    where.push(`p.color IN (${placeholders})`);
+    params.push(...rawColors);
   }
-  if (opts?.surface?.trim()) {
-    where.push("LOWER(p.surface) LIKE ?");
-    params.push(`%${opts.surface.trim().toLowerCase()}%`);
+
+  const rawSurfaces = (opts?.surfaces?.filter(Boolean) ?? []).length > 0
+    ? (opts?.surfaces?.filter(Boolean) ?? [])
+    : (opts?.surface?.trim() ? [opts.surface.trim()] : []);
+  if (rawSurfaces.length > 0) {
+    const placeholders = rawSurfaces.map(() => "?").join(", ");
+    where.push(`p.surface IN (${placeholders})`);
+    params.push(...rawSurfaces);
   }
-  if (opts?.size?.trim()) {
-    where.push("LOWER(p.size) = ?");
-    params.push(opts.size.trim().toLowerCase());
+
+  const rawShapes = (opts?.shapes?.filter(Boolean) ?? []).length > 0
+    ? (opts?.shapes?.filter(Boolean) ?? [])
+    : (opts?.shape?.trim() ? [opts.shape.trim()] : []);
+  if (rawShapes.length > 0) {
+    const placeholders = rawShapes.map(() => "?").join(", ");
+    where.push(`p.shape IN (${placeholders})`);
+    params.push(...rawShapes);
   }
-  if (opts?.shape?.trim()) {
-    where.push("LOWER(p.shape) LIKE ?");
-    params.push(`%${opts.shape.trim().toLowerCase()}%`);
+
+  const rawCollections = Array.isArray(opts?.collections)
+    ? opts.collections.filter(Boolean)
+    : (opts?.collections?.trim() ? [opts.collections.trim()] : []);
+  if (rawCollections.length > 0) {
+    const placeholders = rawCollections.map(() => "?").join(", ");
+    where.push(`p.collections IN (${placeholders})`);
+    params.push(...rawCollections);
   }
-  if (opts?.collections?.trim()) {
-    where.push("LOWER(p.collections) LIKE ?");
-    params.push(`%${opts.collections.trim().toLowerCase()}%`);
+
+  const rawSizes = (opts?.sizes?.filter(Boolean) ?? []).length > 0
+    ? (opts?.sizes?.filter(Boolean) ?? [])
+    : (opts?.size?.trim() ? [opts.size.trim()] : []);
+  if (rawSizes.length > 0) {
+    const placeholders = rawSizes.map(() => "?").join(", ");
+    where.push(`p.size IN (${placeholders})`);
+    params.push(...rawSizes);
   }
+
   if (opts?.search?.trim()) {
     where.push("(LOWER(p.code) LIKE ? OR LOWER(p.name) LIKE ?)");
     const q = `%${opts.search.trim().toLowerCase()}%`;
     params.push(q, q);
   }
-
   const whereClause = where.join(" AND ");
 
   // Count total matching items
@@ -250,7 +276,7 @@ export async function listPublicCatalog(opts?: {
           WHERE ${baseWhereClause} AND COALESCE(p.color, '') <> ''
           GROUP BY p.color
           ORDER BY count DESC, value
-          LIMIT 20`,
+          LIMIT 50`,
       )
       .all<CatalogFacetOption>(...baseParams),
     db
@@ -260,7 +286,7 @@ export async function listPublicCatalog(opts?: {
           WHERE ${baseWhereClause} AND COALESCE(p.surface, '') <> ''
           GROUP BY p.surface
           ORDER BY count DESC, value
-          LIMIT 20`,
+          LIMIT 50`,
       )
       .all<CatalogFacetOption>(...baseParams),
     db
@@ -270,7 +296,7 @@ export async function listPublicCatalog(opts?: {
           WHERE ${baseWhereClause} AND COALESCE(p.size, '') <> ''
           GROUP BY p.size
           ORDER BY count DESC, value
-          LIMIT 20`,
+          LIMIT 50`,
       )
       .all<CatalogFacetOption>(...baseParams),
     db
@@ -280,7 +306,7 @@ export async function listPublicCatalog(opts?: {
           WHERE ${baseWhereClause} AND COALESCE(p.shape, '') <> ''
           GROUP BY p.shape
           ORDER BY count DESC, value
-          LIMIT 20`,
+          LIMIT 50`,
       )
       .all<CatalogFacetOption>(...baseParams),
     db
@@ -290,11 +316,10 @@ export async function listPublicCatalog(opts?: {
           WHERE ${baseWhereClause} AND COALESCE(p.collections, '') <> ''
           GROUP BY p.collections
           ORDER BY count DESC, value
-          LIMIT 20`,
+          LIMIT 50`,
       )
       .all<CatalogFacetOption>(...baseParams),
   ]);
-
   return {
     items,
     total,

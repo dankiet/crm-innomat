@@ -21,10 +21,14 @@ export const fetchPublicCatalogFn = createServerFn({ method: "GET" })
     (data?: {
       category?: string | null;
       color?: string | null;
+      colors?: string[] | null;
       surface?: string | null;
+      surfaces?: string[] | null;
       size?: string | null;
+      sizes?: string[] | null;
       shape?: string | null;
-      collections?: string | null;
+      shapes?: string[] | null;
+      collections?: string | string[] | null;
       search?: string | null;
       page?: number;
       limit?: number;

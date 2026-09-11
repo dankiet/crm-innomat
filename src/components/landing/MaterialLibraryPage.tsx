@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, FormEvent } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   Search,
@@ -14,6 +14,7 @@ import {
   LockKeyhole,
   ArrowRight,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { BrandMark } from "./BrandMark";
 import {
@@ -21,8 +22,10 @@ import {
   authGoogleStart,
   fetchPublicMeFn,
 } from "@/api/lp";
+import type { CatalogFacets, CatalogFacetOption } from "@/lib/lp-types";
+import { FilterChip } from "@/components/product-filter/FilterChip";
+import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import {
-  tileLines,
   type LineId,
   type Material,
 } from "@/data/mockData";
@@ -46,9 +49,19 @@ export function MaterialLibraryPage({
 }: MaterialLibraryPageProps) {
   const [selectedCategory, setSelectedCategory] = useState<LineId | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTone, setSelectedTone] = useState<string>("all");
-  const [selectedFinish, setSelectedFinish] = useState<string>("all");
-  const [selectedSize, setSelectedSize] = useState<string>("all");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSurfaces, setSelectedSurfaces] = useState<string[]>([]);
+  const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const [facets, setFacets] = useState<CatalogFacets>({
+    colors: [],
+    surfaces: [],
+    sizes: [],
+    shapes: [],
+    collections: [],
+  });
+  const [totalCount, setTotalCount] = useState<number>(0);
 
   // Unlock Gate State (Up to 12 items demo preview)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
@@ -57,6 +70,14 @@ export function MaterialLibraryPage({
 
   const [liveMaterials, setLiveMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleGoogleLogin = async () => {
     setIsLoggingIn(true);
@@ -85,10 +106,46 @@ export function MaterialLibraryPage({
         }
       })
       .catch(() => {});
+  }, []);
 
-    fetchPublicCatalogFn({ data: { limit: 300 } })
+  const categoryName = useMemo(() => {
+    const map: Record<LineId | "all", string | undefined> = {
+      "all": undefined,
+      "gach-the": "Gạch thẻ",
+      "mosaic": "Gạch mosaic",
+      "gach-bong": "Gạch bông",
+      "gach-op-lat": "Gạch ốp lát",
+    };
+    return map[selectedCategory];
+  }, [selectedCategory]);
+
+  // Reset filters when category changes
+  const handleCategoryChange = (cat: LineId | "all") => {
+    setSelectedCategory(cat);
+    setSelectedColors([]);
+    setSelectedSurfaces([]);
+    setSelectedShapes([]);
+    setSelectedCollections([]);
+  };
+
+  // Fetch catalog & facets from PostgreSQL
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchPublicCatalogFn({
+      data: {
+        category: categoryName,
+        colors: selectedColors.length ? selectedColors : undefined,
+        surfaces: selectedSurfaces.length ? selectedSurfaces : undefined,
+        shapes: selectedShapes.length ? selectedShapes : undefined,
+        collections: selectedCollections.length ? selectedCollections : undefined,
+        search: debouncedSearch || undefined,
+        limit: 300,
+      },
+    })
       .then((res) => {
-        if (res && res.items && res.items.length > 0) {
+        if (cancelled) return;
+        if (res && res.items) {
           const mapped: Material[] = res.items.map((p) => ({
             id: String(p.id),
             code: p.code,
@@ -96,88 +153,49 @@ export function MaterialLibraryPage({
             type: (p.category as Material["type"]) || "Gạch thẻ",
             size: p.size || "",
             finish: p.surface || "Men mờ",
-            tone: p.color || "#B94A2E",
+            tone: p.color || "Trắng",
             image: p.image,
             description: `${p.name} (${p.size || ""})`,
             application: "Tường trang trí, phòng tắm, vách sảnh, mặt tiền",
           }));
           setLiveMaterials(mapped);
+          setTotalCount(res.total);
+          if (res.facets) {
+            setFacets(res.facets);
+          }
         }
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryName, selectedColors, selectedSurfaces, selectedShapes, selectedCollections, debouncedSearch]);
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedColors([]);
+    setSelectedSurfaces([]);
+    setSelectedShapes([]);
+    setSelectedCollections([]);
+    setSearchQuery("");
+    setDebouncedSearch("");
   }, []);
 
-  const allLibraryMaterials = liveMaterials;
-
-  // Filter options derived from data
-  const toneOptions = useMemo(() => {
-    return [
-      { id: "all", label: "Tất cả tông màu" },
-      { id: "#B94A2E", label: "Đất nung / Terracotta" },
-      { id: "#2E4E52", label: "Xanh khoáng / Rêu" },
-      { id: "#C8B7A1", label: "Be cát / Kem" },
-      { id: "#1E3544", label: "Mực xanh / Đen tro" },
-      { id: "#9A634E", label: "Hổ phách / Nâu" },
-      { id: "#948E81", label: "Ghi xám / Xi măng" },
-    ];
-  }, []);
-
-  const finishOptions = useMemo(() => {
-    const set = new Set<string>();
-    allLibraryMaterials.forEach((m) => {
-      if (m.finish) set.add(m.finish);
-    });
-    return ["all", ...Array.from(set)];
-  }, [allLibraryMaterials]);
-
-  const sizeOptions = useMemo(() => {
-    const set = new Set<string>();
-    allLibraryMaterials.forEach((m) => {
-      if (m.size) set.add(m.size);
-    });
-    return ["all", ...Array.from(set)];
-  }, [allLibraryMaterials]);
-
-  // Filtered materials
-  const filteredMaterials = useMemo(() => {
-    return allLibraryMaterials.filter((m) => {
-      if (selectedCategory !== "all") {
-        const typeMap: Record<LineId, string> = {
-          "gach-the": "Gạch thẻ",
-          mosaic: "Gạch mosaic",
-          "gach-bong": "Gạch bông",
-          "gach-op-lat": "Gạch ốp lát",
-        };
-        if (m.type !== typeMap[selectedCategory]) return false;
-      }
-
-      if (searchQuery.trim() !== "") {
-        const q = searchQuery.toLowerCase();
-        const match =
-          m.name.toLowerCase().includes(q) ||
-          m.code.toLowerCase().includes(q) ||
-          m.finish.toLowerCase().includes(q) ||
-          m.size.toLowerCase().includes(q);
-        if (!match) return false;
-      }
-
-      if (selectedTone !== "all" && m.tone !== selectedTone) return false;
-      if (selectedFinish !== "all" && m.finish !== selectedFinish) return false;
-      if (selectedSize !== "all" && m.size !== selectedSize) return false;
-
-      return true;
-    });
-  }, [allLibraryMaterials, selectedCategory, searchQuery, selectedTone, selectedFinish, selectedSize]);
+  const hasActiveFilters =
+    selectedColors.length > 0 ||
+    selectedSurfaces.length > 0 ||
+    selectedShapes.length > 0 ||
+    selectedCollections.length > 0 ||
+    Boolean(searchQuery.trim());
 
   // Ngưỡng xem trước: hiển thị 12 mã demo khi chưa đăng nhập
   const DEMO_LIMIT = 12;
   const visibleMaterials = isUnlocked
-    ? filteredMaterials
-    : filteredMaterials.slice(0, DEMO_LIMIT);
-
+    ? liveMaterials
+    : liveMaterials.slice(0, DEMO_LIMIT);
   const showUnlockGate = !isUnlocked;
-
 
   return (
     <div className="material-library-page">
@@ -277,16 +295,16 @@ export function MaterialLibraryPage({
               type="button"
               role="tab"
               aria-selected={selectedCategory === "all"}
-              onClick={() => setSelectedCategory("all")}
+              onClick={() => handleCategoryChange("all")}
               className={`lib-cat-tab ${selectedCategory === "all" ? "is-active" : ""}`}
             >
-              Tất cả dòng gạch ({allLibraryMaterials.length})
+              Tất cả dòng gạch
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={selectedCategory === "gach-the"}
-              onClick={() => setSelectedCategory("gach-the")}
+              onClick={() => handleCategoryChange("gach-the")}
               className={`lib-cat-tab ${selectedCategory === "gach-the" ? "is-active" : ""}`}
             >
               Gạch thẻ (GT)
@@ -295,7 +313,7 @@ export function MaterialLibraryPage({
               type="button"
               role="tab"
               aria-selected={selectedCategory === "mosaic"}
-              onClick={() => setSelectedCategory("mosaic")}
+              onClick={() => handleCategoryChange("mosaic")}
               className={`lib-cat-tab ${selectedCategory === "mosaic" ? "is-active" : ""}`}
             >
               Gạch mosaic (MS)
@@ -304,7 +322,7 @@ export function MaterialLibraryPage({
               type="button"
               role="tab"
               aria-selected={selectedCategory === "gach-bong"}
-              onClick={() => setSelectedCategory("gach-bong")}
+              onClick={() => handleCategoryChange("gach-bong")}
               className={`lib-cat-tab ${selectedCategory === "gach-bong" ? "is-active" : ""}`}
             >
               Gạch bông (GB)
@@ -313,93 +331,72 @@ export function MaterialLibraryPage({
               type="button"
               role="tab"
               aria-selected={selectedCategory === "gach-op-lat"}
-              onClick={() => setSelectedCategory("gach-op-lat")}
+              onClick={() => handleCategoryChange("gach-op-lat")}
               className={`lib-cat-tab ${selectedCategory === "gach-op-lat" ? "is-active" : ""}`}
             >
               Gạch ốp lát (OL)
             </button>
           </div>
 
-          {/* Contextual Facet Dropdowns */}
-          <div className="library-facet-row">
-            <div className="facet-group">
-              <span className="facet-label">Tông màu:</span>
-              <select
-                value={selectedTone}
-                onChange={(e) => setSelectedTone(e.target.value)}
-                className="facet-select"
-              >
-                {toneOptions.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Contextual Facet Filters (CRM Standard: FilterChip + MultiSelectFilter) */}
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-dashed border-border/70">
+            <FilterChip label="Màu sắc" count={selectedColors.length}>
+              <MultiSelectFilter
+                title="Chọn màu sắc"
+                options={facets.colors}
+                selected={selectedColors}
+                onChange={setSelectedColors}
+                searchable
+              />
+            </FilterChip>
 
-            <div className="facet-group">
-              <span className="facet-label">Bề mặt:</span>
-              <select
-                value={selectedFinish}
-                onChange={(e) => setSelectedFinish(e.target.value)}
-                className="facet-select"
-              >
-                <option value="all">Tất cả bề mặt</option>
-                {finishOptions
-                  .filter((f) => f !== "all")
-                  .map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            <FilterChip label="Bề mặt" count={selectedSurfaces.length}>
+              <MultiSelectFilter
+                title="Chọn bề mặt"
+                options={facets.surfaces}
+                selected={selectedSurfaces}
+                onChange={setSelectedSurfaces}
+                searchable
+              />
+            </FilterChip>
 
-            <div className="facet-group">
-              <span className="facet-label">Kích thước:</span>
-              <select
-                value={selectedSize}
-                onChange={(e) => setSelectedSize(e.target.value)}
-                className="facet-select"
-              >
-                <option value="all">Tất cả kích thước</option>
-                {sizeOptions
-                  .filter((s) => s !== "all")
-                  .map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            <FilterChip label="Kiểu dáng" count={selectedShapes.length}>
+              <MultiSelectFilter
+                title="Chọn kiểu dáng"
+                options={facets.shapes}
+                selected={selectedShapes}
+                onChange={setSelectedShapes}
+                searchable
+              />
+            </FilterChip>
 
-            {(selectedCategory !== "all" ||
-              selectedTone !== "all" ||
-              selectedFinish !== "all" ||
-              selectedSize !== "all" ||
-              searchQuery) && (
+            <FilterChip label="Bộ sưu tập" count={selectedCollections.length}>
+              <MultiSelectFilter
+                title="Chọn bộ sưu tập"
+                options={facets.collections}
+                selected={selectedCollections}
+                onChange={setSelectedCollections}
+                searchable
+              />
+            </FilterChip>
+
+            {hasActiveFilters && (
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedCategory("all");
-                  setSelectedTone("all");
-                  setSelectedFinish("all");
-                  setSelectedSize("all");
-                  setSearchQuery("");
-                }}
-                className="facet-reset-btn"
+                onClick={handleClearFilters}
+                className="h-9 px-3 rounded-full text-xs font-semibold text-terracotta hover:bg-terracotta/10 transition-colors inline-flex items-center gap-1 cursor-pointer"
               >
-                ✕ Xóa bộ lọc
+                <span>Xóa bộ lọc</span>
+                <span>✕</span>
               </button>
             )}
 
-            <div className="library-results-count">
-              Đang hiển thị <strong>{visibleMaterials.length}</strong> / {filteredMaterials.length} mã vật liệu
+            <div className="ml-auto text-xs text-muted-foreground font-medium">
+              Hiển thị <strong className="text-foreground">{visibleMaterials.length}</strong> / {totalCount} mã vật liệu
               {!isUnlocked && " (Bản xem trước)"}
             </div>
           </div>
         </div>
-
         {/* Unlocked Toast Banner */}
         {gateSuccessToast && (
           <div className="unlocked-notification-bar">
@@ -421,21 +418,15 @@ export function MaterialLibraryPage({
 
         {/* Materials Masonry Grid */}
         <div className="library-grid-display">
-          {filteredMaterials.length === 0 ? (
+          {liveMaterials.length === 0 ? (
             <div className="library-empty-state">
               <SlidersHorizontal size={40} className="text-muted-foreground" />
               <h3>Không tìm thấy mã vật liệu phù hợp</h3>
-              <p>Thử xóa bộ lọc hoặc tìm kiếm với từ khóa khác (ví dụ: gạch thẻ, đất nung, xanh khoáng, mosaic).</p>
+              <p>Thử xóa bớt bộ lọc hoặc tìm kiếm với từ khóa khác.</p>
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedCategory("all");
-                  setSelectedTone("all");
-                  setSelectedFinish("all");
-                  setSelectedSize("all");
-                  setSearchQuery("");
-                }}
-                className="btn-clear-empty-filter"
+                onClick={handleClearFilters}
+                className="btn-clear-empty-filter cursor-pointer"
               >
                 Đặt lại toàn bộ bộ lọc
               </button>
