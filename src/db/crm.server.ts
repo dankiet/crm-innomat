@@ -2729,7 +2729,7 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
         @code, @name, @size, @material, @surface, @shape, @collections, @category, @supplier,
         @color, @packing, @packing_m2, @packing_pcs, @packing_kg,
         @retail_price, @trade_price, @b2b_price, @discount_tp, @discount_b2b,
-        @note, @is_hot, @image_path
+        @note, @is_hot, @is_public, @featured_rank, @image_path
       )`,
     )
     .run({
