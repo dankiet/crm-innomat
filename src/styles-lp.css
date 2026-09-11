@@ -2452,8 +2452,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .space-gallery-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
 }
 
 .space-lookbook-card {
@@ -2566,14 +2566,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .space-material-footer {
   display: grid;
-  grid-template-columns: 56px 1fr auto;
-  gap: 16px;
+  grid-template-columns: 48px 1fr auto;
+  gap: 12px;
   align-items: start;
-  padding: 18px 20px 20px;
+  padding: 14px 16px 16px;
   background: #fffdf9;
   border-top: 1px solid #eae3d5;
 }
-
 .space-swatch-anchor {
   position: relative;
   width: 56px;
@@ -2833,8 +2832,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .btn-anchor-detail {
     flex: 1;
   }
+  .space-gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
   .space-material-footer {
-    grid-template-columns: 50px 1fr;
+    grid-template-columns: 48px 1fr;
   }
   .space-material-actions {
     grid-column: 1 / -1;
