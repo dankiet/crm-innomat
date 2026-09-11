@@ -547,7 +547,11 @@ function ProductsPage() {
   const viewMode: ViewMode = viewParam === "list" ? "list" : "grid";
 
   const category = categoryFromSlug(nhom);
-  const supportsSizeTab = category === "Gạch bông" || category === "Gạch Ốp Lát";
+  const supportsSizeTab =
+    category.toLowerCase() === "gạch bông" ||
+    category.toLowerCase() === "gạch ốp lát" ||
+    category.toLowerCase() === "gạch thẻ" ||
+    category.toLowerCase() === "gạch mosaic";
   const groupLabel = labelFromSlug(nhom);
 
   // Input search dùng local state + debounce vào URL để đỡ giật
