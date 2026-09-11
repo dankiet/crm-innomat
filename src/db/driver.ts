@@ -32,10 +32,42 @@ interface AsyncStmt {
   run(...params: SqlValue[]): Promise<RunResult>;
 }
 
+export type TransactionRunner<T> = (() => Promise<T>) & Promise<T>;
+
+export function makeTxCallable<T>(runner: () => Promise<T>): TransactionRunner<T> {
+  let executedPromise: Promise<T> | null = null;
+  const getPromise = () => {
+    if (!executedPromise) {
+      executedPromise = runner();
+    }
+    return executedPromise;
+  };
+
+  const fn = Object.assign((() => getPromise()), {
+    then<TResult1 = T, TResult2 = never>(
+      onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+    ): Promise<TResult1 | TResult2> {
+      return getPromise().then(onfulfilled, onrejected);
+    },
+    catch<TResult = never>(
+      onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null,
+    ): Promise<T | TResult> {
+      return getPromise().catch(onrejected);
+    },
+    finally(onfinally?: (() => void) | null): Promise<T> {
+      return getPromise().finally(onfinally ?? undefined);
+    },
+    [Symbol.toStringTag]: "Promise",
+  }) as unknown as TransactionRunner<T>;
+
+  return fn;
+}
+
 export interface AsyncDb {
   prepare(sql: string): AsyncStmt;
   exec(sql: string): Promise<void>;
-  transaction<T>(fn: (db: AsyncDb) => Promise<T> | T): () => Promise<T>;
+  transaction<T>(fn: (db: AsyncDb) => Promise<T> | T): TransactionRunner<T>;
   close(): Promise<void>;
 }
 
@@ -252,9 +284,9 @@ class PostgresDb implements AsyncDb {
     await this.pool.query(sql);
   }
 
-  /** Trả về function thực thi transaction trên một connection riêng. */
-  transaction<T>(fn: (db: AsyncDb) => Promise<T> | T): () => Promise<T> {
-    return async () => {
+  /** Trả về callable & thenable thực thi transaction trên connection riêng. */
+  transaction<T>(fn: (db: AsyncDb) => Promise<T> | T): TransactionRunner<T> {
+    return makeTxCallable(async () => {
       const client = await this.pool.connect();
       try {
         await client.query("BEGIN");
@@ -272,7 +304,7 @@ class PostgresDb implements AsyncDb {
       } finally {
         client.release();
       }
-    };
+    });
   }
 
   async close(): Promise<void> {
@@ -289,9 +321,9 @@ function makeClientDb(client: PoolClient): AsyncDb {
     async exec(sql: string): Promise<void> {
       await client.query(sql);
     },
-    transaction<T>(fn: (db: AsyncDb) => Promise<T> | T): () => Promise<T> {
+    transaction<T>(fn: (db: AsyncDb) => Promise<T> | T): TransactionRunner<T> {
       // Nested transaction trong PG vẫn dùng cùng client.
-      return async () => {
+      return makeTxCallable(async () => {
         const savepoint = `sp_${Math.random().toString(36).slice(2)}`;
         await client.query(`SAVEPOINT ${savepoint}`);
         try {
@@ -306,7 +338,7 @@ function makeClientDb(client: PoolClient): AsyncDb {
           }
           throw err;
         }
-      };
+      });
     },
     async close(): Promise<void> {
       /* no-op: client do transaction quản lý */

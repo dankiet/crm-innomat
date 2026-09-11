@@ -549,9 +549,7 @@ function ProductsPage() {
   const category = categoryFromSlug(nhom);
   const supportsSizeTab =
     category.toLowerCase() === "gạch bông" ||
-    category.toLowerCase() === "gạch ốp lát" ||
-    category.toLowerCase() === "gạch thẻ" ||
-    category.toLowerCase() === "gạch mosaic";
+    category.toLowerCase() === "gạch ốp lát";
   const groupLabel = labelFromSlug(nhom);
 
   // Input search dùng local state + debounce vào URL để đỡ giật

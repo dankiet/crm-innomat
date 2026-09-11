@@ -84,7 +84,9 @@ export async function listPublicMaterials(opts?: {
  *   3. Gán product mới vào `rank`, đồng thời tự động Bật Online (`is_public = 1`) nếu chưa.
  *   Trong cùng 1 transaction để tránh trạng thái inconsistent giữa các query.
  */
-export async function setFeaturedSlot(rank: number, productId: number | null): Promise<void> {
+export async function setFeaturedSlot(rankInput: number, productIdInput: number | null): Promise<void> {
+  const rank = Number(rankInput);
+  const productId = productIdInput == null ? null : Number(productIdInput);
   const db = getDb();
   await db.transaction(async (tx) => {
     // 1) Clear mọi sản phẩm đang ngồi vị trí `rank` (nếu có)
@@ -92,7 +94,7 @@ export async function setFeaturedSlot(rank: number, productId: number | null): P
       .prepare("UPDATE products SET featured_rank = NULL WHERE featured_rank = ?")
       .run(rank);
 
-    if (productId == null) {
+    if (productId == null || isNaN(productId)) {
       // Chỉ yêu cầu GỠ khỏi slot -> thoát transaction tại đây
       return;
     }

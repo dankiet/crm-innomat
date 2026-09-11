@@ -176,17 +176,33 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const isCatalogActive = pathname === "/san-pham";
   const isLibraryActive = pathname === "/thu-vien";
   const currentNhom = search?.nhom;
+
+  const SIZE_SUBTAB_SLUGS = new Set(["gach-bong", "gach-op-lat"]);
+
   const [catalogExpanded, setCatalogExpanded] = useState(isCatalogActive);
+  const [expandedSizeGroup, setExpandedSizeGroup] = useState<string | null>(() => {
+    return isCatalogActive && currentNhom && SIZE_SUBTAB_SLUGS.has(currentNhom) ? currentNhom : null;
+  });
+
   useEffect(() => {
     setCatalogExpanded(isCatalogActive);
-    if (!isCatalogActive) setExpandedSizeGroup(null);
-  }, [isCatalogActive]);
-  const [expandedSizeGroup, setExpandedSizeGroup] = useState<string | null>(null);
+    if (isCatalogActive && currentNhom && SIZE_SUBTAB_SLUGS.has(currentNhom)) {
+      setExpandedSizeGroup(currentNhom);
+    } else if (!isCatalogActive || (currentNhom && !SIZE_SUBTAB_SLUGS.has(currentNhom))) {
+      setExpandedSizeGroup(null);
+    }
+  }, [isCatalogActive, currentNhom]);
+
   const [sizeOptions, setSizeOptions] = useState<string[]>([]);
   const [loadingSizes, setLoadingSizes] = useState(false);
+
   useEffect(() => {
+    if (!expandedSizeGroup || !SIZE_SUBTAB_SLUGS.has(expandedSizeGroup)) {
+      setSizeOptions([]);
+      return;
+    }
     const group = PRODUCT_GROUPS.find((item) => item.slug === expandedSizeGroup);
-    if (!group || group.slug === "tat-ca") {
+    if (!group) {
       setSizeOptions([]);
       return;
     }
@@ -216,10 +232,10 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
       cancelled = true;
     };
   }, [expandedSizeGroup]);
+
   /** Close drawer on tap only when the tap cannot navigate (already there). */
   const linkCloseHandler = (item: { to: string; search?: { nhom?: string } }) =>
     closesWithoutNavigation(item, pathname, currentNhom) ? onMobileClose : undefined;
-
   const nav = (
     <>
       <div className="flex items-center gap-3 border-b border-border/70 px-5 py-5">
@@ -287,13 +303,23 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
               {PRODUCT_GROUPS.map((group) => {
                 const Icon = productIcons[group.slug] ?? LayoutGrid;
                 const active = isCatalogActive && search?.nhom === group.slug;
+                const canHaveSizes = SIZE_SUBTAB_SLUGS.has(group.slug);
+                const isExpanded = expandedSizeGroup === group.slug;
+
                 return (
                   <Fragment key={group.slug}>
                     <div className="flex items-center justify-between rounded-lg hover:bg-accent/60 transition-colors">
                       <Link
                         to="/san-pham"
                         search={{ nhom: group.slug }}
-                        onClick={active ? onMobileClose : undefined}
+                        onClick={() => {
+                          if (canHaveSizes) {
+                            setExpandedSizeGroup(group.slug);
+                          } else {
+                            setExpandedSizeGroup(null);
+                          }
+                          if (active) onMobileClose?.();
+                        }}
                         className={`flex flex-1 items-center gap-2 px-2.5 py-2 text-xs transition-colors ${
                           active ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground"
                         }`}
@@ -301,7 +327,7 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                         <Icon className="size-3.5 shrink-0" />
                         <span className="min-w-0 flex-1 truncate">{group.label}</span>
                       </Link>
-                      {group.slug !== "tat-ca" ? (
+                      {canHaveSizes ? (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -310,29 +336,37 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                             setExpandedSizeGroup((current) => (current === group.slug ? null : group.slug));
                           }}
                           aria-label={`Mở danh sách kích thước ${group.label}`}
+                          aria-expanded={isExpanded}
                           className="p-2 text-muted-foreground hover:text-foreground cursor-pointer"
                         >
                           <ChevronRight
                             className={`size-3 transition-transform ${
-                              expandedSizeGroup === group.slug ? "rotate-90 text-primary" : ""
+                              isExpanded ? "rotate-90 text-primary" : ""
                             }`}
                           />
                         </button>
                       ) : null}
                     </div>
-                    {expandedSizeGroup === group.slug ? (
+                    {canHaveSizes && isExpanded ? (
                       <div className="ml-5 border-l border-border/70 pl-2 py-0.5 space-y-0.5 animate-in fade-in-0 duration-150">
-                        {sizeOptions.map((size) => (
-                          <Link
-                            key={size}
-                            to="/san-pham"
-                            search={{ nhom: group.slug, sizes: [size] }}
-                            onClick={onMobileClose}
-                            className="block truncate rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground transition-colors"
-                          >
-                            {size}
-                          </Link>
-                        ))}
+                        {sizeOptions.map((size) => {
+                          const isSizeActive = active && Array.isArray(search?.sizes) && search.sizes.includes(size);
+                          return (
+                            <Link
+                              key={size}
+                              to="/san-pham"
+                              search={{ nhom: group.slug, sizes: [size] }}
+                              onClick={onMobileClose}
+                              className={`block truncate rounded-md px-2 py-1 text-[11px] transition-colors ${
+                                isSizeActive
+                                  ? "bg-primary/10 font-semibold text-primary"
+                                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                              }`}
+                            >
+                              {size}
+                            </Link>
+                          );
+                        })}
                         {loadingSizes ? (
                           <span className="block px-2 py-1 text-[11px] text-muted-foreground/70 italic">Đang tải kích thước…</span>
                         ) : !sizeOptions.length ? (
