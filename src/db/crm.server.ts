@@ -2796,9 +2796,9 @@ export async function listFlatMediaImages(opts?: {
   roomSlug?: ImageRoomTagSlug;
   publicFilter?: "all" | "public" | "hidden";
   colors?: string[];
+  surfaces?: string[];
   shapes?: string[];
   collections?: string[];
-  sort?: FlatMediaSort;
   page?: number;
   pageSize?: number;
 }): Promise<{
@@ -2820,7 +2820,7 @@ export async function listFlatMediaImages(opts?: {
   const baseParams: SqlValue[] = [];
 
   if (opts?.category && opts.category !== "all") {
-    baseWhere.push("p.category = ?");
+    baseWhere.push("LOWER(p.category) = LOWER(?)");
     baseParams.push(opts.category);
   }
 
@@ -2844,6 +2844,12 @@ export async function listFlatMediaImages(opts?: {
     const placeholders = opts.colors.map(() => "?").join(", ");
     baseWhere.push(`p.color IN (${placeholders})`);
     baseParams.push(...opts.colors);
+  }
+
+  if (opts?.surfaces && opts.surfaces.length > 0) {
+    const placeholders = opts.surfaces.map(() => "?").join(", ");
+    baseWhere.push(`p.surface IN (${placeholders})`);
+    baseParams.push(...opts.surfaces);
   }
 
   if (opts?.shapes && opts.shapes.length > 0) {

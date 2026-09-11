@@ -447,9 +447,11 @@ function MediaStoragePage() {
   const [roomSlug, setRoomSlug] = useState<ImageRoomTagSlug | "all">("all");
   const [publicFilter, setPublicFilter] = useState<"all" | "public" | "hidden">("all");
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSurfaces, setSelectedSurfaces] = useState<string[]>([]);
   const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [colorOptions, setColorOptions] = useState<{ value: string; label: string }[]>([]);
+  const [surfaceOptions, setSurfaceOptions] = useState<{ value: string; label: string }[]>([]);
   const [shapeOptions, setShapeOptions] = useState<{ value: string; label: string }[]>([]);
   const [collectionOptions, setCollectionOptions] = useState<{ value: string; label: string }[]>([]);
   const [search, setSearch] = useState("");
@@ -457,24 +459,35 @@ function MediaStoragePage() {
   const [sort, setSort] = useState<FlatMediaSort>("newest");
   const [currentHeroImage, setCurrentHeroImage] = useState<string>("");
 
-  // Load danh mục filter options
+  // Load danh mục filter options scoped chính xác theo nhóm danh mục đang chọn (category)
   useEffect(() => {
     let cancelled = false;
+    const catParam = category === "all" ? undefined : category;
     Promise.all([
-      fetchProductFieldValues({ data: { field: "color" } }).catch(() => [] as string[]),
-      fetchProductFieldValues({ data: { field: "shape" } }).catch(() => [] as string[]),
-      fetchProductFieldValues({ data: { field: "collections" } }).catch(() => [] as string[]),
-    ]).then(([colors, shapes, collections]) => {
+      fetchProductFieldValues({ data: { field: "color", category: catParam } }).catch(() => [] as string[]),
+      fetchProductFieldValues({ data: { field: "surface", category: catParam } }).catch(() => [] as string[]),
+      fetchProductFieldValues({ data: { field: "shape", category: catParam } }).catch(() => [] as string[]),
+      fetchProductFieldValues({ data: { field: "collections", category: catParam } }).catch(() => [] as string[]),
+    ]).then(([colors, surfaces, shapes, collections]) => {
       if (cancelled) return;
-      const allColors = Array.from(new Set([...PRODUCT_COLORS, ...colors])).filter(Boolean);
+      const allColors = Array.from(new Set([...(catParam ? [] : PRODUCT_COLORS), ...colors])).filter(Boolean);
       setColorOptions(allColors.map((c) => ({ value: c, label: c })));
+      setSurfaceOptions(surfaces.filter(Boolean).map((s) => ({ value: s, label: s })));
       setShapeOptions(shapes.filter(Boolean).map((s) => ({ value: s, label: s })));
       setCollectionOptions(collections.filter(Boolean).map((c) => ({ value: c, label: c })));
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [category]);
+
+  // Reset các facet filter khi đổi danh mục gạch để không bị dính giá trị của danh mục khác
+  useEffect(() => {
+    setSelectedColors([]);
+    setSelectedSurfaces([]);
+    setSelectedShapes([]);
+    setSelectedCollections([]);
+  }, [category]);
   useEffect(() => {
     fetchLpHeroImageFn()
       .then((res) => {
@@ -560,6 +573,7 @@ function MediaStoragePage() {
         roomSlug: roomSlug === "all" ? undefined : roomSlug,
         publicFilter: publicFilter === "all" ? undefined : publicFilter,
         colors: selectedColors.length ? selectedColors : undefined,
+        surfaces: selectedSurfaces.length ? selectedSurfaces : undefined,
         shapes: selectedShapes.length ? selectedShapes : undefined,
         collections: selectedCollections.length ? selectedCollections : undefined,
         sort,
@@ -590,10 +604,10 @@ function MediaStoragePage() {
         roomSlug: roomSlug === "all" ? undefined : roomSlug,
         publicFilter: publicFilter === "all" ? undefined : publicFilter,
         colors: selectedColors.length ? selectedColors : undefined,
+        surfaces: selectedSurfaces.length ? selectedSurfaces : undefined,
         shapes: selectedShapes.length ? selectedShapes : undefined,
         collections: selectedCollections.length ? selectedCollections : undefined,
         sort,
-        page: 1,
         pageSize: 1,
       },
     })
@@ -610,7 +624,7 @@ function MediaStoragePage() {
     setPage(1);
     loadData(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, category, roomSlug, publicFilter, selectedColors, selectedShapes, selectedCollections, sort, debouncedSearch, pageSize]);
+  }, [tab, category, roomSlug, publicFilter, selectedColors, selectedSurfaces, selectedShapes, selectedCollections, sort, debouncedSearch, pageSize]);
 
   function handlePageChange(newPage: number) {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
@@ -931,7 +945,7 @@ function MediaStoragePage() {
           </div>
         </div>
 
-        {/* HÀNG 1.5: Facet Filters (Màu, Kiểu dáng, Bộ sưu tập) */}
+        {/* HÀNG 1.5: Facet Filters (Màu, Bề mặt, Kiểu dáng, Bộ sưu tập — tự động lọc theo danh mục) */}
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-dashed border-border/50">
           <FilterChip label="Màu" count={selectedColors.length}>
             <MultiSelectFilter
@@ -939,6 +953,15 @@ function MediaStoragePage() {
               options={colorOptions}
               selected={selectedColors}
               onChange={setSelectedColors}
+              searchable
+            />
+          </FilterChip>
+          <FilterChip label="Bề mặt" count={selectedSurfaces.length}>
+            <MultiSelectFilter
+              title="Chọn bề mặt"
+              options={surfaceOptions}
+              selected={selectedSurfaces}
+              onChange={setSelectedSurfaces}
               searchable
             />
           </FilterChip>
@@ -960,11 +983,12 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          {(selectedColors.length > 0 || selectedShapes.length > 0 || selectedCollections.length > 0) ? (
+          {(selectedColors.length > 0 || selectedSurfaces.length > 0 || selectedShapes.length > 0 || selectedCollections.length > 0) ? (
             <button
               type="button"
               onClick={() => {
                 setSelectedColors([]);
+                setSelectedSurfaces([]);
                 setSelectedShapes([]);
                 setSelectedCollections([]);
               }}
