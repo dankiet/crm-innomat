@@ -7,6 +7,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArchitectLanding } from "@/components/landing/ArchitectLanding";
 import { DEFAULT_LP_SLUG, findLpVariant } from "@/lib/lp-content";
+import { fetchLpHeroImageFn } from "@/api/lp";
 import lpCss from "../styles-lp.css?url";
 
 export const Route = createFileRoute("/")({
@@ -42,9 +43,12 @@ export const Route = createFileRoute("/")({
   },
   loader: async () => {
     const variant = findLpVariant(DEFAULT_LP_SLUG);
-    const { getHeroImageSetting } = await import("@/db/lp.server");
-    const heroImage = await getHeroImageSetting();
-    return { variant, heroImage };
+    try {
+      const res = await fetchLpHeroImageFn();
+      return { variant, heroImage: res?.heroImage };
+    } catch {
+      return { variant, heroImage: undefined };
+    }
   },
   component: HomePageRoute,
 });

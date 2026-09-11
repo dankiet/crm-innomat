@@ -325,7 +325,7 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                   onClick={() => handleSwitchView("library")}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-terracotta hover:text-terracotta/80 transition-colors cursor-pointer group"
                 >
-                  <span>Mở Thư viện đầy đủ ({totalCatalogCount ? `${totalCatalogCount}+` : "500+"} mã)</span>
+                  <span>Mở Thư viện đầy đủ (300+ mã)</span>
                   <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
                 </button>
               </div>

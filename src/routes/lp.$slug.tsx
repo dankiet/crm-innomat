@@ -7,6 +7,7 @@
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { ArchitectLanding } from "@/components/landing/ArchitectLanding";
 import { findLpVariant, DEFAULT_LP_SLUG } from "@/lib/lp-content";
+import { fetchLpHeroImageFn } from "@/api/lp";
 import lpCss from "../styles-lp.css?url";
 
 export const Route = createFileRoute("/lp/$slug")({
@@ -49,9 +50,12 @@ export const Route = createFileRoute("/lp/$slug")({
     if (!variant) {
       throw notFound();
     }
-    const { getHeroImageSetting } = await import("@/db/lp.server");
-    const heroImage = await getHeroImageSetting();
-    return { variant, heroImage };
+    try {
+      const res = await fetchLpHeroImageFn();
+      return { variant, heroImage: res?.heroImage };
+    } catch {
+      return { variant, heroImage: undefined };
+    }
   },
   component: LandingPageRoute,
 });
