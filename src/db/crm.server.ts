@@ -538,8 +538,8 @@ export async function setProductImageKind(
 ): Promise<ProductImageRow[]> {
   const db = getDb();
   const row = (await db
-    .prepare("SELECT id FROM product_images WHERE id = ? AND product_id = ?")
-    .get<{ id: number }>(imageId, productId)) as { id: number } | undefined;
+    .prepare("SELECT id, path FROM product_images WHERE id = ? AND product_id = ?")
+    .get<{ id: number; path: string }>(imageId, productId)) as { id: number; path: string } | undefined;
   if (!row) throw new Error("Không tìm thấy ảnh của sản phẩm này");
 
   const runTx = db.transaction(async (tx) => {
@@ -549,6 +549,16 @@ export async function setProductImageKind(
           "UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?",
         )
         .run(productId, imageId);
+      // Đồng bộ ảnh đại diện sản phẩm products.image_path và is_primary
+      await tx
+        .prepare("UPDATE products SET image_path = ? WHERE id = ?")
+        .run(row.path, productId);
+      await tx
+        .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ? AND id <> ?")
+        .run(productId, imageId);
+      await tx
+        .prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?")
+        .run(imageId);
     }
     await tx.prepare("UPDATE product_images SET kind = ? WHERE id = ?").run(kind, imageId);
     if (kind !== "concept") {
@@ -3063,25 +3073,35 @@ export async function bulkSetProductImageKind(
   await db.transaction(async (tx) => {
     if (kind === "map") {
       // Map yêu cầu mỗi SP chỉ có tối đa 1 ảnh MAP.
-      // Lấy danh sách ảnh cùng product_id
+      // Lấy danh sách ảnh cùng product_id và path
       const placeholders = cleanIds.map(() => "?").join(", ");
       const rows = await tx
-        .prepare(`SELECT id, product_id FROM product_images WHERE id IN (${placeholders}) ORDER BY id ASC`)
-        .all<{ id: number; product_id: number }>(...cleanIds);
+        .prepare(`SELECT id, product_id, path FROM product_images WHERE id IN (${placeholders}) ORDER BY id ASC`)
+        .all<{ id: number; product_id: number; path: string }>(...cleanIds);
 
       // Nếu cùng 1 SP có nhiều ảnh được chọn, lấy ảnh cuối cùng làm MAP
-      const targetImageByProduct = new Map<number, number>();
+      const targetImageByProduct = new Map<number, { id: number; path: string }>();
       for (const row of rows) {
-        targetImageByProduct.set(row.product_id, row.id);
+        targetImageByProduct.set(row.product_id, { id: row.id, path: row.path });
       }
 
-      for (const [productId, targetImgId] of targetImageByProduct.entries()) {
+      for (const [productId, targetImg] of targetImageByProduct.entries()) {
         // Hạ các ảnh MAP cũ của SP này về normal
         await tx
           .prepare("UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?")
-          .run(productId, targetImgId);
+          .run(productId, targetImg.id);
         // Set ảnh được chọn thành MAP
-        const res = await tx.prepare("UPDATE product_images SET kind = 'map' WHERE id = ?").run(targetImgId);
+        const res = await tx.prepare("UPDATE product_images SET kind = 'map' WHERE id = ?").run(targetImg.id);
+        // Đồng bộ products.image_path và is_primary
+        await tx
+          .prepare("UPDATE products SET image_path = ? WHERE id = ?")
+          .run(targetImg.path, productId);
+        await tx
+          .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ? AND id <> ?")
+          .run(productId, targetImg.id);
+        await tx
+          .prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?")
+          .run(targetImg.id);
         updated += Number(res.changes) || 0;
       }
     } else {

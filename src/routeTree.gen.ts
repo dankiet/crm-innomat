@@ -19,8 +19,6 @@ import { Route as AppThuVienRouteImport } from './routes/_app.thu-vien'
 import { Route as AppSanPhamRouteImport } from './routes/_app.san-pham'
 import { Route as AppNhatKyRouteImport } from './routes/_app.nhat-ky'
 import { Route as AppNguoiDungRouteImport } from './routes/_app.nguoi-dung'
-import { Route as AppMauTrangChuRouteImport } from './routes/_app.mau-trang-chu'
-import { Route as AppMauThuVienRouteImport } from './routes/_app.mau-thu-vien'
 import { Route as AppLuuTruRouteImport } from './routes/_app.luu-tru'
 import { Route as AppLeadsRouteImport } from './routes/_app.leads'
 import { Route as AppKhongGianRouteImport } from './routes/_app.khong-gian'
@@ -79,16 +77,6 @@ const AppNhatKyRoute = AppNhatKyRouteImport.update({
 const AppNguoiDungRoute = AppNguoiDungRouteImport.update({
   id: '/nguoi-dung',
   path: '/nguoi-dung',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMauTrangChuRoute = AppMauTrangChuRouteImport.update({
-  id: '/mau-trang-chu',
-  path: '/mau-trang-chu',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMauThuVienRoute = AppMauThuVienRouteImport.update({
-  id: '/mau-thu-vien',
-  path: '/mau-thu-vien',
   getParentRoute: () => AppRoute,
 } as any)
 const AppLuuTruRoute = AppLuuTruRouteImport.update({
@@ -153,8 +141,6 @@ export interface FileRoutesByFullPath {
   '/khong-gian': typeof AppKhongGianRoute
   '/leads': typeof AppLeadsRoute
   '/luu-tru': typeof AppLuuTruRoute
-  '/mau-thu-vien': typeof AppMauThuVienRoute
-  '/mau-trang-chu': typeof AppMauTrangChuRoute
   '/nguoi-dung': typeof AppNguoiDungRoute
   '/nhat-ky': typeof AppNhatKyRoute
   '/san-pham': typeof AppSanPhamRoute
@@ -175,8 +161,6 @@ export interface FileRoutesByTo {
   '/khong-gian': typeof AppKhongGianRoute
   '/leads': typeof AppLeadsRoute
   '/luu-tru': typeof AppLuuTruRoute
-  '/mau-thu-vien': typeof AppMauThuVienRoute
-  '/mau-trang-chu': typeof AppMauTrangChuRoute
   '/nguoi-dung': typeof AppNguoiDungRoute
   '/nhat-ky': typeof AppNhatKyRoute
   '/san-pham': typeof AppSanPhamRoute
@@ -200,8 +184,6 @@ export interface FileRoutesById {
   '/_app/khong-gian': typeof AppKhongGianRoute
   '/_app/leads': typeof AppLeadsRoute
   '/_app/luu-tru': typeof AppLuuTruRoute
-  '/_app/mau-thu-vien': typeof AppMauThuVienRoute
-  '/_app/mau-trang-chu': typeof AppMauTrangChuRoute
   '/_app/nguoi-dung': typeof AppNguoiDungRoute
   '/_app/nhat-ky': typeof AppNhatKyRoute
   '/_app/san-pham': typeof AppSanPhamRoute
@@ -225,8 +207,6 @@ export interface FileRouteTypes {
     | '/khong-gian'
     | '/leads'
     | '/luu-tru'
-    | '/mau-thu-vien'
-    | '/mau-trang-chu'
     | '/nguoi-dung'
     | '/nhat-ky'
     | '/san-pham'
@@ -247,8 +227,6 @@ export interface FileRouteTypes {
     | '/khong-gian'
     | '/leads'
     | '/luu-tru'
-    | '/mau-thu-vien'
-    | '/mau-trang-chu'
     | '/nguoi-dung'
     | '/nhat-ky'
     | '/san-pham'
@@ -271,8 +249,6 @@ export interface FileRouteTypes {
     | '/_app/khong-gian'
     | '/_app/leads'
     | '/_app/luu-tru'
-    | '/_app/mau-thu-vien'
-    | '/_app/mau-trang-chu'
     | '/_app/nguoi-dung'
     | '/_app/nhat-ky'
     | '/_app/san-pham'
@@ -362,20 +338,6 @@ declare module '@tanstack/react-router' {
       path: '/nguoi-dung'
       fullPath: '/nguoi-dung'
       preLoaderRoute: typeof AppNguoiDungRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/mau-trang-chu': {
-      id: '/_app/mau-trang-chu'
-      path: '/mau-trang-chu'
-      fullPath: '/mau-trang-chu'
-      preLoaderRoute: typeof AppMauTrangChuRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/mau-thu-vien': {
-      id: '/_app/mau-thu-vien'
-      path: '/mau-thu-vien'
-      fullPath: '/mau-thu-vien'
-      preLoaderRoute: typeof AppMauThuVienRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/luu-tru': {
@@ -474,8 +436,6 @@ interface AppRouteChildren {
   AppKhongGianRoute: typeof AppKhongGianRoute
   AppLeadsRoute: typeof AppLeadsRoute
   AppLuuTruRoute: typeof AppLuuTruRoute
-  AppMauThuVienRoute: typeof AppMauThuVienRoute
-  AppMauTrangChuRoute: typeof AppMauTrangChuRoute
   AppNguoiDungRoute: typeof AppNguoiDungRoute
   AppNhatKyRoute: typeof AppNhatKyRoute
   AppSanPhamRoute: typeof AppSanPhamRoute
@@ -492,8 +452,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppKhongGianRoute: AppKhongGianRoute,
   AppLeadsRoute: AppLeadsRoute,
   AppLuuTruRoute: AppLuuTruRoute,
-  AppMauThuVienRoute: AppMauThuVienRoute,
-  AppMauTrangChuRoute: AppMauTrangChuRoute,
   AppNguoiDungRoute: AppNguoiDungRoute,
   AppNhatKyRoute: AppNhatKyRoute,
   AppSanPhamRoute: AppSanPhamRoute,

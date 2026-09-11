@@ -45,9 +45,9 @@ export async function listPublicMaterials(opts?: {
   const params: SqlValue[] = [];
   const where: string[] = [
     "p.is_public = 1",
-    "COALESCE(p.image_path, '') <> ''",
     "p.featured_rank IS NOT NULL",
     "p.featured_rank BETWEEN 1 AND 12",
+    "(COALESCE(p.image_path, '') <> '' OR map_img.path IS NOT NULL)",
   ];
 
   const cat = opts?.category?.trim();
@@ -103,9 +103,22 @@ export async function setFeaturedSlot(rank: number, productId: number | null): P
       .run(productId, rank);
 
     // 3) Gán product vào slot mới, đồng thời ép nó phải Online để hiển thị trên Thư viện web
-    await tx
-      .prepare("UPDATE products SET is_public = 1, featured_rank = ? WHERE id = ?")
-      .run(rank, productId);
+    // Nếu products.image_path rỗng nhưng có ảnh map -> fallback lấy ảnh map gán vào products.image_path
+    const mapRow = (await tx
+      .prepare("SELECT path FROM product_images WHERE product_id = ? AND kind = 'map' LIMIT 1")
+      .get<{ path: string }>(productId)) as { path: string } | undefined;
+
+    if (mapRow?.path) {
+      await tx
+        .prepare(
+          "UPDATE products SET is_public = 1, featured_rank = ?, image_path = COALESCE(NULLIF(image_path, ''), ?) WHERE id = ?",
+        )
+        .run(rank, mapRow.path, productId);
+    } else {
+      await tx
+        .prepare("UPDATE products SET is_public = 1, featured_rank = ? WHERE id = ?")
+        .run(rank, productId);
+    }
   });
 }
 

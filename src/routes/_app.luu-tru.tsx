@@ -1455,22 +1455,26 @@ function MediaStoragePage() {
                             </>
                           ) : tab === "featured" ? (
                             <>
-                              {/* Toggle Thư viện icon button */}
+                              {/* Popover đổi/gỡ 12 vị trí Tuyển chọn */}
+                              <QuickFeaturedRankPopover
+                                item={img}
+                                onUpdated={() => loadData()}
+                              />
+                              {/* Toggle MAP icon button */}
                               <button
                                 type="button"
-                                onClick={() => handleTogglePublic(img.product_id, img.product_is_public)}
-                                title={img.product_is_public === 1 ? "Đang hiển thị trên Thư viện (Bấm để Ẩn)" : "Đang ẩn khỏi Thư viện (Bấm để hiển thị)"}
+                                onClick={() => handleSingleSetKind(img, isMap ? "normal" : "map")}
+                                title={isMap ? "Đang là ảnh MAP (Bấm để tắt)" : "Gán làm ảnh MAP"}
                                 className={cn(
                                   "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition-all cursor-pointer border",
-                                  img.product_is_public === 1
-                                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-2xs"
-                                    : "bg-surface-strong/60 border-border/80 text-muted-foreground/60 hover:text-emerald-600 hover:border-emerald-500/30",
+                                  isMap
+                                    ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                                    : "bg-surface-strong/60 border-border/80 text-muted-foreground/60 hover:bg-indigo-50 hover:text-indigo-600",
                                 )}
                               >
-                                <Globe className={cn("size-3.5", img.product_is_public === 1 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/60")} />
-                                <span>{img.product_is_public === 1 ? "Thư viện" : "Ẩn"}</span>
+                                <Grid className="size-3.5" />
+                                <span>MAP</span>
                               </button>
-
                             </>
                           ) : tab === "concept" ? (
                             <>
@@ -1538,20 +1542,10 @@ function MediaStoragePage() {
                                 <span>Concept</span>
                               </button>
                               {isMap ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleTogglePublic(img.product_id, img.product_is_public)}
-                                  title={img.product_is_public === 1 ? "Đang hiển thị trên Thư viện (Bấm để Ẩn)" : "Đang ẩn khỏi Thư viện (Bấm để hiển thị)"}
-                                  className={cn(
-                                    "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition-all cursor-pointer border",
-                                    img.product_is_public === 1
-                                      ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold"
-                                      : "bg-surface-strong/60 border-border/80 text-muted-foreground/60 hover:text-emerald-600",
-                                  )}
-                                >
-                                  <Globe className="size-3.5" />
-                                  <span>{img.product_is_public === 1 ? "Thư viện" : "Ẩn"}</span>
-                                </button>
+                                <QuickFeaturedRankPopover
+                                  item={img}
+                                  onUpdated={() => loadData()}
+                                />
                               ) : null}
                               {isConcept ? (
                                 <button
