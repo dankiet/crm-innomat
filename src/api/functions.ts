@@ -1717,6 +1717,9 @@ export const fetchFlatMediaImagesFn = createServerFn({ method: "GET" })
       search?: string;
       roomSlug?: ImageRoomTagSlug;
       publicFilter?: "all" | "public" | "hidden";
+      colors?: string[];
+      shapes?: string[];
+      collections?: string[];
       sort?: FlatMediaSort;
       page?: number;
       pageSize?: number;

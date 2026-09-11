@@ -2785,6 +2785,9 @@ export async function listFlatMediaImages(opts?: {
   search?: string;
   roomSlug?: ImageRoomTagSlug;
   publicFilter?: "all" | "public" | "hidden";
+  colors?: string[];
+  shapes?: string[];
+  collections?: string[];
   sort?: FlatMediaSort;
   page?: number;
   pageSize?: number;
@@ -2827,6 +2830,23 @@ export async function listFlatMediaImages(opts?: {
     baseWhere.push(opts.publicFilter === "public" ? "p.is_public = 1" : "p.is_public = 0");
   }
 
+  if (opts?.colors && opts.colors.length > 0) {
+    const placeholders = opts.colors.map(() => "?").join(", ");
+    baseWhere.push(`p.color IN (${placeholders})`);
+    baseParams.push(...opts.colors);
+  }
+
+  if (opts?.shapes && opts.shapes.length > 0) {
+    const placeholders = opts.shapes.map(() => "?").join(", ");
+    baseWhere.push(`p.shape IN (${placeholders})`);
+    baseParams.push(...opts.shapes);
+  }
+
+  if (opts?.collections && opts.collections.length > 0) {
+    const placeholders = opts.collections.map(() => "?").join(", ");
+    baseWhere.push(`p.collections IN (${placeholders})`);
+    baseParams.push(...opts.collections);
+  }
   const baseWhereSql = `WHERE ${baseWhere.join(" AND ")}`;
   // 2. Counts trên các Tabs (Đếm chính xác theo số lượng Ảnh)
   const statsSql = `

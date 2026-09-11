@@ -31,6 +31,7 @@ import {
   bulkSetProductImageRoomTagsFn,
   deleteProductImageFn,
   fetchFlatMediaImagesFn,
+  fetchProductFieldValues,
   fetchProductImages,
   setImageRoomTagsDirectFn,
   setProductImageKindFn,
@@ -47,7 +48,9 @@ import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { ImageRoomTagPicker } from "@/components/ImageRoomTagPicker";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
+import { FilterChip } from "@/components/product-filter/FilterChip";
+import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
+import { PRODUCT_COLORS } from "@/lib/types";
 export const Route = createFileRoute("/_app/luu-tru")({
   errorComponent: ({ error }) => (
     <div className="p-8 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300">
@@ -443,10 +446,35 @@ function MediaStoragePage() {
   const [category, setCategory] = useState<string>("all");
   const [roomSlug, setRoomSlug] = useState<ImageRoomTagSlug | "all">("all");
   const [publicFilter, setPublicFilter] = useState<"all" | "public" | "hidden">("all");
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const [colorOptions, setColorOptions] = useState<{ value: string; label: string }[]>([]);
+  const [shapeOptions, setShapeOptions] = useState<{ value: string; label: string }[]>([]);
+  const [collectionOptions, setCollectionOptions] = useState<{ value: string; label: string }[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState<FlatMediaSort>("newest");
   const [currentHeroImage, setCurrentHeroImage] = useState<string>("");
+
+  // Load danh mục filter options
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetchProductFieldValues({ data: { field: "color" } }).catch(() => [] as string[]),
+      fetchProductFieldValues({ data: { field: "shape" } }).catch(() => [] as string[]),
+      fetchProductFieldValues({ data: { field: "collections" } }).catch(() => [] as string[]),
+    ]).then(([colors, shapes, collections]) => {
+      if (cancelled) return;
+      const allColors = Array.from(new Set([...PRODUCT_COLORS, ...colors])).filter(Boolean);
+      setColorOptions(allColors.map((c) => ({ value: c, label: c })));
+      setShapeOptions(shapes.filter(Boolean).map((s) => ({ value: s, label: s })));
+      setCollectionOptions(collections.filter(Boolean).map((c) => ({ value: c, label: c })));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     fetchLpHeroImageFn()
       .then((res) => {
@@ -531,6 +559,9 @@ function MediaStoragePage() {
         search: debouncedSearch || undefined,
         roomSlug: roomSlug === "all" ? undefined : roomSlug,
         publicFilter: publicFilter === "all" ? undefined : publicFilter,
+        colors: selectedColors.length ? selectedColors : undefined,
+        shapes: selectedShapes.length ? selectedShapes : undefined,
+        collections: selectedCollections.length ? selectedCollections : undefined,
         sort,
         page: targetPage,
         pageSize: targetPageSize,
@@ -558,6 +589,9 @@ function MediaStoragePage() {
         category: category === "all" ? undefined : category,
         roomSlug: roomSlug === "all" ? undefined : roomSlug,
         publicFilter: publicFilter === "all" ? undefined : publicFilter,
+        colors: selectedColors.length ? selectedColors : undefined,
+        shapes: selectedShapes.length ? selectedShapes : undefined,
+        collections: selectedCollections.length ? selectedCollections : undefined,
         sort,
         page: 1,
         pageSize: 1,
@@ -576,8 +610,7 @@ function MediaStoragePage() {
     setPage(1);
     loadData(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, category, roomSlug, publicFilter, sort, debouncedSearch, pageSize]);
-
+  }, [tab, category, roomSlug, publicFilter, selectedColors, selectedShapes, selectedCollections, sort, debouncedSearch, pageSize]);
 
   function handlePageChange(newPage: number) {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
@@ -896,6 +929,50 @@ function MediaStoragePage() {
               );
             })}
           </div>
+        </div>
+
+        {/* HÀNG 1.5: Facet Filters (Màu, Kiểu dáng, Bộ sưu tập) */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-dashed border-border/50">
+          <FilterChip label="Màu" count={selectedColors.length}>
+            <MultiSelectFilter
+              title="Chọn màu"
+              options={colorOptions}
+              selected={selectedColors}
+              onChange={setSelectedColors}
+              searchable
+            />
+          </FilterChip>
+          <FilterChip label="Kiểu dáng" count={selectedShapes.length}>
+            <MultiSelectFilter
+              title="Chọn kiểu dáng"
+              options={shapeOptions}
+              selected={selectedShapes}
+              onChange={setSelectedShapes}
+              searchable
+            />
+          </FilterChip>
+          <FilterChip label="Bộ sưu tập" count={selectedCollections.length}>
+            <MultiSelectFilter
+              title="Chọn bộ sưu tập"
+              options={collectionOptions}
+              selected={selectedCollections}
+              onChange={setSelectedCollections}
+              searchable
+            />
+          </FilterChip>
+          {(selectedColors.length > 0 || selectedShapes.length > 0 || selectedCollections.length > 0) ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedColors([]);
+                setSelectedShapes([]);
+                setSelectedCollections([]);
+              }}
+              className="h-8 px-3 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-strong/60 transition-colors cursor-pointer"
+            >
+              Xóa bộ lọc SP
+            </button>
+          ) : null}
         </div>
 
         {/* HÀNG 2: Tabs Loại ảnh (KIND) bên trái + Sắp xếp, Size trang, Thao tác bên phải */}
@@ -1226,7 +1303,7 @@ function MediaStoragePage() {
                         #{img.featured_rank}
                       </span>
                     ) : null}
-                    {img.product_is_public === 1 && (tab === "map" || tab === "all" || tab === "featured") ? (
+                    {img.product_is_public === 1 && tab === "map" ? (
                       <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
                         <Globe className="size-2.5" />
                         Thư viện
