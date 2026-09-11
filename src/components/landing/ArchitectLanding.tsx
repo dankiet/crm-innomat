@@ -49,7 +49,6 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
   } = useShortlistStorage([]);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<string>("all");
   const [moodboardOpen, setMoodboardOpen] = useState(false);
   const [activeModalMaterial, setActiveModalMaterial] = useState<Material | null>(null);
   const [modalInitialTab, setModalInitialTab] = useState<"surface" | "context">("surface");
@@ -113,12 +112,6 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
     addStorageMaterials(ids);
     trackEvent("AddToCart", { collection_ids: ids });
   };
-
-  // Filtered materials for curated section
-  const filteredCuratedMaterials = useMemo(() => {
-    if (activeCategory === "all") return liveMaterials;
-    return liveMaterials.filter((m) => m.type === activeCategory);
-  }, [activeCategory, liveMaterials]);
 
   // Shortlisted material objects
   const shortlistedMaterials = useMemo(() => {
@@ -321,40 +314,53 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                   Những bề mặt đất nung, gốm men rạn, mosaic và gạch ốp lát tiêu biểu. Đây là lớp mở đầu cô đọng để bạn chạm vào cảm xúc bề mặt trước khi đi sâu vào Thư viện mã gạch.
                 </p>
               </div>
-
-              {/* Category Filter Chips */}
-              <div className="curated-filter-bar">
-                <span className="filter-bar-label">Lọc theo nhóm:</span>
-                {["all", "Gạch thẻ", "Gạch mosaic", "Gạch bông", "Gạch ốp lát"].map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    className={`curated-filter-chip ${activeCategory === cat ? "is-active" : ""}`}
-                    onClick={() => setActiveCategory(cat)}
-                  >
-                    {cat === "all" ? `Tất cả (${liveMaterials.length} mã)` : cat}
-                  </button>
-                ))}
-              </div>
-
-              <div className="featured-ledger">
-                <span>FEATURED SELECTION / 2026</span>
-                <span>CLICK CARD ĐỂ SOI CẬN CẢNH VÂN &amp; ẢNH PHỐI CẢNH</span>
+              {/* Header Top Action & Ledger */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                <div className="featured-ledger !mt-0 !mb-0">
+                  <span>FEATURED SELECTION / 2026 · {liveMaterials.length} MÃ TIÊU BIỂU</span>
+                  <span>CLICK CARD ĐỂ SOI CẬN CẢNH VÂN &amp; ẢNH PHỐI CẢNH</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchView("library")}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-terracotta hover:text-terracotta/80 transition-colors cursor-pointer group"
+                >
+                  <span>Mở Thư viện đầy đủ ({totalCatalogCount ? `${totalCatalogCount}+` : "500+"} mã)</span>
+                  <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+                </button>
               </div>
 
               {/* Materials Grid */}
-              {filteredCuratedMaterials.length > 0 ? (
-                <div className="materials-grid">
-                  {filteredCuratedMaterials.map((material) => (
-                    <MaterialCard
-                      key={material.id}
-                      material={material}
-                      selected={selectedIds.includes(material.id)}
-                      onToggle={toggleMaterial}
-                      onOpenModal={(mat) => handleOpenMaterialModal(mat, "surface")}
-                    />
-                  ))}
-                </div>
+              {liveMaterials.length > 0 ? (
+                <>
+                  <div className="materials-grid">
+                    {liveMaterials.map((material) => (
+                      <MaterialCard
+                        key={material.id}
+                        material={material}
+                        selected={selectedIds.includes(material.id)}
+                        onToggle={toggleMaterial}
+                        onOpenModal={(mat) => handleOpenMaterialModal(mat, "surface")}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Bottom Invitation Banner */}
+                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-surface-strong/40 border border-border/80">
+                    <div>
+                      <p className="text-xs font-bold text-foreground">Bạn đang tìm kích thước hoặc bề mặt khác cho concept?</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Thư viện có đầy đủ bộ lọc chi tiết theo màu sắc, kiểu dáng, bề mặt và bộ sưu tập.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchView("library")}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-xs font-semibold hover:bg-foreground/90 transition-colors shrink-0 shadow-xs cursor-pointer"
+                    >
+                      <span>Khám phá Thư viện mã gạch</span>
+                      <MoveUpRight size={13} />
+                    </button>
+                  </div>
+                </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-border/80 bg-surface-strong/30 p-8 text-center my-6">
                   <p className="text-sm font-semibold text-foreground">Bộ tuyển chọn đang được cập nhật</p>
