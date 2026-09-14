@@ -386,6 +386,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .cases-grid { grid-template-columns: 1fr 1fr; }
   .brief-section { grid-template-columns: 1fr; gap: 52px; padding: 92px 7vw; }
   .brief-heading { padding-top: 0; }
+  .brief-heading > p:not(.section-kicker) { max-width: 100%; }
   .brief-panel { padding-top: 0; }
   .landing-footer { grid-template-columns: 1fr 1fr; padding: 45px 7vw 80px; }
   .footer-contact { grid-column: 1 / -1; justify-self: start; align-items: flex-start; margin-top: 10px; }
