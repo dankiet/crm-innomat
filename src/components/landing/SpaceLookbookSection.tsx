@@ -242,8 +242,8 @@ export function SpaceLookbookSection({
       </div>
 
       {/* 2.1 Color Palette Swatch Dots */}
-      <div className="flex items-center gap-2.5 py-3">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#788075] shrink-0 select-none">
+      <div className="space-color-bar" role="group" aria-label="Lọc theo gam màu">
+        <span className="space-color-label">
           Color
         </span>
 
@@ -252,9 +252,9 @@ export function SpaceLookbookSection({
           type="button"
           onClick={() => handleColorChange("all")}
           className={cn(
-                       "h-6 px-2.5 rounded-full text-[11px] font-medium transition-all cursor-pointer shrink-0 leading-none",
+            "h-7 px-3 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 leading-none",
             activeColor === "all"
-              ? "bg-[#141f23] text-white"
+              ? "bg-[#141f23] text-white shadow-xs"
               : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
           )}
           aria-label="Tất cả màu"
@@ -263,28 +263,30 @@ export function SpaceLookbookSection({
         </button>
 
         {/* Dòng nút tròn hiển thị 8 gam màu */}
-        {COLOR_PALETTES.map((palette) => {
-          const isActive = activeColor === palette.id;
-          return (
-            <button
-              key={palette.id}
-              type="button"
-              onClick={() => handleColorChange(palette.id)}
-              aria-label={palette.label}
-              title={palette.label}
-              className={cn(
-                               "size-7 rounded-full cursor-pointer shrink-0 transition-all",
-                isActive
-                  ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-white scale-110"
-                  : "hover:scale-110 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40",
-              )}
-              style={{
-                backgroundColor: palette.hex,
-                border: `1.5px solid ${palette.dotBorder || "rgba(0,0,0,0.15)"}`,
-              }}
-            />
-          );
-        })}
+        <div className="flex items-center gap-2.5 shrink-0 py-1 px-0.5">
+          {COLOR_PALETTES.map((palette) => {
+            const isActive = activeColor === palette.id;
+            return (
+              <button
+                key={palette.id}
+                type="button"
+                onClick={() => handleColorChange(palette.id)}
+                aria-label={palette.label}
+                title={palette.label}
+                className={cn(
+                  "size-7 rounded-full cursor-pointer shrink-0 transition-all focus:outline-none",
+                  isActive
+                    ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-[#f7f4ed] scale-110 shadow-xs"
+                    : "hover:scale-105 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40 active:scale-95",
+                )}
+                style={{
+                  backgroundColor: palette.hex,
+                  border: `1.5px solid ${palette.dotBorder || "rgba(0,0,0,0.15)"}`,
+                }}
+              />
+            );
+          })}
+        </div>
       </div>
       {isLoggedIn && !loading && (
         <div className="flex items-center justify-between mb-6 px-4 py-3 bg-[#FAF8F5] border border-[#E7E2DA] rounded-xl text-xs text-[#1D1917]">

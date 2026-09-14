@@ -2534,6 +2534,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-bottom: none;
 }
 
+.space-color-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.space-color-bar::-webkit-scrollbar {
+  display: none;
+}
+.space-color-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #788075;
+  flex-shrink: 0;
+  user-select: none;
+}
 .space-tabs-scroll {
   display: flex;
   align-items: center;
