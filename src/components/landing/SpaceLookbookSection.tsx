@@ -274,7 +274,7 @@ export function SpaceLookbookSection({
                 aria-label={palette.label}
                 title={palette.label}
                 className={cn(
-                  "size-7 rounded-full cursor-pointer shrink-0 transition-all focus:outline-none",
+                  "size-7 rounded-full cursor-pointer shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
                   isActive
                     ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-[#f7f4ed] scale-110 shadow-xs"
                     : "hover:scale-105 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40 active:scale-95",
