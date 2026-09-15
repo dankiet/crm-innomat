@@ -23,13 +23,14 @@ import {
   fetchPublicMeFn,
 } from "@/api/lp";
 import type { CatalogFacets, CatalogFacetOption } from "@/lib/lp-types";
+import { COLOR_PALETTES } from "@/lib/color-palette";
+import { cn } from "@/lib/utils";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import {
   type LineId,
   type Material,
 } from "@/data/mockData";
-
 type MaterialLibraryPageProps = {
   shortlistIds: string[];
   onToggleShortlist: (id: string) => void;
@@ -50,12 +51,13 @@ export function MaterialLibraryPage({
   const [selectedCategory, setSelectedCategory] = useState<LineId | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [activePalette, setActivePalette] = useState<string>("all");
   const [selectedSurfaces, setSelectedSurfaces] = useState<string[]>([]);
   const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [facets, setFacets] = useState<CatalogFacets>({
     colors: [],
+    colorPalettes: [],
     surfaces: [],
     sizes: [],
     shapes: [],
@@ -122,10 +124,10 @@ export function MaterialLibraryPage({
   // Reset filters when category changes
   const handleCategoryChange = (cat: LineId | "all") => {
     setSelectedCategory(cat);
-    setSelectedColors([]);
+    setActivePalette("all");
     setSelectedSurfaces([]);
     setSelectedShapes([]);
-    setSelectedCollections([]);
+    setSelectedSizes([]);
   };
 
   // Fetch catalog & facets from PostgreSQL
@@ -135,10 +137,10 @@ export function MaterialLibraryPage({
     fetchPublicCatalogFn({
       data: {
         category: categoryName,
-        colors: selectedColors.length ? selectedColors : undefined,
+        colorPalettes: activePalette !== "all" ? [activePalette] : undefined,
         surfaces: selectedSurfaces.length ? selectedSurfaces : undefined,
         shapes: selectedShapes.length ? selectedShapes : undefined,
-        collections: selectedCollections.length ? selectedCollections : undefined,
+        sizes: selectedSizes.length ? selectedSizes : undefined,
         search: debouncedSearch || undefined,
         limit: 300,
       },
@@ -172,22 +174,22 @@ export function MaterialLibraryPage({
     return () => {
       cancelled = true;
     };
-  }, [categoryName, selectedColors, selectedSurfaces, selectedShapes, selectedCollections, debouncedSearch]);
+  }, [categoryName, activePalette, selectedSurfaces, selectedShapes, selectedSizes, debouncedSearch]);
 
   const handleClearFilters = useCallback(() => {
-    setSelectedColors([]);
+    setActivePalette("all");
     setSelectedSurfaces([]);
     setSelectedShapes([]);
-    setSelectedCollections([]);
+    setSelectedSizes([]);
     setSearchQuery("");
     setDebouncedSearch("");
   }, []);
 
   const hasActiveFilters =
-    selectedColors.length > 0 ||
+    activePalette !== "all" ||
     selectedSurfaces.length > 0 ||
     selectedShapes.length > 0 ||
-    selectedCollections.length > 0 ||
+    selectedSizes.length > 0 ||
     Boolean(searchQuery.trim());
 
   // Ngưỡng xem trước: hiển thị 12 mã demo khi chưa đăng nhập
@@ -337,19 +339,51 @@ export function MaterialLibraryPage({
               Gạch ốp lát (OL)
             </button>
           </div>
+          {/* 2. Architectural Color Palette Swatches Bar */}
+          <div className="space-color-bar pt-3 border-t border-dashed border-border/70" role="group" aria-label="Lọc theo gam màu">
+            <button
+              type="button"
+              onClick={() => setActivePalette("all")}
+              className={cn(
+                "h-7 px-3 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
+                activePalette === "all"
+                  ? "bg-[#141f23] text-white shadow-xs"
+                  : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
+              )}
+              aria-label="Tất cả màu sắc"
+            >
+              Tất cả màu sắc
+            </button>
+            <div className="flex items-center gap-2.5 shrink-0 py-1 px-0.5">
+              {COLOR_PALETTES.map((palette) => {
+                const isActive = activePalette === palette.id;
+                const facetOption = facets.colorPalettes?.find((f) => f.value === palette.id);
+                const facetCount = facetOption ? facetOption.count : 0;
+                return (
+                  <button
+                    key={palette.id}
+                    type="button"
+                    onClick={() => setActivePalette(isActive ? "all" : palette.id)}
+                    aria-label={palette.label}
+                    title={`${palette.label}${facetCount > 0 ? ` (${facetCount} mã)` : ""}`}
+                    className={cn(
+                      "size-7 rounded-full cursor-pointer shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
+                      isActive
+                        ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-[#f7f4ed] scale-110 shadow-xs"
+                        : "hover:scale-105 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40 active:scale-95",
+                    )}
+                    style={{
+                      backgroundColor: palette.hex,
+                      border: `1.5px solid ${palette.dotBorder || "rgba(0,0,0,0.15)"}`,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
 
-          {/* Contextual Facet Filters (CRM Standard: FilterChip + MultiSelectFilter) */}
+          {/* 3. Surface & Shape & Size Filter Chips (Chuẩn hóa Kiến trúc, bỏ các mã bộ sưu tập nội bộ CRM) */}
           <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-dashed border-border/70">
-            <FilterChip label="Màu sắc" count={selectedColors.length}>
-              <MultiSelectFilter
-                title="Chọn màu sắc"
-                options={facets.colors}
-                selected={selectedColors}
-                onChange={setSelectedColors}
-                searchable
-              />
-            </FilterChip>
-
             <FilterChip label="Bề mặt" count={selectedSurfaces.length}>
               <MultiSelectFilter
                 title="Chọn bề mặt"
@@ -370,12 +404,12 @@ export function MaterialLibraryPage({
               />
             </FilterChip>
 
-            <FilterChip label="Bộ sưu tập" count={selectedCollections.length}>
+            <FilterChip label="Kích thước" count={selectedSizes.length}>
               <MultiSelectFilter
-                title="Chọn bộ sưu tập"
-                options={facets.collections}
-                selected={selectedCollections}
-                onChange={setSelectedCollections}
+                title="Chọn kích thước"
+                options={facets.sizes}
+                selected={selectedSizes}
+                onChange={setSelectedSizes}
                 searchable
               />
             </FilterChip>
@@ -390,7 +424,6 @@ export function MaterialLibraryPage({
                 <span>✕</span>
               </button>
             )}
-
             <div className="ml-auto text-xs text-muted-foreground font-medium">
               Hiển thị <strong className="text-foreground">{visibleMaterials.length}</strong> / {totalCount} mã vật liệu
               {!isUnlocked && " (Bản xem trước)"}

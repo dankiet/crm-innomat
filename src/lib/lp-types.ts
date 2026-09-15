@@ -173,6 +173,7 @@ export type CatalogFacetOption = {
 
 export type CatalogFacets = {
   colors: CatalogFacetOption[];
+  colorPalettes?: CatalogFacetOption[];
   surfaces: CatalogFacetOption[];
   sizes: CatalogFacetOption[];
   shapes: CatalogFacetOption[];

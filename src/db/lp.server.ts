@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { getDb, type SqlValue } from "./index.server";
 import { createCustomer } from "./crm.server";
 import { normalizePhone, isPhoneMatchable } from "@/lib/phone";
+import { COLOR_PALETTES, matchColorPalette } from "@/lib/color-palette";
 import type {
   CatalogFacetOption,
   LpCatalogResult,
@@ -23,7 +24,6 @@ import type {
   LpMaterial,
   ShortlistContextItem,
 } from "@/lib/lp-types";
-
 function nowLocal() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
@@ -162,6 +162,7 @@ export async function listPublicCatalog(opts?: {
   category?: string | null;
   color?: string | null;
   colors?: string[] | null;
+  colorPalettes?: string[] | null;
   surface?: string | null;
   surfaces?: string[] | null;
   size?: string | null;
@@ -183,15 +184,32 @@ export async function listPublicCatalog(opts?: {
     params.push(cat.toLowerCase());
   }
 
-  const rawColors = (opts?.colors?.filter(Boolean) ?? []).length > 0
-    ? (opts?.colors?.filter(Boolean) ?? [])
-    : (opts?.color?.trim() ? [opts.color.trim()] : []);
-  if (rawColors.length > 0) {
-    const placeholders = rawColors.map(() => "?").join(", ");
-    where.push(`p.color IN (${placeholders})`);
-    params.push(...rawColors);
+  // 1. Lọc theo bảng màu kiến trúc chuẩn (colorPalettes: ID[])
+  const activePalettes = (opts?.colorPalettes?.filter(Boolean) ?? []);
+  if (activePalettes.length > 0) {
+    const matchedDbValues: string[] = [];
+    for (const pid of activePalettes) {
+      const p = COLOR_PALETTES.find((cp) => cp.id === pid);
+      if (p) {
+        matchedDbValues.push(...p.dbCanonicalValues);
+      }
+    }
+    if (matchedDbValues.length > 0) {
+      const placeholders = matchedDbValues.map(() => "?").join(", ");
+      where.push(`LOWER(TRIM(p.color)) IN (${placeholders})`);
+      params.push(...matchedDbValues);
+    }
+  } else {
+    // Fallback lọc màu theo chuỗi raw (nếu có)
+    const rawColors = (opts?.colors?.filter(Boolean) ?? []).length > 0
+      ? (opts?.colors?.filter(Boolean) ?? [])
+      : (opts?.color?.trim() ? [opts.color.trim()] : []);
+    if (rawColors.length > 0) {
+      const placeholders = rawColors.map(() => "?").join(", ");
+      where.push(`p.color IN (${placeholders})`);
+      params.push(...rawColors);
+    }
   }
-
   const rawSurfaces = (opts?.surfaces?.filter(Boolean) ?? []).length > 0
     ? (opts?.surfaces?.filter(Boolean) ?? [])
     : (opts?.surface?.trim() ? [opts.surface.trim()] : []);
@@ -322,6 +340,19 @@ export async function listPublicCatalog(opts?: {
       )
       .all<CatalogFacetOption>(...baseParams),
   ]);
+  // Tổng hợp facet theo 11 bảng màu kiến trúc chuẩn
+  const paletteCountMap: Record<string, number> = {};
+  for (const c of (colors as CatalogFacetOption[]) ?? []) {
+    const pid = matchColorPalette(c.value);
+    if (pid) {
+      paletteCountMap[pid] = (paletteCountMap[pid] || 0) + Number(c.count);
+    }
+  }
+  const colorPalettes: CatalogFacetOption[] = COLOR_PALETTES.map((p) => ({
+    value: p.id,
+    count: paletteCountMap[p.id] || 0,
+  })).filter((p) => p.count > 0);
+
   return {
     items,
     total,
@@ -329,6 +360,7 @@ export async function listPublicCatalog(opts?: {
     limit,
     facets: {
       colors: (colors as CatalogFacetOption[]) ?? [],
+      colorPalettes,
       surfaces: (surfaces as CatalogFacetOption[]) ?? [],
       sizes: (sizes as CatalogFacetOption[]) ?? [],
       shapes: (shapes as CatalogFacetOption[]) ?? [],
