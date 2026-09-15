@@ -421,7 +421,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                 <ProductSuggestionField
                   value={form.surface}
                   onChange={(v) => setForm((f) => ({ ...f, surface: v }))}
-                  options={fieldOptions.surface}
+                  options={fieldOptions.surface || []}
                   placeholder="— Chọn bề mặt —"
                   label="bề mặt"
                   canManageOptions={canManageOptions}
@@ -432,7 +432,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                 <ProductSuggestionField
                   value={form.shape}
                   onChange={(v) => setForm((f) => ({ ...f, shape: v }))}
-                  options={fieldOptions.shape}
+                  options={fieldOptions.shape || []}
                   placeholder="— Chọn kiểu dáng —"
                   label="kiểu dáng"
                   canManageOptions={canManageOptions}
@@ -443,7 +443,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                 <ProductSuggestionField
                   value={form.texture}
                   onChange={(v) => setForm((f) => ({ ...f, texture: v }))}
-                  options={Array.from(new Set([...PRODUCT_TEXTURES, ...fieldOptions.texture]))}
+                  options={Array.from(new Set([...PRODUCT_TEXTURES, ...(fieldOptions.texture || [])]))}
                   placeholder="— Chọn hiệu ứng vân —"
                   label="hiệu ứng vân"
                   canManageOptions={canManageOptions}
@@ -454,7 +454,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                 <ProductSuggestionField
                   value={form.category}
                   onChange={(v) => setForm((f) => ({ ...f, category: v }))}
-                  options={fieldOptions.category}
+                  options={fieldOptions.category || []}
                   placeholder="— Chọn danh mục —"
                   label="danh mục"
                   canManageOptions={canManageOptions}
@@ -465,7 +465,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                 <ProductSuggestionField
                   value={form.supplier}
                   onChange={(v) => setForm((f) => ({ ...f, supplier: v }))}
-                  options={fieldOptions.supplier}
+                  options={fieldOptions.supplier || []}
                   placeholder="— Chọn nhà cung cấp —"
                   label="nhà cung cấp"
                   canManageOptions={canManageOptions}
@@ -476,7 +476,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                 <ProductSuggestionField
                   value={form.collections}
                   onChange={(v) => setForm((f) => ({ ...f, collections: v }))}
-                  options={fieldOptions.collections}
+                  options={fieldOptions.collections || []}
                   placeholder="— Chọn bộ sưu tập —"
                   label="bộ sưu tập"
                   canManageOptions={canManageOptions}
@@ -487,7 +487,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                 <ProductSuggestionField
                   value={form.color}
                   onChange={(v) => setForm((f) => ({ ...f, color: v }))}
-                  options={Array.from(new Set([...PRODUCT_COLORS, ...fieldOptions.color]))}
+                  options={Array.from(new Set([...PRODUCT_COLORS, ...(fieldOptions.color || [])]))}
                   placeholder="— Chọn màu sắc —"
                   label="màu sắc"
                   canManageOptions={canManageOptions}

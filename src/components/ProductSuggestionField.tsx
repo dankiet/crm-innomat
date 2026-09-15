@@ -8,7 +8,7 @@ function normalize(value: string) {
 
 export function ProductSuggestionField({
   value,
-  options,
+  options = [],
   onChange,
   placeholder = "Chọn hoặc thêm giá trị…",
   label = "giá trị",
@@ -20,7 +20,7 @@ export function ProductSuggestionField({
   onDeleteOption,
 }: {
   value: string;
-  options: string[];
+  options?: string[];
   onChange: (value: string) => void;
   placeholder?: string;
   label?: string;
@@ -34,7 +34,7 @@ export function ProductSuggestionField({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   useEffect(() => { if (!open) setQuery(""); }, [open]);
-  const uniqueOptions = useMemo(() => Array.from(new Map(options.filter(Boolean).map((option) => [normalize(option), option])).values()), [options]);
+  const uniqueOptions = useMemo(() => Array.from(new Map((options ?? []).filter(Boolean).map((option) => [normalize(option), option])).values()), [options]);
   const filtered = useMemo(() => {
     const q = normalize(query);
     if (!q) return uniqueOptions;
