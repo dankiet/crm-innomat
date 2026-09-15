@@ -345,6 +345,7 @@ export const updateProductFn = createServerFn({ method: "POST" })
       material?: string;
       surface?: string;
       shape?: string;
+      texture?: string;
       collections?: string;
       category?: string;
       supplier?: string;
@@ -391,6 +392,7 @@ export const createProductFn = createServerFn({ method: "POST" })
       material?: string;
       surface?: string;
       shape?: string;
+      texture?: string;
       collections?: string;
       category?: string;
       supplier?: string;

@@ -14,7 +14,7 @@ import {
   clearProductFieldValueFn,
   syncProductInternalCodesFn,
 } from "@/api/functions";
-import { PRODUCT_COLORS } from "@/lib/types";
+import { PRODUCT_COLORS, PRODUCT_TEXTURES } from "@/lib/types";
 import { ProductSuggestionField } from "@/components/ProductSuggestionField";
 import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ const SUGGEST_FIELDS = [
   "category",
   "surface",
   "shape",
+  "texture",
   "collections",
 ] as const;
 type SuggestField = (typeof SUGGEST_FIELDS)[number];
@@ -46,6 +47,7 @@ const emptyForm = {
   material: "",
   surface: "",
   shape: "",
+  texture: "",
   collections: "",
   category: "",
   supplier: "",
@@ -86,9 +88,9 @@ export function NewProductDialog({
     category: [],
     surface: [],
     shape: [],
+    texture: [],
     collections: [],
   });
-
   function loadFieldOptions() {
     return Promise.all(
       SUGGEST_FIELDS.map((field) =>
@@ -211,6 +213,7 @@ export function NewProductDialog({
           material: form.material.trim(),
           surface: form.surface.trim(),
           shape: form.shape.trim(),
+          texture: form.texture.trim(),
           category: form.category.trim(),
           supplier: form.supplier.trim(),
           collections: form.collections.trim(),
@@ -405,6 +408,17 @@ export function NewProductDialog({
                   label="kiểu dáng"
                   canManageOptions={canManageOptions}
                   onDeleteOption={(option) => void handleDeleteOption("shape", option)}
+                />
+              </Field>
+              <Field label="Hiệu ứng vân (Texture)">
+                <ProductSuggestionField
+                  value={form.texture}
+                  onChange={(v) => setForm((f) => ({ ...f, texture: v }))}
+                  options={Array.from(new Set([...PRODUCT_TEXTURES, ...fieldOptions.texture]))}
+                  placeholder="— Chọn hiệu ứng vân —"
+                  label="hiệu ứng vân"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("texture", option)}
                 />
               </Field>
               <Field label="Danh mục">

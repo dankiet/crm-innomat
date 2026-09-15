@@ -16,9 +16,8 @@ import {
   syncProductInternalCodesFn,
 } from "@/api/functions";
 import type { Product } from "@/lib/types";
-import { PRODUCT_COLORS } from "@/lib/types";
+import { PRODUCT_COLORS, PRODUCT_TEXTURES } from "@/lib/types";
 import { ProductSuggestionField } from "@/components/ProductSuggestionField";
-import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
 import { parseInternalCodesList } from "@/lib/product-internal-codes";
 
@@ -28,6 +27,7 @@ const SUGGEST_FIELDS = [
   "category",
   "surface",
   "shape",
+  "texture",
   "collections",
 ] as const;
 type SuggestField = (typeof SUGGEST_FIELDS)[number];
@@ -57,6 +57,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
     material: "",
     surface: "",
     shape: "",
+    texture: "",
     collections: "",
     category: "",
     supplier: "",
@@ -64,7 +65,8 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
     packing_m2: "",
     packing_pcs: "",
     packing_kg: "",
-    retail_price: "",    trade_price: "",
+    retail_price: "",
+    trade_price: "",
     b2b_price: "",
     discount_tp: "",
     discount_b2b: "",
@@ -79,9 +81,9 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
     category: [],
     surface: [],
     shape: [],
+    texture: [],
     collections: [],
   });
-
   function loadFieldOptions() {
     return Promise.all(
       SUGGEST_FIELDS.map((field) =>
@@ -125,9 +127,9 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
       material: product.material,
       surface: product.surface || "",
       shape: product.shape || "",
+      texture: product.texture || "",
       collections: product.collections || "",
       category: product.category,
-      supplier: product.supplier || "",
       color: product.color || "",
       packing_m2: product.packing_m2 != null ? String(product.packing_m2) : "",
       packing_pcs: product.packing_pcs != null ? String(product.packing_pcs) : "",
@@ -219,12 +221,12 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
         data: {
           id: product.id,
           code: form.code.trim(),
-
           name: form.name.trim(),
           size: form.size.trim(),
           material: form.material.trim(),
           surface: form.surface.trim(),
           shape: form.shape.trim(),
+          texture: form.texture.trim(),
           category: form.category.trim(),
           supplier: form.supplier.trim(),
           collections: form.collections.trim(),
@@ -243,9 +245,6 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
           image_path: form.image_path.trim(),
         },
       });
-      setInternalCodes(syncedCodes.internal_codes);
-      setSavedInternalCodes(syncedCodes.internal_codes);
-      savedSinceOpenRef.current = true;
       toast.success("Đã cập nhật sản phẩm");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
@@ -437,6 +436,17 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
                   label="kiểu dáng"
                   canManageOptions={canManageOptions}
                   onDeleteOption={(option) => void handleDeleteOption("shape", option)}
+                />
+              </Field>
+              <Field label="Hiệu ứng vân (Texture)">
+                <ProductSuggestionField
+                  value={form.texture}
+                  onChange={(v) => setForm((f) => ({ ...f, texture: v }))}
+                  options={Array.from(new Set([...PRODUCT_TEXTURES, ...fieldOptions.texture]))}
+                  placeholder="— Chọn hiệu ứng vân —"
+                  label="hiệu ứng vân"
+                  canManageOptions={canManageOptions}
+                  onDeleteOption={(option) => void handleDeleteOption("texture", option)}
                 />
               </Field>
               <Field label="Danh mục">

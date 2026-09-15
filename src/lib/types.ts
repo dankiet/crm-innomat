@@ -166,13 +166,14 @@ export type Product = {
   discount_b2b: number | null;
   note: string;
   surface?: string;
-  /** Kiểu dáng (vd: hình vuông, vảy cá, dạng thanh KitKat...) */
+  /** Kiểu dáng hình học (vd: Vuông, Thanh, Chữ Nhật, Lục Giác, Vảy Cá...) */
   shape?: string;
-  /** Hiệu ứng vân/mặt gạch (vd: giả vân gỗ, giả đá, nhũ...) */
+  /** Hiệu ứng vân / Đồ họa (vd: Vân đá, Marble, Vân gỗ, Terrazzo, Xi măng...) */
+  texture?: string;
+  /** Bộ sưu tập series (vd: Bộ Đá Tự Nhiên & Xi Măng 600x600...) */
   collections?: string;
   unit?: string;
   is_hot: number;
-  /** Hiện trên landing page công khai (LP chỉ lấy product có ảnh) */
   is_public?: number;
   /** Thứ tự ưu tiên trên landing page; null = xếp sau, theo id */
   featured_rank?: number | null;
@@ -204,7 +205,17 @@ export const PRODUCT_COLORS = [
   "Gold",
 ] as const;
 
-/** Nguồn khách hàng / lead */
+/** Hiệu ứng vân chuẩn để gợi ý */
+export const PRODUCT_TEXTURES = [
+  "Vân đá",
+  "Marble",
+  "Vân gỗ",
+  "Terrazzo",
+  "Xi măng",
+  "Giả thẻ",
+  "Sa thạch",
+  "Đơn sắc",
+] as const;
 export type LeadSource = "Facebook" | "Zalo" | "Khác" | "";
 
 export const LEAD_SOURCES: Exclude<LeadSource, "">[] = ["Facebook", "Zalo", "Khác"];

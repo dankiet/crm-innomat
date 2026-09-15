@@ -166,11 +166,11 @@ const PRODUCT_SUGGEST_FIELDS = [
   "category",
   "surface",
   "shape",
+  "texture",
   "collections",
   "material",
   "size",
 ] as const;
-type ProductSuggestField = (typeof PRODUCT_SUGGEST_FIELDS)[number];
 
 /** Lấy danh sách giá trị distinct đã dùng cho 1 field phân loại — dùng làm gợi ý datalist */
 export async function listProductFieldValues(
@@ -2608,6 +2608,7 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
         material = @material,
         surface = @surface,
         shape = @shape,
+        texture = @texture,
         collections = @collections,
         category = @category,
         supplier = @supplier,
@@ -2636,12 +2637,11 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       material: (input.material ?? existing.material).trim(),
       surface: (input.surface ?? existing.surface ?? "").trim(),
       shape: (input.shape ?? existing.shape ?? "").trim(),
+      texture: (input.texture ?? existing.texture ?? "").trim(),
       collections: (input.collections ?? existing.collections ?? "").trim(),
       category: (input.category ?? existing.category).trim(),
       supplier: (input.supplier ?? existing.supplier).trim(),
       color: (input.color ?? existing.color ?? "").trim(),
-      packing: (input.packing ?? existing.packing ?? "").trim(),
-      packing_m2: input.packing_m2 !== undefined ? input.packing_m2 : existing.packing_m2,
       packing_pcs: input.packing_pcs !== undefined ? input.packing_pcs : existing.packing_pcs,
       packing_kg: input.packing_kg !== undefined ? input.packing_kg : existing.packing_kg,
       retail_price: retail,
@@ -2721,12 +2721,12 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
   const info = await getDb()
     .prepare(
       `INSERT INTO products (
-        code, name, size, material, surface, shape, collections, category, supplier,
+        code, name, size, material, surface, shape, texture, collections, category, supplier,
         color, packing, packing_m2, packing_pcs, packing_kg,
         retail_price, trade_price, b2b_price, discount_tp, discount_b2b,
         note, is_hot, is_public, featured_rank, image_path
       ) VALUES (
-        @code, @name, @size, @material, @surface, @shape, @collections, @category, @supplier,
+        @code, @name, @size, @material, @surface, @shape, @texture, @collections, @category, @supplier,
         @color, @packing, @packing_m2, @packing_pcs, @packing_kg,
         @retail_price, @trade_price, @b2b_price, @discount_tp, @discount_b2b,
         @note, @is_hot, @is_public, @featured_rank, @image_path
@@ -2739,6 +2739,7 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
       material: (input.material ?? "").trim(),
       surface: (input.surface ?? "").trim(),
       shape: (input.shape ?? "").trim(),
+      texture: (input.texture ?? "").trim(),
       collections: (input.collections ?? "").trim(),
       category: (input.category ?? "").trim(),
       supplier: (input.supplier ?? "").trim(),

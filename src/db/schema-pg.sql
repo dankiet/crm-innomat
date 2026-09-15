@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS products (
   internal_code TEXT NOT NULL DEFAULT '',
   internal_codes TEXT NOT NULL DEFAULT '',
   collections TEXT NOT NULL DEFAULT '',
-  shape TEXT NOT NULL DEFAULT ''
+  shape TEXT NOT NULL DEFAULT '',
+  texture TEXT NOT NULL DEFAULT ''
 );
 
 -- Atomically migrate legacy product meanings; gallery_collections stays unchanged.
@@ -41,8 +42,10 @@ BEGIN
   END IF;
 END $$;
 
--- Khối lượng đóng gói (Kg/thùng) — idempotent cho DB đã tạo trước đó.
+-- Khối lượng đóng gói (Kg/thùng) & Cột Texture (Hiệu ứng vân) — idempotent cho DB đã tạo trước đó.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS packing_kg DOUBLE PRECISION;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS texture TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_products_texture ON products(texture);
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_products_code ON products(code);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
