@@ -175,8 +175,10 @@ export type CatalogFacets = {
   colors: CatalogFacetOption[];
   colorPalettes?: CatalogFacetOption[];
   surfaces: CatalogFacetOption[];
-  sizes: CatalogFacetOption[];
+  surfaceFinishes?: CatalogFacetOption[];
   shapes: CatalogFacetOption[];
+  formatFamilies?: CatalogFacetOption[];
+  sizes: CatalogFacetOption[];
   collections: CatalogFacetOption[];
 };
 

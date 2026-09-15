@@ -24,6 +24,7 @@ import {
 } from "@/api/lp";
 import type { CatalogFacets, CatalogFacetOption } from "@/lib/lp-types";
 import { COLOR_PALETTES } from "@/lib/color-palette";
+import { SURFACE_FINISHES, FORMAT_FAMILIES } from "@/lib/material-taxonomy";
 import { cn } from "@/lib/utils";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
@@ -52,15 +53,17 @@ export function MaterialLibraryPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activePalette, setActivePalette] = useState<string>("all");
-  const [selectedSurfaces, setSelectedSurfaces] = useState<string[]>([]);
-  const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
+  const [selectedFinishes, setSelectedFinishes] = useState<string[]>([]);
+  const [selectedFamilies, setSelectedFamilies] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [facets, setFacets] = useState<CatalogFacets>({
     colors: [],
     colorPalettes: [],
     surfaces: [],
-    sizes: [],
+    surfaceFinishes: [],
     shapes: [],
+    formatFamilies: [],
+    sizes: [],
     collections: [],
   });
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -125,8 +128,8 @@ export function MaterialLibraryPage({
   const handleCategoryChange = (cat: LineId | "all") => {
     setSelectedCategory(cat);
     setActivePalette("all");
-    setSelectedSurfaces([]);
-    setSelectedShapes([]);
+    setSelectedFinishes([]);
+    setSelectedFamilies([]);
     setSelectedSizes([]);
   };
 
@@ -138,8 +141,8 @@ export function MaterialLibraryPage({
       data: {
         category: categoryName,
         colorPalettes: activePalette !== "all" ? [activePalette] : undefined,
-        surfaces: selectedSurfaces.length ? selectedSurfaces : undefined,
-        shapes: selectedShapes.length ? selectedShapes : undefined,
+        surfaceFinishes: selectedFinishes.length ? selectedFinishes : undefined,
+        formatFamilies: selectedFamilies.length ? selectedFamilies : undefined,
         sizes: selectedSizes.length ? selectedSizes : undefined,
         search: debouncedSearch || undefined,
         limit: 300,
@@ -174,21 +177,43 @@ export function MaterialLibraryPage({
     return () => {
       cancelled = true;
     };
-  }, [categoryName, activePalette, selectedSurfaces, selectedShapes, selectedSizes, debouncedSearch]);
+  }, [categoryName, activePalette, selectedFinishes, selectedFamilies, selectedSizes, debouncedSearch]);
 
   const handleClearFilters = useCallback(() => {
     setActivePalette("all");
-    setSelectedSurfaces([]);
-    setSelectedShapes([]);
+    setSelectedFinishes([]);
+    setSelectedFamilies([]);
     setSelectedSizes([]);
     setSearchQuery("");
     setDebouncedSearch("");
   }, []);
 
+  const finishOptions = useMemo(() => {
+    return SURFACE_FINISHES.map((sf) => {
+      const count = facets.surfaceFinishes?.find((f) => f.value === sf.id)?.count || 0;
+      return {
+        value: sf.id,
+        label: sf.shortLabel,
+        count,
+      };
+    }).filter((o) => o.count > 0);
+  }, [facets.surfaceFinishes]);
+
+  const familyOptions = useMemo(() => {
+    return FORMAT_FAMILIES.map((ff) => {
+      const count = facets.formatFamilies?.find((f) => f.value === ff.id)?.count || 0;
+      return {
+        value: ff.id,
+        label: ff.shortLabel,
+        count,
+      };
+    }).filter((o) => o.count > 0);
+  }, [facets.formatFamilies]);
+
   const hasActiveFilters =
     activePalette !== "all" ||
-    selectedSurfaces.length > 0 ||
-    selectedShapes.length > 0 ||
+    selectedFinishes.length > 0 ||
+    selectedFamilies.length > 0 ||
     selectedSizes.length > 0 ||
     Boolean(searchQuery.trim());
 
@@ -384,29 +409,29 @@ export function MaterialLibraryPage({
 
           {/* 3. Surface & Shape & Size Filter Chips (Chuẩn hóa Kiến trúc, bỏ các mã bộ sưu tập nội bộ CRM) */}
           <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-dashed border-border/70">
-            <FilterChip label="Bề mặt" count={selectedSurfaces.length}>
+            <FilterChip label="Bề mặt" count={selectedFinishes.length}>
               <MultiSelectFilter
-                title="Chọn bề mặt"
-                options={facets.surfaces}
-                selected={selectedSurfaces}
-                onChange={setSelectedSurfaces}
+                title="Chọn nhóm bề mặt"
+                options={finishOptions}
+                selected={selectedFinishes}
+                onChange={setSelectedFinishes}
                 searchable
               />
             </FilterChip>
 
-            <FilterChip label="Kiểu dáng" count={selectedShapes.length}>
+            <FilterChip label="Kiểu dáng" count={selectedFamilies.length}>
               <MultiSelectFilter
-                title="Chọn kiểu dáng"
-                options={facets.shapes}
-                selected={selectedShapes}
-                onChange={setSelectedShapes}
+                title="Chọn kiểu dáng hình học"
+                options={familyOptions}
+                selected={selectedFamilies}
+                onChange={setSelectedFamilies}
                 searchable
               />
             </FilterChip>
 
             <FilterChip label="Kích thước" count={selectedSizes.length}>
               <MultiSelectFilter
-                title="Chọn kích thước"
+                title="Chọn khổ gạch"
                 options={facets.sizes}
                 selected={selectedSizes}
                 onChange={setSelectedSizes}

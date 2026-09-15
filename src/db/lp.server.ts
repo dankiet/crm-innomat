@@ -15,6 +15,7 @@ import { getDb, type SqlValue } from "./index.server";
 import { createCustomer } from "./crm.server";
 import { normalizePhone, isPhoneMatchable } from "@/lib/phone";
 import { COLOR_PALETTES, matchColorPalette } from "@/lib/color-palette";
+import { SURFACE_FINISHES, FORMAT_FAMILIES } from "@/lib/material-taxonomy";
 import type {
   CatalogFacetOption,
   LpCatalogResult,
@@ -165,10 +166,12 @@ export async function listPublicCatalog(opts?: {
   colorPalettes?: string[] | null;
   surface?: string | null;
   surfaces?: string[] | null;
+  surfaceFinishes?: string[] | null;
   size?: string | null;
   sizes?: string[] | null;
   shape?: string | null;
   shapes?: string[] | null;
+  formatFamilies?: string[] | null;
   collections?: string | string[] | null;
   search?: string | null;
   page?: number;
@@ -211,31 +214,55 @@ export async function listPublicCatalog(opts?: {
       params.push(...rawColors);
     }
   }
-  const rawSurfaces = (opts?.surfaces?.filter(Boolean) ?? []).length > 0
-    ? (opts?.surfaces?.filter(Boolean) ?? [])
-    : (opts?.surface?.trim() ? [opts.surface.trim()] : []);
-  if (rawSurfaces.length > 0) {
-    const placeholders = rawSurfaces.map(() => "?").join(", ");
-    where.push(`p.surface IN (${placeholders})`);
-    params.push(...rawSurfaces);
+
+  // 2. Lọc theo nhóm Cảm xúc Bề mặt (surfaceFinishes: ID[])
+  const activeFinishes = (opts?.surfaceFinishes?.filter(Boolean) ?? []);
+  if (activeFinishes.length > 0) {
+    const matchedSurfaces: string[] = [];
+    for (const fid of activeFinishes) {
+      const g = SURFACE_FINISHES.find((sf) => sf.id === fid);
+      if (g) matchedSurfaces.push(...g.rawSurfaces);
+    }
+    const uniqueSurfaces = Array.from(new Set(matchedSurfaces));
+    if (uniqueSurfaces.length > 0) {
+      const placeholders = uniqueSurfaces.map(() => "?").join(", ");
+      where.push(`p.surface IN (${placeholders})`);
+      params.push(...uniqueSurfaces);
+    }
+  } else {
+    const rawSurfaces = (opts?.surfaces?.filter(Boolean) ?? []).length > 0
+      ? (opts?.surfaces?.filter(Boolean) ?? [])
+      : (opts?.surface?.trim() ? [opts.surface.trim()] : []);
+    if (rawSurfaces.length > 0) {
+      const placeholders = rawSurfaces.map(() => "?").join(", ");
+      where.push(`p.surface IN (${placeholders})`);
+      params.push(...rawSurfaces);
+    }
   }
 
-  const rawShapes = (opts?.shapes?.filter(Boolean) ?? []).length > 0
-    ? (opts?.shapes?.filter(Boolean) ?? [])
-    : (opts?.shape?.trim() ? [opts.shape.trim()] : []);
-  if (rawShapes.length > 0) {
-    const placeholders = rawShapes.map(() => "?").join(", ");
-    where.push(`p.shape IN (${placeholders})`);
-    params.push(...rawShapes);
-  }
-
-  const rawCollections = Array.isArray(opts?.collections)
-    ? opts.collections.filter(Boolean)
-    : (opts?.collections?.trim() ? [opts.collections.trim()] : []);
-  if (rawCollections.length > 0) {
-    const placeholders = rawCollections.map(() => "?").join(", ");
-    where.push(`p.collections IN (${placeholders})`);
-    params.push(...rawCollections);
+  // 3. Lọc theo nhóm Kiểu dáng Hình học (formatFamilies: ID[])
+  const activeFamilies = (opts?.formatFamilies?.filter(Boolean) ?? []);
+  if (activeFamilies.length > 0) {
+    const matchedShapes: string[] = [];
+    for (const fid of activeFamilies) {
+      const g = FORMAT_FAMILIES.find((ff) => ff.id === fid);
+      if (g) matchedShapes.push(...g.rawShapes);
+    }
+    const uniqueShapes = Array.from(new Set(matchedShapes));
+    if (uniqueShapes.length > 0) {
+      const placeholders = uniqueShapes.map(() => "?").join(", ");
+      where.push(`p.shape IN (${placeholders})`);
+      params.push(...uniqueShapes);
+    }
+  } else {
+    const rawShapes = (opts?.shapes?.filter(Boolean) ?? []).length > 0
+      ? (opts?.shapes?.filter(Boolean) ?? [])
+      : (opts?.shape?.trim() ? [opts.shape.trim()] : []);
+    if (rawShapes.length > 0) {
+      const placeholders = rawShapes.map(() => "?").join(", ");
+      where.push(`p.shape IN (${placeholders})`);
+      params.push(...rawShapes);
+    }
   }
 
   const rawSizes = (opts?.sizes?.filter(Boolean) ?? []).length > 0
@@ -246,7 +273,6 @@ export async function listPublicCatalog(opts?: {
     where.push(`p.size IN (${placeholders})`);
     params.push(...rawSizes);
   }
-
   if (opts?.search?.trim()) {
     where.push("(LOWER(p.code) LIKE ? OR LOWER(p.name) LIKE ?)");
     const q = `%${opts.search.trim().toLowerCase()}%`;
@@ -341,7 +367,7 @@ export async function listPublicCatalog(opts?: {
       )
       .all<CatalogFacetOption>(...baseParams),
   ]);
-  // Tổng hợp facet theo 11 bảng màu kiến trúc chuẩn
+  // 1. Tổng hợp facet theo 11 bảng màu kiến trúc chuẩn
   const paletteCountMap: Record<string, number> = {};
   for (const c of (colors as CatalogFacetOption[]) ?? []) {
     const pid = matchColorPalette(c.value);
@@ -354,6 +380,34 @@ export async function listPublicCatalog(opts?: {
     count: paletteCountMap[p.id] || 0,
   })).filter((p) => p.count > 0);
 
+  // 2. Tổng hợp facet theo 4 nhóm Cảm xúc Bề mặt
+  const finishCounts: Record<string, number> = {};
+  for (const s of (surfaces as CatalogFacetOption[]) ?? []) {
+    for (const g of SURFACE_FINISHES) {
+      if (g.rawSurfaces.includes(s.value)) {
+        finishCounts[g.id] = (finishCounts[g.id] || 0) + Number(s.count);
+      }
+    }
+  }
+  const surfaceFinishes: CatalogFacetOption[] = SURFACE_FINISHES.map((g) => ({
+    value: g.id,
+    count: finishCounts[g.id] || 0,
+  })).filter((g) => g.count > 0);
+
+  // 3. Tổng hợp facet theo 4 nhóm Kiểu dáng Hình học
+  const familyCounts: Record<string, number> = {};
+  for (const sh of (shapes as CatalogFacetOption[]) ?? []) {
+    for (const g of FORMAT_FAMILIES) {
+      if (g.rawShapes.includes(sh.value)) {
+        familyCounts[g.id] = (familyCounts[g.id] || 0) + Number(sh.count);
+      }
+    }
+  }
+  const formatFamilies: CatalogFacetOption[] = FORMAT_FAMILIES.map((g) => ({
+    value: g.id,
+    count: familyCounts[g.id] || 0,
+  })).filter((g) => g.count > 0);
+
   return {
     items,
     total,
@@ -363,8 +417,10 @@ export async function listPublicCatalog(opts?: {
       colors: (colors as CatalogFacetOption[]) ?? [],
       colorPalettes,
       surfaces: (surfaces as CatalogFacetOption[]) ?? [],
-      sizes: (sizes as CatalogFacetOption[]) ?? [],
+      surfaceFinishes,
       shapes: (shapes as CatalogFacetOption[]) ?? [],
+      formatFamilies,
+      sizes: (sizes as CatalogFacetOption[]) ?? [],
       collections: (collections as CatalogFacetOption[]) ?? [],
     },
   };
