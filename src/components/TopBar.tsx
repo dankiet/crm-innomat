@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { Menu, FilePlus2, Map, Plus, Globe, ExternalLink } from "lucide-react";
 import { NewCustomerDialog } from "@/components/NewCustomerDialog";

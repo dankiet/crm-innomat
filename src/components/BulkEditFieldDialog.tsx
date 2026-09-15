@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { bulkUpdateProductFieldFn, clearProductFieldValueFn, fetchProductFieldValues } from "@/api/functions";
 import { PRODUCT_COLORS } from "@/lib/types";
