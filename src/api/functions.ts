@@ -261,6 +261,7 @@ export const fetchProductFieldValues = createServerFn({ method: "GET" })
         | "surface"
         | "collections"
         | "shape"
+        | "texture"
         | "material"
         | "size";
       category?: string;
@@ -284,6 +285,7 @@ export const bulkUpdateProductFieldFn = createServerFn({ method: "POST" })
         | "surface"
         | "collections"
         | "shape"
+        | "texture"
         | "material"
         | "size";
       value: string;
@@ -315,6 +317,7 @@ export const clearProductFieldValueFn = createServerFn({ method: "POST" })
         | "surface"
         | "collections"
         | "shape"
+        | "texture"
         | "material"
         | "size";
       value: string;
