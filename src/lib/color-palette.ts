@@ -9,8 +9,10 @@ export type ColorPaletteGroup = {
   shortLabel: string;
   hex: string;
   dotBorder?: string;
-  canonicalValues: string[];
-  keywords: string[];
+  /** Các giá trị chuẩn nguyên bản (LOWER(TRIM(color))) thực tế trong PostgreSQL */
+  dbCanonicalValues: string[];
+  /** Các từ khóa alias bổ trợ cho tìm kiếm / moodboard */
+  aliases: string[];
 };
 
 export const COLOR_PALETTES: ColorPaletteGroup[] = [
@@ -20,8 +22,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Trắng",
     hex: "#FFFFFF",
     dotBorder: "#D1D5DB",
-    canonicalValues: ["trắng"],
-    keywords: ["trắng", "white", "off-white"],
+    dbCanonicalValues: ["trắng"],
+    aliases: ["white", "off-white"],
   },
   {
     id: "beige",
@@ -29,8 +31,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Be/Kem",
     hex: "#E6D7C3",
     dotBorder: "#CDBFA9",
-    canonicalValues: ["kem/be", "kem", "be", "beige"],
-    keywords: ["kem/be", "kem", "be", "beige", "sand", "cát", "ivory", "travertine"],
+    dbCanonicalValues: ["kem/be", "kem", "beige"],
+    aliases: ["sand", "cát", "ivory", "travertine"],
   },
   {
     id: "grey",
@@ -38,8 +40,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Ghi xám",
     hex: "#9E9E9E",
     dotBorder: "#7E7E7E",
-    canonicalValues: ["xám"],
-    keywords: ["xám", "ghi", "grey", "gray", "xi măng", "cement"],
+    dbCanonicalValues: ["xám"],
+    aliases: ["ghi", "grey", "gray", "xi măng", "cement"],
   },
   {
     id: "black",
@@ -47,8 +49,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Đen",
     hex: "#1E2022",
     dotBorder: "#111213",
-    canonicalValues: ["đen"],
-    keywords: ["đen", "black", "charcoal"],
+    dbCanonicalValues: ["đen"],
+    aliases: ["black", "charcoal"],
   },
   {
     id: "brown",
@@ -56,8 +58,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Nâu gỗ",
     hex: "#6B4C35",
     dotBorder: "#4F3624",
-    canonicalValues: ["nâu"],
-    keywords: ["nâu", "brown", "gỗ", "coffee", "cà phê", "chocolate"],
+    dbCanonicalValues: ["nâu"],
+    aliases: ["brown", "gỗ", "coffee", "cà phê", "chocolate"],
   },
   {
     id: "green",
@@ -65,8 +67,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Xanh lá",
     hex: "#386641",
     dotBorder: "#27482D",
-    canonicalValues: ["xanh lá", "xanh mint"],
-    keywords: ["xanh lá", "rêu", "xanh mint", "mint", "green", "ngọc lục bảo", "emerald", "olive", "sage"],
+    dbCanonicalValues: ["xanh lá", "xanh mint"],
+    aliases: ["rêu", "mint", "green", "ngọc lục bảo", "emerald", "olive", "sage"],
   },
   {
     id: "blue",
@@ -74,8 +76,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Xanh dương",
     hex: "#264653",
     dotBorder: "#1A323C",
-    canonicalValues: ["xanh dương"],
-    keywords: ["xanh dương", "xanh biển", "blue", "teal", "cobalt", "navy", "ocean"],
+    dbCanonicalValues: ["xanh dương"],
+    aliases: ["xanh biển", "blue", "teal", "cobalt", "navy", "ocean"],
   },
   {
     id: "terracotta",
@@ -83,8 +85,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Đất nung",
     hex: "#B94A2E",
     dotBorder: "#92361E",
-    canonicalValues: ["cam", "đỏ"],
-    keywords: ["cam", "đỏ", "terracotta", "đất nung", "red", "orange"],
+    dbCanonicalValues: ["cam", "đỏ"],
+    aliases: ["terracotta", "đất nung", "red", "orange"],
   },
   {
     id: "yellow",
@@ -92,8 +94,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Vàng",
     hex: "#E5A93C",
     dotBorder: "#B88228",
-    canonicalValues: ["vàng", "gold"],
-    keywords: ["vàng", "yellow", "gold", "mù tạt", "amber", "mustard"],
+    dbCanonicalValues: ["vàng"],
+    aliases: ["yellow", "gold", "mù tạt", "amber", "mustard"],
   },
   {
     id: "pink",
@@ -101,8 +103,8 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Hồng",
     hex: "#D98A8A",
     dotBorder: "#B86B6B",
-    canonicalValues: ["hồng"],
-    keywords: ["hồng", "pink", "rose", "pastel"],
+    dbCanonicalValues: ["hồng"],
+    aliases: ["pink", "rose", "pastel"],
   },
   {
     id: "purple",
@@ -110,32 +112,41 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
     shortLabel: "Tím",
     hex: "#7E57C2",
     dotBorder: "#5E35B1",
-    canonicalValues: ["tím"],
-    keywords: ["tím", "purple", "violet"],
+    dbCanonicalValues: ["tím"],
+    aliases: ["purple", "violet"],
   },
 ];
 
-// Bản đồ tra cứu nhanh O(1) cho các giá trị màu canonical và alias đầy đủ
+// Bản đồ tra cứu O(1) chính xác cho các giá trị canonical từ DB
 const CANONICAL_MAP = new Map<string, string>();
 for (const p of COLOR_PALETTES) {
-  for (const v of [...p.canonicalValues, ...p.keywords]) {
-    const k = v.toLowerCase().trim();
-    if (!CANONICAL_MAP.has(k)) {
-      CANONICAL_MAP.set(k, p.id);
-    }
+  for (const v of p.dbCanonicalValues) {
+    CANONICAL_MAP.set(v.toLowerCase().trim(), p.id);
+  }
+}
+
+// Bản đồ tra cứu alias mở rộng
+const ALIAS_MAP = new Map<string, string>();
+for (const p of COLOR_PALETTES) {
+  for (const v of p.aliases) {
+    ALIAS_MAP.set(v.toLowerCase().trim(), p.id);
   }
 }
 
 /**
  * Ánh xạ chuỗi màu trong DB sang ID của bảng màu kiến trúc.
- * Xử lý tuần tự: Exact Match -> Slash Match -> Fallback 'Xanh' -> Safe Phrase Match
+ * Xử lý tuần tự:
+ * 1. Exact Match trên giá trị Canonical DB
+ * 2. Exact Match trên giá trị phân tách bằng dấu gạch chéo
+ * 3. Exact Match trên danh sách Alias mở rộng
+ * 4. Safe Phrase Match trên Alias có độ dài >= 4 ký tự
  */
 export function matchColorPalette(rawColor: string | null | undefined): string | null {
   if (!rawColor) return null;
   const s = rawColor.trim().toLowerCase();
   if (!s || s === "chưa xác định" || s === "unknown") return null;
 
-  // 1. So khớp chính xác từ điển chuẩn O(1)
+  // 1. So khớp chính xác từ điển chuẩn DB O(1)
   if (CANONICAL_MAP.has(s)) {
     return CANONICAL_MAP.get(s)!;
   }
@@ -150,13 +161,15 @@ export function matchColorPalette(rawColor: string | null | undefined): string |
     }
   }
 
-  // 3. Fallback cho màu "Xanh" đơn lẻ (không xác định lá hay dương)
-  if (s === "xanh") return "green";
+  // 3. So khớp chính xác từ điển Alias O(1)
+  if (ALIAS_MAP.has(s)) {
+    return ALIAS_MAP.get(s)!;
+  }
 
-  // 4. So khớp cụm từ an toàn (chỉ xét từ khóa dài >= 4 ký tự để tránh lỗi substring ngắn như 'be', 'tro')
+  // 4. So khớp cụm từ an toàn (chỉ xét alias dài >= 4 ký tự để tránh lỗi substring ngắn như 'be', 'tro')
   for (const p of COLOR_PALETTES) {
-    for (const kw of p.keywords) {
-      if (kw.length >= 4 && s.includes(kw)) {
+    for (const alias of p.aliases) {
+      if (alias.length >= 4 && s.includes(alias)) {
         return p.id;
       }
     }

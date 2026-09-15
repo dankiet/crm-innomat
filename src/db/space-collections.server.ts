@@ -327,19 +327,10 @@ export async function listCrmConceptImages(filter?: CrmConceptFilter): Promise<C
   // Filter by color palette (Khớp chính xác canonical values từ DB, tránh lỗi ILIKE wildcard)
   if (filter?.color && filter.color !== "all") {
     const palette = COLOR_PALETTES.find((p) => p.id === filter.color);
-    if (palette) {
-      const colorConditions: string[] = [];
-      if (palette.canonicalValues.length > 0) {
-        const inPlaceholders = palette.canonicalValues.map(() => "?").join(", ");
-        colorConditions.push(`LOWER(TRIM(p.color)) IN (${inPlaceholders})`);
-        palette.canonicalValues.forEach((v) => params.push(v.toLowerCase().trim()));
-      }
-      if (palette.id === "green") {
-        colorConditions.push(`LOWER(TRIM(p.color)) = 'xanh'`);
-      }
-      if (colorConditions.length > 0) {
-        conditions.push(`(${colorConditions.join(" OR ")})`);
-      }
+    if (palette && palette.dbCanonicalValues.length > 0) {
+      const inPlaceholders = palette.dbCanonicalValues.map(() => "?").join(", ");
+      conditions.push(`LOWER(TRIM(p.color)) IN (${inPlaceholders})`);
+      palette.dbCanonicalValues.forEach((v) => params.push(v.toLowerCase().trim()));
     }
   }
   // Filter by search (product code, name, caption, ai_description)

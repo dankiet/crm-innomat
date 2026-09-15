@@ -257,7 +257,7 @@ export function SpaceLookbookSection({
         >
           Tất cả màu sắc
         </button>
-        {/* Dòng nút tròn hiển thị 8 gam màu */}
+        {/* Dòng nút tròn hiển thị 11 gam màu trực diện */}
         <div className="flex items-center gap-2.5 shrink-0 py-1 px-0.5">
           {COLOR_PALETTES.map((palette) => {
             const isActive = activeColor === palette.id;
