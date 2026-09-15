@@ -193,16 +193,19 @@ export function NewProductDialog({
       return;
     }
     let packing_m2: number | null = null;
-    if (form.packing_m2.trim() !== "") {
-      packing_m2 = Number(form.packing_m2.trim().replace(",", "."));
+    if ((form.packing_m2 || "").trim() !== "") {
+      const val = Number((form.packing_m2 || "").trim().replace(",", "."));
+      packing_m2 = Number.isNaN(val) ? null : val;
     }
     let packing_pcs: number | null = null;
-    if (form.packing_pcs.trim() !== "") {
-      packing_pcs = Number(form.packing_pcs.trim());
+    if ((form.packing_pcs || "").trim() !== "") {
+      const val = Number((form.packing_pcs || "").trim());
+      packing_pcs = Number.isNaN(val) ? null : val;
     }
     let packing_kg: number | null = null;
-    if (form.packing_kg.trim() !== "") {
-      packing_kg = Number(form.packing_kg.trim().replace(",", "."));
+    if ((form.packing_kg || "").trim() !== "") {
+      const val = Number((form.packing_kg || "").trim().replace(",", "."));
+      packing_kg = Number.isNaN(val) ? null : val;
     }
     setSaving(true);
     try {

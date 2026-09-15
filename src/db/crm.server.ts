@@ -2646,9 +2646,18 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       supplier: String(input.supplier ?? existing.supplier ?? "").trim(),
       color: String(input.color ?? existing.color ?? "").trim(),
       packing: String(input.packing ?? existing.packing ?? "").trim(),
-      packing_m2: input.packing_m2 !== undefined ? input.packing_m2 : existing.packing_m2,
-      packing_pcs: input.packing_pcs !== undefined ? input.packing_pcs : existing.packing_pcs,
-      packing_kg: input.packing_kg !== undefined ? input.packing_kg : existing.packing_kg,
+      packing_m2:
+        input.packing_m2 !== undefined
+          ? (input.packing_m2 != null && !Number.isNaN(Number(input.packing_m2)) ? Number(input.packing_m2) : null)
+          : existing.packing_m2,
+      packing_pcs:
+        input.packing_pcs !== undefined
+          ? (input.packing_pcs != null && !Number.isNaN(Number(input.packing_pcs)) ? Number(input.packing_pcs) : null)
+          : existing.packing_pcs,
+      packing_kg:
+        input.packing_kg !== undefined
+          ? (input.packing_kg != null && !Number.isNaN(Number(input.packing_kg)) ? Number(input.packing_kg) : null)
+          : existing.packing_kg,
       retail_price: retail,
       trade_price: tradePrice,
       b2b_price: b2bPrice,
