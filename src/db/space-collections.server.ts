@@ -324,16 +324,24 @@ export async function listCrmConceptImages(filter?: CrmConceptFilter): Promise<C
   }
 
 
-  // Filter by color palette
+  // Filter by color palette (Khớp chính xác canonical values từ DB, tránh lỗi ILIKE wildcard)
   if (filter?.color && filter.color !== "all") {
     const palette = COLOR_PALETTES.find((p) => p.id === filter.color);
-    if (palette && palette.keywords.length > 0) {
-      const orClauses = palette.keywords.map(() => "p.color ILIKE ?").join(" OR ");
-      palette.keywords.forEach((kw) => params.push(`%${kw}%`));
-      conditions.push(`(${orClauses})`);
+    if (palette) {
+      const colorConditions: string[] = [];
+      if (palette.canonicalValues.length > 0) {
+        const inPlaceholders = palette.canonicalValues.map(() => "?").join(", ");
+        colorConditions.push(`LOWER(TRIM(p.color)) IN (${inPlaceholders})`);
+        palette.canonicalValues.forEach((v) => params.push(v.toLowerCase().trim()));
+      }
+      if (palette.id === "green") {
+        colorConditions.push(`LOWER(TRIM(p.color)) = 'xanh'`);
+      }
+      if (colorConditions.length > 0) {
+        conditions.push(`(${colorConditions.join(" OR ")})`);
+      }
     }
   }
-
   // Filter by search (product code, name, caption, ai_description)
   if (filter?.search && filter.search.trim()) {
     const pattern = `%${filter.search.trim()}%`;
