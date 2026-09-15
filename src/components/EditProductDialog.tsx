@@ -205,17 +205,29 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
     let packing_m2: number | null = null;
     if ((form.packing_m2 || "").trim() !== "") {
       const val = Number((form.packing_m2 || "").trim().replace(",", "."));
-      packing_m2 = Number.isNaN(val) ? null : val;
+      if (Number.isNaN(val) || val < 0) {
+        toast.error("Quy cách m²/Thùng không hợp lệ");
+        return;
+      }
+      packing_m2 = val;
     }
     let packing_pcs: number | null = null;
     if ((form.packing_pcs || "").trim() !== "") {
       const val = Number((form.packing_pcs || "").trim());
-      packing_pcs = Number.isNaN(val) ? null : val;
+      if (Number.isNaN(val) || val < 0 || !Number.isInteger(val)) {
+        toast.error("Số lượng viên/Thùng không hợp lệ");
+        return;
+      }
+      packing_pcs = val;
     }
     let packing_kg: number | null = null;
     if ((form.packing_kg || "").trim() !== "") {
       const val = Number((form.packing_kg || "").trim().replace(",", "."));
-      packing_kg = Number.isNaN(val) ? null : val;
+      if (Number.isNaN(val) || val < 0) {
+        toast.error("Khối lượng Kg/Thùng không hợp lệ");
+        return;
+      }
+      packing_kg = val;
     }
     setSaving(true);
     try {
