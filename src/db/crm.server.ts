@@ -2642,6 +2642,8 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       category: (input.category ?? existing.category).trim(),
       supplier: (input.supplier ?? existing.supplier).trim(),
       color: (input.color ?? existing.color ?? "").trim(),
+      packing: (input.packing ?? existing.packing ?? "").trim(),
+      packing_m2: input.packing_m2 !== undefined ? input.packing_m2 : existing.packing_m2,
       packing_pcs: input.packing_pcs !== undefined ? input.packing_pcs : existing.packing_pcs,
       packing_kg: input.packing_kg !== undefined ? input.packing_kg : existing.packing_kg,
       retail_price: retail,
@@ -2651,7 +2653,6 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       discount_b2b: discountB2b,
       note: (input.note ?? existing.note).trim(),
       is_hot: input.is_hot !== undefined ? (input.is_hot ? 1 : 0) : existing.is_hot,
-      // LP chỉ nhận product có ảnh — bật is_public mà chưa có ảnh thì vô nghĩa.
       is_public:
         input.is_public !== undefined ? (input.is_public ? 1 : 0) : (existing.is_public ?? 0),
       featured_rank:
