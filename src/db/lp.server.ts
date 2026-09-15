@@ -194,10 +194,11 @@ export async function listPublicCatalog(opts?: {
         matchedDbValues.push(...p.dbCanonicalValues);
       }
     }
-    if (matchedDbValues.length > 0) {
-      const placeholders = matchedDbValues.map(() => "?").join(", ");
+    const uniqueDbValues = Array.from(new Set(matchedDbValues));
+    if (uniqueDbValues.length > 0) {
+      const placeholders = uniqueDbValues.map(() => "?").join(", ");
       where.push(`LOWER(TRIM(p.color)) IN (${placeholders})`);
-      params.push(...matchedDbValues);
+      params.push(...uniqueDbValues);
     }
   } else {
     // Fallback lọc màu theo chuỗi raw (nếu có)
