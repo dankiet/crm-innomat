@@ -1833,7 +1833,7 @@ function ActiveTag({
 }
 
 /** Tag bề mặt / thông số: mỗi loại một màu để dễ phân biệt */
-type MetaKind = "size" | "surface" | "shape" | "material" | "color" | "finish";
+type MetaKind = "size" | "surface" | "shape" | "texture" | "material" | "color" | "finish";
 
 const META_TAG_CLASS: Record<MetaKind, string> = {
   size: "bg-surface-strong/70 text-foreground/80 ring-black/5",
@@ -1841,6 +1841,8 @@ const META_TAG_CLASS: Record<MetaKind, string> = {
     "bg-sky-50 text-sky-800 ring-sky-200/70 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/25",
   shape:
     "bg-lime-50 text-lime-800 ring-lime-200/70 dark:bg-lime-500/10 dark:text-lime-300 dark:ring-lime-400/25",
+  texture:
+    "bg-teal-50 text-teal-800 ring-teal-200/70 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-400/25",
   material:
     "bg-violet-50 text-violet-800 ring-violet-200/70 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/25",
   color:
@@ -1853,9 +1855,10 @@ const META_TAG_TITLE: Record<MetaKind, string> = {
   size: "Kích thước",
   surface: "Bề mặt",
   shape: "Kiểu dáng",
+  texture: "Hiệu ứng vân",
   material: "Chất liệu",
   color: "Màu",
-  finish: "Hiệu ứng",
+  finish: "Bộ sưu tập",
 };
 
 function productMetaTags(p: Product): { kind: MetaKind; value: string }[] {
@@ -1864,6 +1867,7 @@ function productMetaTags(p: Product): { kind: MetaKind; value: string }[] {
       { kind: "size", value: p.size },
       { kind: "surface", value: p.surface },
       { kind: "shape", value: p.shape },
+      { kind: "texture", value: p.texture },
       { kind: "material", value: p.material },
       { kind: "color", value: p.color },
       { kind: "finish", value: p.collections },
