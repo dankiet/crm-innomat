@@ -18,9 +18,9 @@ import {
 import type { Product } from "@/lib/types";
 import { PRODUCT_COLORS, PRODUCT_TEXTURES } from "@/lib/types";
 import { ProductSuggestionField } from "@/components/ProductSuggestionField";
+import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
 import { parseInternalCodesList } from "@/lib/product-internal-codes";
-
 const SUGGEST_FIELDS = [
   "color",
   "supplier",
