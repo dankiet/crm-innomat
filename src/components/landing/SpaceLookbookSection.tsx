@@ -243,25 +243,20 @@ export function SpaceLookbookSection({
 
       {/* 2.1 Color Palette Swatch Dots */}
       <div className="space-color-bar" role="group" aria-label="Lọc theo gam màu">
-        <span className="space-color-label">
-          Color
-        </span>
-
-        {/* Nút "Tất cả" nhỏ gọn */}
+        {/* Nút "Tất cả màu sắc" đồng bộ với "Tất cả không gian" */}
         <button
           type="button"
           onClick={() => handleColorChange("all")}
           className={cn(
-            "h-7 px-3 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 leading-none",
+            "h-7 px-3 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
             activeColor === "all"
               ? "bg-[#141f23] text-white shadow-xs"
               : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
           )}
-          aria-label="Tất cả màu"
+          aria-label="Tất cả màu sắc"
         >
-          Tất cả
+          Tất cả màu sắc
         </button>
-
         {/* Dòng nút tròn hiển thị 8 gam màu */}
         <div className="flex items-center gap-2.5 shrink-0 py-1 px-0.5">
           {COLOR_PALETTES.map((palette) => {
