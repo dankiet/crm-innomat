@@ -170,17 +170,18 @@ export function NewProductDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const price = Number(String(form.retail_price).replace(/\D/g, ""));
-    const tradeRaw = String(form.trade_price).replace(/\D/g, "");
-    const b2bRaw = String(form.b2b_price).replace(/\D/g, "");
+    const priceRaw = String(form.retail_price ?? "").replace(/\D/g, "");
+    const price = priceRaw === "" ? null : Number(priceRaw);
+    const tradeRaw = String(form.trade_price ?? "").replace(/\D/g, "");
+    const b2bRaw = String(form.b2b_price ?? "").replace(/\D/g, "");
     const trade_price = tradeRaw ? Number(tradeRaw) : null;
     const b2b_price = b2bRaw ? Number(b2bRaw) : null;
     if (!form.code.trim()) {
       toast.error("Mã sản phẩm bắt buộc");
       return;
     }
-    if (!price || price <= 0) {
-      toast.error("Giá bán lẻ không hợp lệ");
+    if (price == null || Number.isNaN(price) || price < 0) {
+      toast.error("Giá bán lẻ không hợp lệ (nhập số ≥ 0)");
       return;
     }
     if (trade_price != null && trade_price < 0) {

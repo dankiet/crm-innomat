@@ -2537,6 +2537,7 @@ export type ProductUpdate = {
   material?: string;
   surface?: string;
   shape?: string;
+  texture?: string;
   collections?: string;
   unit?: string;
   category?: string;
@@ -2564,7 +2565,7 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
   const existing = await getProduct(id);
   if (!existing) throw new Error("Không tìm thấy sản phẩm");
 
-  const code = (input.code ?? existing.code).trim();
+  const code = ((input.code ?? existing.code ?? "") as string).trim();
   if (!code) throw new Error("Mã sản phẩm bắt buộc");
 
   if (code !== existing.code) {
@@ -2576,7 +2577,9 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
 
   const retail =
     input.retail_price != null ? Math.round(Number(input.retail_price)) : existing.retail_price;
-  if (!retail || retail < 0) throw new Error("Giá bán lẻ không hợp lệ");
+  if (retail == null || Number.isNaN(retail) || retail < 0) {
+    throw new Error("Giá bán lẻ không hợp lệ (giá phải ≥ 0)");
+  }
 
   const tradePrice =
     input.trade_price !== undefined
@@ -2632,17 +2635,17 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
     .run({
       id,
       code,
-      name: (input.name ?? existing.name).trim() || code,
-      size: (input.size ?? existing.size).trim(),
-      material: (input.material ?? existing.material).trim(),
-      surface: (input.surface ?? existing.surface ?? "").trim(),
-      shape: (input.shape ?? existing.shape ?? "").trim(),
-      texture: (input.texture ?? existing.texture ?? "").trim(),
-      collections: (input.collections ?? existing.collections ?? "").trim(),
-      category: (input.category ?? existing.category).trim(),
-      supplier: (input.supplier ?? existing.supplier).trim(),
-      color: (input.color ?? existing.color ?? "").trim(),
-      packing: (input.packing ?? existing.packing ?? "").trim(),
+      name: String(input.name ?? existing.name ?? "").trim() || code,
+      size: String(input.size ?? existing.size ?? "").trim(),
+      material: String(input.material ?? existing.material ?? "").trim(),
+      surface: String(input.surface ?? existing.surface ?? "").trim(),
+      shape: String(input.shape ?? existing.shape ?? "").trim(),
+      texture: String(input.texture ?? existing.texture ?? "").trim(),
+      collections: String(input.collections ?? existing.collections ?? "").trim(),
+      category: String(input.category ?? existing.category ?? "").trim(),
+      supplier: String(input.supplier ?? existing.supplier ?? "").trim(),
+      color: String(input.color ?? existing.color ?? "").trim(),
+      packing: String(input.packing ?? existing.packing ?? "").trim(),
       packing_m2: input.packing_m2 !== undefined ? input.packing_m2 : existing.packing_m2,
       packing_pcs: input.packing_pcs !== undefined ? input.packing_pcs : existing.packing_pcs,
       packing_kg: input.packing_kg !== undefined ? input.packing_kg : existing.packing_kg,
@@ -2651,13 +2654,13 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       b2b_price: b2bPrice,
       discount_tp: discountTp,
       discount_b2b: discountB2b,
-      note: (input.note ?? existing.note).trim(),
+      note: String(input.note ?? existing.note ?? "").trim(),
       is_hot: input.is_hot !== undefined ? (input.is_hot ? 1 : 0) : existing.is_hot,
       is_public:
         input.is_public !== undefined ? (input.is_public ? 1 : 0) : (existing.is_public ?? 0),
       featured_rank:
         input.featured_rank !== undefined ? input.featured_rank : (existing.featured_rank ?? null),
-      image_path: (input.image_path ?? existing.image_path).trim(),
+      image_path: String(input.image_path ?? existing.image_path ?? "").trim(),
     } as unknown as SqlValue);
 
   return (await getProduct(id))!;
@@ -2671,6 +2674,7 @@ export type ProductCreateInput = {
   material?: string;
   surface?: string;
   shape?: string;
+  texture?: string;
   collections?: string;
   unit?: string;
   category?: string;
@@ -2700,8 +2704,7 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
   if (clash) throw new Error(`Mã ${code} đã tồn tại`);
 
   const retail = Math.round(Number(input.retail_price) || 0);
-  if (!retail || retail < 0) throw new Error("Giá bán lẻ không hợp lệ");
-
+  if (Number.isNaN(retail) || retail < 0) throw new Error("Giá bán lẻ không hợp lệ (giá phải ≥ 0)");
   const tradePrice =
     input.trade_price == null || input.trade_price === ("" as unknown)
       ? null
