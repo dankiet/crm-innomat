@@ -277,6 +277,7 @@ export type QuoteItem = {
   sort_order?: number;
   image_path?: string;
   surface?: string;
+  material?: string;
 };
 export type Order = {
   id: number;

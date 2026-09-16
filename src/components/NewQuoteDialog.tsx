@@ -87,6 +87,7 @@ type Line = {
   product: Product | null;
   customProduct?: CustomProduct | null;
   size?: string;
+  material?: string;
   /** Mã hiển thị trên BG (có thể khác mã catalog) */
   product_code: string;
   /** Tên hiển thị trên BG (có thể khác tên catalog) */
@@ -234,6 +235,7 @@ export function NewQuoteDialog({
                   name: item.product_name || "",
                   size: item.size || "",
                   surface: item.surface || "",
+                  material: item.material || "",
                   retailPrice: String(item.retail_price || item.unit_price || ""),
                   imagePath: item.image_path || "",
                   imageDataUrl: null,
@@ -246,6 +248,7 @@ export function NewQuoteDialog({
               product,
               customProduct,
               size: item.size || product?.size || "",
+              material: item.material || product?.material || "",
               product_code: item.product_code || product?.code || "",
               product_name: item.product_name || product?.name || "",
               quantity_m2: item.quantity_m2,
@@ -346,8 +349,8 @@ export function NewQuoteDialog({
           product,
           customProduct: null,
           size: product.size || "",
+          material: product.material || "",
           product_code: product.code,
-          product_name: product.name,
           discount_pct: pct,
           unit_price: unit,
         };
@@ -461,6 +464,7 @@ export function NewQuoteDialog({
               area: l.area,
               size: (l.size ?? l.customProduct.size).trim(),
               surface: l.customProduct.surface.trim(),
+              material: (l.material ?? l.customProduct.material ?? "").trim(),
               image_path: customProductImagePath,
               retail_price: Math.round(
                 Number(l.customProduct.retailPrice.replace(/\D/g, "")) ||
@@ -475,6 +479,7 @@ export function NewQuoteDialog({
             product_code: l.product_code.trim() || l.product!.code,
             product_name: l.product_name.trim() || l.product!.name,
             size: (l.size ?? l.product!.size ?? "").trim(),
+            material: (l.material ?? l.product!.material ?? "").trim(),
             quantity_m2: l.quantity_m2,
             discount_pct: l.discount_pct,
             unit_price: Math.round(Number(l.unit_price) || 0),
@@ -904,7 +909,7 @@ export function NewQuoteDialog({
                     disabled={locked}
                     onChange={(e) => setEditQuoteLabels(e.target.checked)}
                   />
-                  Sửa mã/tên/kích thước trên BG
+                  Sửa mã/tên/kích thước/chất liệu trên BG
                 </label>
                 {!locked ? (
                   <button
@@ -1090,7 +1095,7 @@ export function NewQuoteDialog({
                     {!line.collapsed && ((line.product || line.customProduct) ? (
                       <>
                         {editQuoteLabels ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                             <label className="block">
                               <span className="text-[10px] text-muted-foreground">
                                 Mã trên BG
@@ -1160,6 +1165,38 @@ export function NewQuoteDialog({
                                         ? {
                                             ...l,
                                             size: e.target.value,
+                                          }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Chất liệu trên BG
+                              </span>
+                              <input
+                                className={inputCls}
+                                placeholder={
+                                  line.product?.material ||
+                                  line.customProduct?.material ||
+                                  "VD: Gốm, Porcelain..."
+                                }
+                                value={
+                                  line.material ??
+                                  line.product?.material ??
+                                  line.customProduct?.material ??
+                                  ""
+                                }
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? {
+                                            ...l,
+                                            material: e.target.value,
                                           }
                                         : l,
                                     ),
@@ -1562,6 +1599,7 @@ export function NewQuoteDialog({
                     product_name:
                       customProduct.name.trim() || "Sản phẩm ngoài danh mục",
                     size: customProduct.size.trim(),
+                    material: customProduct.material.trim(),
                     unit_price: price,
                     quantity_m2: l.quantity_m2 || 1,
                     quantity_raw: l.quantity_raw || "1",
@@ -1584,6 +1622,7 @@ function emptyLine(): Line {
     product: null,
     customProduct: null,
     size: "",
+    material: "",
     product_code: "",
     product_name: "",
     quantity_m2: 0,

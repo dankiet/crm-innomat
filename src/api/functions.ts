@@ -1150,6 +1150,7 @@ export const saveQuote = createServerFn({ method: "POST" })
         product_code?: string;
         size?: string;
         surface?: string;
+        material?: string;
         image_path?: string;
         retail_price?: number;
         sort_order?: number;
@@ -1193,6 +1194,7 @@ export const updateQuoteFn = createServerFn({ method: "POST" })
         product_code?: string;
         size?: string;
         surface?: string;
+        material?: string;
         image_path?: string;
         retail_price?: number;
         sort_order?: number;

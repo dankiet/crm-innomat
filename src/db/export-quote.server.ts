@@ -94,7 +94,7 @@ export async function exportQuoteToHtml(
     .trim() || "QT";
 
   const items = (await db.prepare(
-      `SELECT qi.*, p.internal_code, p.material, p.packing, p.packing_pcs, p.packing_m2, p.note as p_note,
+      `SELECT qi.*, p.internal_code, COALESCE(NULLIF(qi.material, ''), p.material, '') AS material, p.packing, p.packing_pcs, p.packing_m2, p.note as p_note,
        COALESCE(
          NULLIF(qi.image_path, ''),
          (SELECT path FROM product_images pi
