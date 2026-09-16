@@ -1838,7 +1838,6 @@ export type QuoteItemInput = {
   product_code?: string;
   size?: string;
   surface?: string;
-  material?: string;
   image_path?: string;
   retail_price?: number;
   area?: string;
@@ -1888,11 +1887,11 @@ export async function createQuote(input: {
       `INSERT INTO quote_items (
         quote_id, product_id, product_code, product_name, size,
         quantity_m2, retail_price, discount_pct, unit_price, area, line_total,
-        sort_order, image_path, surface, material
+        sort_order, image_path, surface
       ) VALUES (
         @quote_id, @product_id, @product_code, @product_name, @size,
         @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total,
-        @sort_order, @image_path, @surface, @material
+        @sort_order, @image_path, @surface
       )`,
     );
 
@@ -1905,7 +1904,6 @@ export async function createQuote(input: {
       let retailPrice = 0;
       let size = (item.size ?? "").trim();
       let surface = (item.surface ?? "").trim();
-      let material = (item.material ?? "").trim();
       let productCode = (item.product_code ?? "").trim();
       let productName = (item.product_name ?? "").trim();
       let imagePath = (item.image_path ?? "").trim();
@@ -1921,7 +1919,6 @@ export async function createQuote(input: {
         if (!productName) productName = product.name;
         if (!size) size = product.size;
         if (!surface) surface = product.surface || "";
-        if (!material) material = product.material || "";
       } else {
         unit = Math.round(Number(item.unit_price) || 0);
         retailPrice = Math.round(Number(item.retail_price ?? item.unit_price) || 0);
@@ -1948,7 +1945,6 @@ export async function createQuote(input: {
         sort_order: sortOrder,
         image_path: imagePath,
         surface: surface,
-        material: material,
       } as unknown as SqlValue);
 
       if (product) {
@@ -2075,11 +2071,11 @@ export async function updateQuote(input: {
       `INSERT INTO quote_items (
         quote_id, product_id, product_code, product_name, size,
         quantity_m2, retail_price, discount_pct, unit_price, area, line_total,
-        sort_order, image_path, surface, material
+        sort_order, image_path, surface
       ) VALUES (
         @quote_id, @product_id, @product_code, @product_name, @size,
         @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total,
-        @sort_order, @image_path, @surface, @material
+        @sort_order, @image_path, @surface
       )`,
     );
 
@@ -2092,7 +2088,6 @@ export async function updateQuote(input: {
       let retailPrice = 0;
       let size = (item.size ?? "").trim();
       let surface = (item.surface ?? "").trim();
-      let material = (item.material ?? "").trim();
       let productCode = (item.product_code ?? "").trim();
       let productName = (item.product_name ?? "").trim();
       let imagePath = (item.image_path ?? "").trim();
@@ -2108,7 +2103,7 @@ export async function updateQuote(input: {
         if (!productName) productName = product.name;
         if (!size) size = product.size;
         if (!surface) surface = product.surface || "";
-        if (!material) material = product.material || "";
+      } else {
         unit = Math.round(Number(item.unit_price) || 0);
         retailPrice = Math.round(Number(item.retail_price ?? item.unit_price) || 0);
         if (!productCode) productCode = "KDM";
@@ -2134,7 +2129,6 @@ export async function updateQuote(input: {
         sort_order: sortOrder,
         image_path: imagePath,
         surface: surface,
-        material: material,
       } as unknown as SqlValue);
 
       if (product) {

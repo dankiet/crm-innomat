@@ -133,7 +133,6 @@ CREATE TABLE IF NOT EXISTS quote_items (
   sort_order INTEGER NOT NULL DEFAULT 0,
   image_path TEXT NOT NULL DEFAULT '',
   surface TEXT NOT NULL DEFAULT '',
-  material TEXT NOT NULL DEFAULT '',
   product_code TEXT NOT NULL,
   product_name TEXT NOT NULL,
   size TEXT NOT NULL DEFAULT '',

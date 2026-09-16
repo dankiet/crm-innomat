@@ -8,7 +8,6 @@ export type CustomProduct = {
   name: string;
   size: string;
   surface: string;
-  material: string;
   retailPrice: string;
   imagePath: string;
   imageDataUrl: string | null;
@@ -83,7 +82,6 @@ export function ManualProductDialog({
       name: "",
       size: "",
       surface: "",
-      material: "",
       retailPrice: "",
       imagePath: "",
       imageDataUrl: null,
@@ -100,7 +98,6 @@ export function ManualProductDialog({
           name: "",
           size: "",
           surface: "",
-          material: "",
           retailPrice: "",
           imagePath: "",
           imageDataUrl: null,
@@ -257,17 +254,6 @@ export function ManualProductDialog({
                     setDraft((current) => ({ ...current, surface: event.target.value }))
                   }
                   placeholder="VD: Men rạn, Matt, Bóng"
-                />
-              </label>
-              <label>
-                <FieldLabel>Chất liệu</FieldLabel>
-                <input
-                  className={cn(inputClass, "mt-1")}
-                  value={draft.material}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, material: event.target.value }))
-                  }
-                  placeholder="VD: Gốm, Porcelain, Granite"
                 />
               </label>
               <label>
