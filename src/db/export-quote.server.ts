@@ -96,7 +96,6 @@ export async function exportQuoteToHtml(
   const items = (await db.prepare(
       `SELECT qi.*, p.internal_code, p.material, p.packing, p.packing_pcs, p.packing_m2, p.note as p_note,
        COALESCE(
-         NULLIF(qi.image_path, ''),
          (SELECT path FROM product_images pi
           WHERE pi.product_id = qi.product_id
           ORDER BY pi.is_primary DESC, pi.sort_order ASC, pi.id ASC
@@ -107,7 +106,7 @@ export async function exportQuoteToHtml(
        FROM quote_items qi
        LEFT JOIN products p ON p.id = qi.product_id
        WHERE qi.quote_id = ?
-       ORDER BY COALESCE(qi.sort_order, 9999) ASC, qi.id ASC`,
+       ORDER BY qi.id`,
     )
     .all(quoteId)) as Array<{
     id: number;

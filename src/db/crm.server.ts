@@ -171,7 +171,6 @@ const PRODUCT_SUGGEST_FIELDS = [
   "material",
   "size",
 ] as const;
-export type ProductSuggestField = (typeof PRODUCT_SUGGEST_FIELDS)[number];
 
 /** Lấy danh sách giá trị distinct đã dùng cho 1 field phân loại — dùng làm gợi ý datalist */
 export async function listProductFieldValues(
@@ -1211,10 +1210,7 @@ export async function createQuoteFromCustomerMapping(mappingId: number): Promise
 
   const items = (await db
     .prepare(
-      `SELECT product_id, description, size, image_path,
-              custom_product_code, custom_product_name, custom_product_size,
-              custom_product_surface, custom_product_retail_price, custom_product_image_path,
-              price_override
+      `SELECT product_id, description, size, custom_product_name
        FROM customer_mapping_items WHERE mapping_id = ?
        ORDER BY sort_order, id`,
     )
@@ -1222,35 +1218,27 @@ export async function createQuoteFromCustomerMapping(mappingId: number): Promise
       product_id: number | null;
       description: string;
       size: string;
-      image_path: string;
-      custom_product_code: string;
       custom_product_name: string;
-      custom_product_size: string;
-      custom_product_surface: string;
-      custom_product_retail_price: number;
-      custom_product_image_path: string;
-      price_override: number | null;
     }>(mappingId)) as Array<{
     product_id: number | null;
     description: string;
     size: string;
-    image_path: string;
-    custom_product_code: string;
     custom_product_name: string;
-    custom_product_size: string;
-    custom_product_surface: string;
-    custom_product_retail_price: number;
-    custom_product_image_path: string;
-    price_override: number | null;
   }>;
-
-  const meaningfulItems = items.filter(
-    (item) => item.product_id != null || (item.custom_product_name && item.custom_product_name.trim() !== ""),
-  );
-  if (!meaningfulItems.length) {
-    throw new Error("Đề xuất chưa có sản phẩm nào để tạo báo giá");
+  const customCount = items.filter(
+    (item) => !item.product_id && item.custom_product_name.trim(),
+  ).length;
+  if (customCount) {
+    throw new Error(
+      `Có ${customCount} sản phẩm ngoài danh mục. Hãy thêm sản phẩm vào database trước khi chuyển thành báo giá.`,
+    );
   }
-
+  const catalogItems = items.filter(
+    (item): item is typeof item & { product_id: number } => item.product_id != null,
+  );
+  if (!catalogItems.length) {
+    throw new Error("Đề xuất chưa có sản phẩm trong danh mục để tạo báo giá");
+  }
   const quote = await createQuote({
     customer_id: mapping.customer_id,
     discount_type: "custom",
@@ -1258,36 +1246,12 @@ export async function createQuoteFromCustomerMapping(mappingId: number): Promise
     notes: [mapping.name ? `Từ đề xuất vật liệu: ${mapping.name}` : "", mapping.note]
       .filter(Boolean)
       .join("\n"),
-    items: meaningfulItems.map((item, index) => {
-      if (item.product_id != null) {
-        return {
-          product_id: item.product_id,
-          quantity_m2: 0,
-          discount_pct: 0,
-          unit_price: item.price_override != null ? Math.round(Number(item.price_override)) : null,
-          area: item.description || "",
-          size: item.size || "",
-          sort_order: index,
-        };
-      }
-      return {
-        product_id: null,
-        product_code: item.custom_product_code?.trim() || "KDM",
-        product_name: item.custom_product_name?.trim() || "Sản phẩm ngoài danh mục",
-        size: item.custom_product_size?.trim() || item.size || "",
-        surface: item.custom_product_surface?.trim() || "",
-        quantity_m2: 0,
-        discount_pct: 0,
-        retail_price: Math.round(Number(item.custom_product_retail_price) || 0),
-        unit_price:
-          item.price_override != null
-            ? Math.round(Number(item.price_override))
-            : Math.round(Number(item.custom_product_retail_price) || 0),
-        image_path: item.custom_product_image_path || item.image_path || "",
-        area: item.description || "",
-        sort_order: index,
-      };
-    }),
+    items: catalogItems.map((item) => ({
+      product_id: item.product_id,
+      quantity_m2: 0,
+      discount_pct: 0,
+      area: item.size || item.description,
+    })),
   });
   await db
     .prepare(
@@ -1729,7 +1693,7 @@ async function getQuoteItemsForQuotes(quoteIds: number[]): Promise<Map<number, Q
     .prepare(
       `SELECT * FROM quote_items
        WHERE quote_id IN (${placeholders})
-        ORDER BY quote_id, COALESCE(sort_order, 9999) ASC, id ASC`,
+       ORDER BY quote_id, id`,
     )
     .all<QuoteItem>(...quoteIds)) as QuoteItem[];
   for (const item of rows) {
@@ -1760,7 +1724,7 @@ export async function getQuote(id: number): Promise<Quote | null> {
 
 export async function getQuoteItems(quoteId: number): Promise<QuoteItem[]> {
   return (await getDb()
-    .prepare("SELECT * FROM quote_items WHERE quote_id = ? ORDER BY COALESCE(sort_order, 9999) ASC, id ASC")
+    .prepare("SELECT * FROM quote_items WHERE quote_id = ? ORDER BY id")
     .all<QuoteItem>(quoteId)) as QuoteItem[];
 }
 
@@ -1829,21 +1793,6 @@ async function upsertCustomerProductSampleFromQuote(
   }
 }
 
-export type QuoteItemInput = {
-  product_id?: number | null;
-  quantity_m2: number;
-  discount_pct?: number;
-  unit_price?: number | null;
-  product_name?: string;
-  product_code?: string;
-  size?: string;
-  surface?: string;
-  image_path?: string;
-  retail_price?: number;
-  area?: string;
-  sort_order?: number;
-};
-
 export async function createQuote(input: {
   customer_id: number;
   discount_type?: DiscountType;
@@ -1852,7 +1801,17 @@ export async function createQuote(input: {
   prices_include_vat?: boolean | number;
   /** Phí vận chuyển nhập tay (chưa VAT) */
   shipping_fee?: number;
-  items: QuoteItemInput[];
+  items: Array<{
+    product_id: number;
+    quantity_m2: number;
+    discount_pct?: number;
+    unit_price?: number | null;
+    /** Tên hiển thị trên BG (có thể khác catalog) */
+    product_name?: string;
+    /** Mã hiển thị trên BG (có thể khác catalog) */
+    product_code?: string;
+    area?: string;
+  }>;
 }): Promise<Quote> {
   const db = getDb();
   const customer = await getCustomer(input.customer_id);
@@ -1886,77 +1845,47 @@ export async function createQuote(input: {
     const insertItem = db.prepare(
       `INSERT INTO quote_items (
         quote_id, product_id, product_code, product_name, size,
-        quantity_m2, retail_price, discount_pct, unit_price, area, line_total,
-        sort_order, image_path, surface
+        quantity_m2, retail_price, discount_pct, unit_price, area, line_total
       ) VALUES (
         @quote_id, @product_id, @product_code, @product_name, @size,
-        @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total,
-        @sort_order, @image_path, @surface
+        @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total
       )`,
     );
 
-    let itemIdx = 0;
     for (const item of input.items) {
-      const isCustom = item.product_id == null || Number(item.product_id) <= 0;
-      let product: Product | null = null;
-      let unit = 0;
-      let discountPct = Number(item.discount_pct) || 0;
-      let retailPrice = 0;
-      let size = (item.size ?? "").trim();
-      let surface = (item.surface ?? "").trim();
-      let productCode = (item.product_code ?? "").trim();
-      let productName = (item.product_name ?? "").trim();
-      let imagePath = (item.image_path ?? "").trim();
+      const product = await getProduct(item.product_id);
+      if (!product) throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
 
-      if (!isCustom) {
-        product = await getProduct(Number(item.product_id));
-        if (!product) throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
-        const pricing = resolveQuoteItemPricing(product, discountType, item);
-        unit = pricing.unit;
-        discountPct = pricing.discountPct;
-        retailPrice = product.retail_price;
-        if (!productCode) productCode = product.code;
-        if (!productName) productName = product.name;
-        if (!size) size = product.size;
-        if (!surface) surface = product.surface || "";
-      } else {
-        unit = Math.round(Number(item.unit_price) || 0);
-        retailPrice = Math.round(Number(item.retail_price ?? item.unit_price) || 0);
-        if (!productCode) productCode = "KDM";
-        if (!productName) productName = "Sản phẩm ngoài danh mục";
-      }
-
+      const { unit, discountPct } = resolveQuoteItemPricing(product, discountType, item);
       const qty = Number(item.quantity_m2) || 0;
       const lineTotal = Math.round(unit * qty);
-      const sortOrder = item.sort_order ?? itemIdx++;
+
+      const productCode = (item.product_code ?? "").trim() || product.code;
+      const productName = (item.product_name ?? "").trim() || product.name;
 
       await insertItem.run({
         quote_id: quoteId,
-        product_id: product ? product.id : null,
+        product_id: product.id,
         product_code: productCode,
         product_name: productName,
-        size: size,
+        size: product.size,
         quantity_m2: qty,
-        retail_price: retailPrice,
+        retail_price: product.retail_price,
         discount_pct: discountPct,
         unit_price: unit,
         area: item.area ?? "",
         line_total: lineTotal,
-        sort_order: sortOrder,
-        image_path: imagePath,
-        surface: surface,
       } as unknown as SqlValue);
 
-      if (product) {
-        await upsertCustomerProductSampleFromQuote(
-          db,
-          input.customer_id,
-          product.id,
-          productCode,
-          productName,
-        );
-      }
+      await upsertCustomerProductSampleFromQuote(
+        db,
+        input.customer_id,
+        product.id,
+        productCode,
+        productName,
+      );
     }
+
     // Auto-update customer status when quoted
     if (customer.status === "consulting") {
       await db
@@ -2021,7 +1950,15 @@ export async function updateQuote(input: {
   prices_include_vat?: boolean | number;
   /** Phí vận chuyển nhập tay (chưa VAT) */
   shipping_fee?: number;
-  items: QuoteItemInput[];
+  items: Array<{
+    product_id: number;
+    quantity_m2: number;
+    discount_pct?: number;
+    unit_price?: number | null;
+    product_name?: string;
+    product_code?: string;
+    area?: string;
+  }>;
 }): Promise<Quote> {
   const db = getDb();
   const existing = await getQuote(input.id);
@@ -2070,76 +2007,46 @@ export async function updateQuote(input: {
     const insertItem = db.prepare(
       `INSERT INTO quote_items (
         quote_id, product_id, product_code, product_name, size,
-        quantity_m2, retail_price, discount_pct, unit_price, area, line_total,
-        sort_order, image_path, surface
+        quantity_m2, retail_price, discount_pct, unit_price, area, line_total
       ) VALUES (
         @quote_id, @product_id, @product_code, @product_name, @size,
-        @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total,
-        @sort_order, @image_path, @surface
+        @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total
       )`,
     );
 
-    let itemIdx = 0;
     for (const item of input.items) {
-      const isCustom = item.product_id == null || Number(item.product_id) <= 0;
-      let product: Product | null = null;
-      let unit = 0;
-      let discountPct = Number(item.discount_pct) || 0;
-      let retailPrice = 0;
-      let size = (item.size ?? "").trim();
-      let surface = (item.surface ?? "").trim();
-      let productCode = (item.product_code ?? "").trim();
-      let productName = (item.product_name ?? "").trim();
-      let imagePath = (item.image_path ?? "").trim();
-
-      if (!isCustom) {
-        product = await getProduct(Number(item.product_id));
-        if (!product) throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
-        const pricing = resolveQuoteItemPricing(product, discountType, item);
-        unit = pricing.unit;
-        discountPct = pricing.discountPct;
-        retailPrice = product.retail_price;
-        if (!productCode) productCode = product.code;
-        if (!productName) productName = product.name;
-        if (!size) size = product.size;
-        if (!surface) surface = product.surface || "";
-      } else {
-        unit = Math.round(Number(item.unit_price) || 0);
-        retailPrice = Math.round(Number(item.retail_price ?? item.unit_price) || 0);
-        if (!productCode) productCode = "KDM";
-        if (!productName) productName = "Sản phẩm ngoài danh mục";
+      const product = await getProduct(item.product_id);
+      if (!product) {
+        throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
       }
 
+      const { unit, discountPct } = resolveQuoteItemPricing(product, discountType, item);
       const qty = Number(item.quantity_m2) || 0;
       const lineTotal = Math.round(unit * qty);
-      const sortOrder = item.sort_order ?? itemIdx++;
+      const productCode = (item.product_code ?? "").trim() || product.code;
+      const productName = (item.product_name ?? "").trim() || product.name;
 
       await insertItem.run({
         quote_id: input.id,
-        product_id: product ? product.id : null,
+        product_id: product.id,
         product_code: productCode,
         product_name: productName,
-        size: size,
+        size: product.size,
         quantity_m2: qty,
-        retail_price: retailPrice,
+        retail_price: product.retail_price,
         discount_pct: discountPct,
         unit_price: unit,
         area: item.area ?? "",
         line_total: lineTotal,
-        sort_order: sortOrder,
-        image_path: imagePath,
-        surface: surface,
       } as unknown as SqlValue);
 
-      if (product) {
-        await upsertCustomerProductSampleFromQuote(
-          db,
-          input.customer_id,
-          product.id,
-          productCode,
-          productName,
-        );
-      }
+      await upsertCustomerProductSampleFromQuote(
+        db,
+        input.customer_id,
+        product.id,
+        productCode,
+        productName,
+      );
     }
   });
 
