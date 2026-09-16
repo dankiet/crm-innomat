@@ -8,14 +8,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ProductImage";
-import type { Product } from "@/lib/types";
+import { PRODUCT_COLORS, PRODUCT_TEXTURES, type Product } from "@/lib/types";
 import {
   createProductFn,
   fetchProductFieldValues,
   clearProductFieldValueFn,
   syncProductInternalCodesFn,
 } from "@/api/functions";
-import { PRODUCT_COLORS, PRODUCT_TEXTURES } from "@/lib/types";
 import { ProductSuggestionField } from "@/components/ProductSuggestionField";
 import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
@@ -124,6 +123,7 @@ export function NewProductDialog({
     setNewInternalCode("");
     setPendingInternalCodeDelete(null);
     setCreatedId(null);
+    createdProductRef.current = null;
     savedSinceOpenRef.current = false;
     setSaving(false);
   }, [open, defaultCategory]);
@@ -169,6 +169,7 @@ export function NewProductDialog({
     setNewInternalCode("");
     setPendingInternalCodeDelete(null);
     setCreatedId(null);
+    createdProductRef.current = null;
   }
 
   async function handleSubmit(e: React.FormEvent) {

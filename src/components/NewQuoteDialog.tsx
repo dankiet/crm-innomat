@@ -1512,6 +1512,7 @@ export function NewQuoteDialog({
     <NewProductDialog
       open={createProductOpen}
       onOpenChange={setCreateProductOpen}
+      canManageOptions={false}
       onCreated={(product) => {
         setProducts((prev) =>
           prev.some((p) => p.id === product.id) ? prev : [...prev, product],
