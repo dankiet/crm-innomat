@@ -15,7 +15,9 @@ import {
   convertQuoteToOrder,
   deleteQuoteFn,
   exportQuotePrintFn,
+  uploadMappingImageFn,
 } from "@/api/functions";
+import { ManualProductDialog, type CustomProduct } from "./ManualProductDialog";
 import type {
   Customer,
   DiscountType,
@@ -37,7 +39,7 @@ import {
   unitPriceForProduct,
 } from "@/lib/pricing";
 import { toast } from "sonner";
-import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, FileDown, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Thumbnail gọn cho form BG — có ảnh thì hiện; lỗi/không có thì ô xám (không icon vỡ layout). */
@@ -83,6 +85,8 @@ type Line = {
   key: string;
   collapsed: boolean;
   product: Product | null;
+  customProduct?: CustomProduct | null;
+  size?: string;
   /** Mã hiển thị trên BG (có thể khác mã catalog) */
   product_code: string;
   /** Tên hiển thị trên BG (có thể khác tên catalog) */
@@ -162,6 +166,7 @@ export function NewQuoteDialog({
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [productSearch, setProductSearch] = useState("");
   const [activeLineKey, setActiveLineKey] = useState<string | null>(null);
+  const [manualProductKey, setManualProductKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [alsoCreateOrder, setAlsoCreateOrder] = useState(false);
   /** true = đơn giá đã gồm VAT; false = chưa VAT (export +8%) */
@@ -220,32 +225,29 @@ export function NewQuoteDialog({
 
           const productMap = new Map(ps.map((p) => [p.id, p]));
           const loadedLines: Line[] = detail.items.map((item) => {
+            const isCustom = item.product_id == null;
             const product =
-              productMap.get(item.product_id) ??
-              ({
-                id: item.product_id,
-                code: item.product_code,
-                name: item.product_name,
-                size: item.size,
-                material: "",
-                category: "",
-                supplier: "",
-
-                color: "",
-                retail_price: item.retail_price,
-                discount_tp: null,
-                discount_b2b: null,
-                total_stock: null, multi_codes_list: "",
-                note: "",
-                is_hot: 0,
-                image_path: "",
-              } satisfies Product);
+              item.product_id != null ? productMap.get(item.product_id) ?? null : null;
+            const customProduct: CustomProduct | null = isCustom
+              ? {
+                  code: item.product_code || "",
+                  name: item.product_name || "",
+                  size: item.size || "",
+                  surface: item.surface || "",
+                  retailPrice: String(item.retail_price || item.unit_price || ""),
+                  imagePath: item.image_path || "",
+                  imageDataUrl: null,
+                  imageName: "",
+                }
+              : null;
             return {
               key: Math.random().toString(36).slice(2),
               collapsed: false,
               product,
-              product_code: item.product_code || product.code,
-              product_name: item.product_name || product.name,
+              customProduct,
+              size: item.size || product?.size || "",
+              product_code: item.product_code || product?.code || "",
+              product_name: item.product_name || product?.name || "",
               quantity_m2: item.quantity_m2,
               quantity_raw:
                 item.quantity_m2 == null ? "" : String(item.quantity_m2),
@@ -260,9 +262,9 @@ export function NewQuoteDialog({
             (l) =>
               l.product &&
               (l.product_code.trim() !== l.product.code.trim() ||
-                l.product_name.trim() !== l.product.name.trim()),
+                l.product_name.trim() !== l.product.name.trim() ||
+                Boolean(l.size && l.size.trim() !== (l.product.size || "").trim())),
           );
-          setEditQuoteLabels(customized);
         } else {
           setSavedQuote(null);
           setSourceMapping(null);
@@ -342,6 +344,8 @@ export function NewQuoteDialog({
         return {
           ...l,
           product,
+          customProduct: null,
+          size: product.size || "",
           product_code: product.code,
           product_name: product.name,
           discount_pct: pct,
@@ -377,9 +381,18 @@ export function NewQuoteDialog({
     let retail = 0;
     let after = 0;
     for (const l of lines) {
-      if (!l.product || !l.quantity_m2) continue;
-      retail += l.product.retail_price * l.quantity_m2;
-      after += (l.unit_price || 0) * l.quantity_m2;
+      if (!l.quantity_m2) continue;
+      if (l.product) {
+        retail += l.product.retail_price * l.quantity_m2;
+        after += (l.unit_price || 0) * l.quantity_m2;
+      } else if (l.customProduct) {
+        const customRetail =
+          Number(l.customProduct.retailPrice.replace(/\D/g, "")) ||
+          l.unit_price ||
+          0;
+        retail += customRetail * l.quantity_m2;
+        after += (l.unit_price || 0) * l.quantity_m2;
+      }
     }
     return { retail: Math.round(retail), after: Math.round(after) };
   }, [lines]);
@@ -412,18 +425,64 @@ export function NewQuoteDialog({
       toast.error("Chọn khách hàng");
       return null;
     }
-    const items = lines
-      // Cho phép SL = 0 (dòng tham khảo giá) — chỉ cần đã chọn sản phẩm
-      .filter((l) => l.product && l.quantity_m2 >= 0)
-      .map((l) => ({
-        product_id: l.product!.id,
-        product_code: l.product_code.trim() || l.product!.code,
-        product_name: l.product_name.trim() || l.product!.name,
-        quantity_m2: l.quantity_m2,
-        discount_pct: l.discount_pct,
-        unit_price: Math.round(Number(l.unit_price) || 0),
-        area: l.area,
-      }));
+    const items = await Promise.all(
+      lines
+        // Cho phép SL = 0 (dòng tham khảo giá) — chỉ cần đã chọn sản phẩm hoặc SP ngoài catalog
+        .filter((l) => (l.product || l.customProduct) && l.quantity_m2 >= 0)
+        .map(async (l, index) => {
+          if (l.customProduct) {
+            let customProductImagePath = l.customProduct.imagePath || "";
+            if (l.customProduct.imageDataUrl) {
+              try {
+                const uploaded = await uploadMappingImageFn({
+                  data: {
+                    filename:
+                      l.customProduct.imageName ||
+                      `quote-item-${index + 1}.jpg`,
+                    dataBase64: l.customProduct.imageDataUrl,
+                  },
+                });
+                customProductImagePath = uploaded.path;
+              } catch {
+                // Giữ nguyên nếu upload ảnh thất bại
+              }
+            }
+            return {
+              product_id: null,
+              product_code:
+                l.product_code.trim() || l.customProduct.code.trim() || "KDM",
+              product_name:
+                l.product_name.trim() ||
+                l.customProduct.name.trim() ||
+                "Sản phẩm ngoài danh mục",
+              quantity_m2: l.quantity_m2,
+              discount_pct: l.discount_pct,
+              unit_price: Math.round(Number(l.unit_price) || 0),
+              area: l.area,
+              size: (l.size ?? l.customProduct.size).trim(),
+              surface: l.customProduct.surface.trim(),
+              image_path: customProductImagePath,
+              retail_price: Math.round(
+                Number(l.customProduct.retailPrice.replace(/\D/g, "")) ||
+                  l.unit_price ||
+                  0,
+              ),
+              sort_order: index,
+            };
+          }
+          return {
+            product_id: l.product!.id,
+            product_code: l.product_code.trim() || l.product!.code,
+            product_name: l.product_name.trim() || l.product!.name,
+            size: (l.size ?? l.product!.size ?? "").trim(),
+            quantity_m2: l.quantity_m2,
+            discount_pct: l.discount_pct,
+            unit_price: Math.round(Number(l.unit_price) || 0),
+            area: l.area,
+            sort_order: index,
+          };
+        }),
+    );
     if (!items.length) {
       toast.error("Thêm ít nhất 1 sản phẩm");
       return null;
@@ -845,7 +904,7 @@ export function NewQuoteDialog({
                     disabled={locked}
                     onChange={(e) => setEditQuoteLabels(e.target.checked)}
                   />
-                  Sửa mã/tên trên BG
+                  Sửa mã/tên/kích thước trên BG
                 </label>
                 {!locked ? (
                   <button
@@ -888,36 +947,77 @@ export function NewQuoteDialog({
                         {index + 1}
                       </span>
                       <QuoteThumb
-                        src={line.product?.image_path}
-                        alt={line.product?.code ?? ""}
+                        src={
+                          line.customProduct?.imagePath ||
+                          line.customProduct?.imageDataUrl ||
+                          line.product?.image_path
+                        }
+                        alt={line.product?.code ?? line.customProduct?.code ?? ""}
                         className="size-10"
                       />
                       <div className="flex-1 min-w-0">
-                        <button
-                          type="button"
-                          disabled={locked}
-                          className={`${inputCls} text-left flex items-center justify-between gap-2 ${
-                            !line.product
-                              ? "text-muted-foreground"
-                              : "text-foreground"
-                          }`}
-                          onClick={() => {
-                            if (locked) return;
-                            setActiveLineKey(isPickerOpen ? null : line.key);
-                            setProductSearch("");
-                          }}
-                        >
-                          <span className="truncate text-sm">
-                            {line.product
-                              ? `${line.product_code || line.product.code} — ${line.product_name || line.product.name}`
-                              : "Chọn sản phẩm"}
-                          </span>
-                          <ChevronDown
-                            className={`size-3.5 flex-shrink-0 text-muted-foreground transition-transform ${
-                              isPickerOpen ? "rotate-180" : ""
-                            }`}
-                          />
-                        </button>
+                        {line.customProduct ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={locked}
+                              onClick={() => {
+                                if (locked) return;
+                                setManualProductKey(line.key);
+                              }}
+                              className={`${inputCls} text-left flex items-center justify-between gap-2 flex-1 min-w-0`}
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-200/80 shrink-0">
+                                  Ngoài catalog
+                                </span>
+                                <span className="truncate text-sm font-medium text-foreground">
+                                  {line.product_name || line.customProduct.name}
+                                </span>
+                              </div>
+                              <Pencil className="size-3.5 flex-shrink-0 text-muted-foreground hover:text-foreground" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={locked}
+                              className={`${inputCls} text-left flex items-center justify-between gap-2 flex-1 min-w-0 ${
+                                !line.product
+                                  ? "text-muted-foreground"
+                                  : "text-foreground"
+                              }`}
+                              onClick={() => {
+                                if (locked) return;
+                                setActiveLineKey(isPickerOpen ? null : line.key);
+                                setProductSearch("");
+                              }}
+                            >
+                              <span className="truncate text-sm">
+                                {line.product
+                                  ? `${line.product_code || line.product.code} — ${line.product_name || line.product.name}`
+                                  : "Chọn sản phẩm"}
+                              </span>
+                              <ChevronDown
+                                className={`size-3.5 flex-shrink-0 text-muted-foreground transition-transform ${
+                                  isPickerOpen ? "rotate-180" : ""
+                                }`}
+                              />
+                            </button>
+                            {!locked && !line.product ? (
+                              <button
+                                type="button"
+                                onClick={() => setManualProductKey(line.key)}
+                                title="Thêm mã gạch ngoài catalog"
+                                aria-label="Thêm mã gạch ngoài catalog"
+                                className="size-8 shrink-0 grid place-items-center rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition-colors"
+                              >
+                                <Plus className="size-4" />
+                              </button>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
 
                       <div className="w-24 sm:w-32 flex-shrink-0">
@@ -987,10 +1087,10 @@ export function NewQuoteDialog({
                       ) : null}
                     </div>
 
-                    {!line.collapsed && (line.product ? (
+                    {!line.collapsed && ((line.product || line.customProduct) ? (
                       <>
                         {editQuoteLabels ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <label className="block">
                               <span className="text-[10px] text-muted-foreground">
                                 Mã trên BG
@@ -1028,6 +1128,38 @@ export function NewQuoteDialog({
                                         ? {
                                             ...l,
                                             product_name: e.target.value,
+                                          }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Kích thước trên BG
+                              </span>
+                              <input
+                                className={inputCls}
+                                placeholder={
+                                  line.product?.size ||
+                                  line.customProduct?.size ||
+                                  "VD: 60x60 cm"
+                                }
+                                value={
+                                  line.size ??
+                                  line.product?.size ??
+                                  line.customProduct?.size ??
+                                  ""
+                                }
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? {
+                                            ...l,
+                                            size: e.target.value,
                                           }
                                         : l,
                                     ),
@@ -1199,14 +1331,29 @@ export function NewQuoteDialog({
                             </div>
                           </label>
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          DB: {line.product.code}
-                          {line.product.size
-                            ? ` · ${line.product.size}`
-                            : ""}
-                          {" · lẻ "}
-                          {formatVND(line.product.retail_price)}/m²
-                        </p>
+                        {line.product ? (
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            DB: {line.product.code}
+                            {line.size || line.product.size
+                              ? ` · ${line.size || line.product.size}`
+                              : ""}
+                            {" · lẻ "}
+                            {formatVND(line.product.retail_price)}/m²
+                          </p>
+                        ) : line.customProduct ? (
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            Ngoài catalog: {line.customProduct.code || "KDM"}
+                            {line.size || line.customProduct.size
+                              ? ` · ${line.size || line.customProduct.size}`
+                              : ""}
+                            {line.customProduct.surface
+                              ? ` · ${line.customProduct.surface}`
+                              : ""}
+                            {line.customProduct.retailPrice
+                              ? ` · lẻ ${formatVND(Number(line.customProduct.retailPrice.replace(/\D/g, "")) || 0)}`
+                              : ""}
+                          </p>
+                        ) : null}
                         {profitInfo ? (
                           <p
                             className={cn(
@@ -1394,6 +1541,37 @@ export function NewQuoteDialog({
           </div>
         </form>
         )}
+        {manualProductKey ? (
+          <ManualProductDialog
+            open={Boolean(manualProductKey)}
+            value={
+              lines.find((l) => l.key === manualProductKey)?.customProduct ?? null
+            }
+            onClose={() => setManualProductKey(null)}
+            onSave={(customProduct) => {
+              setLines((prev) =>
+                prev.map((l) => {
+                  if (l.key !== manualProductKey) return l;
+                  const price =
+                    Number(customProduct.retailPrice.replace(/\D/g, "")) || 0;
+                  return {
+                    ...l,
+                    product: null,
+                    customProduct,
+                    product_code: customProduct.code.trim() || "KDM",
+                    product_name:
+                      customProduct.name.trim() || "Sản phẩm ngoài danh mục",
+                    size: customProduct.size.trim(),
+                    unit_price: price,
+                    quantity_m2: l.quantity_m2 || 1,
+                    quantity_raw: l.quantity_raw || "1",
+                  };
+                }),
+              );
+              setManualProductKey(null);
+            }}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -1404,6 +1582,8 @@ function emptyLine(): Line {
     key: Math.random().toString(36).slice(2),
     collapsed: false,
     product: null,
+    customProduct: null,
+    size: "",
     product_code: "",
     product_name: "",
     quantity_m2: 0,

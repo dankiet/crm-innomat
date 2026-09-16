@@ -264,7 +264,7 @@ export type Quote = {
 export type QuoteItem = {
   id: number;
   quote_id: number;
-  product_id: number;
+  product_id: number | null;
   product_code: string;
   product_name: string;
   size: string;
@@ -274,8 +274,10 @@ export type QuoteItem = {
   unit_price: number;
   area: string;
   line_total: number;
+  sort_order?: number;
+  image_path?: string;
+  surface?: string;
 };
-
 export type Order = {
   id: number;
   code: string;

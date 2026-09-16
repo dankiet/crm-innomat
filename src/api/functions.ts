@@ -1142,12 +1142,17 @@ export const saveQuote = createServerFn({ method: "POST" })
       prices_include_vat?: boolean;
       shipping_fee?: number;
       items: Array<{
-        product_id: number;
+        product_id?: number | null;
         quantity_m2: number;
         discount_pct?: number;
         unit_price?: number | null;
         product_name?: string;
         product_code?: string;
+        size?: string;
+        surface?: string;
+        image_path?: string;
+        retail_price?: number;
+        sort_order?: number;
         area?: string;
       }>;
     }) => data,
@@ -1180,12 +1185,17 @@ export const updateQuoteFn = createServerFn({ method: "POST" })
       prices_include_vat?: boolean;
       shipping_fee?: number;
       items: Array<{
-        product_id: number;
+        product_id?: number | null;
         quantity_m2: number;
         discount_pct?: number;
         unit_price?: number | null;
         product_name?: string;
         product_code?: string;
+        size?: string;
+        surface?: string;
+        image_path?: string;
+        retail_price?: number;
+        sort_order?: number;
         area?: string;
       }>;
     }) => data,
