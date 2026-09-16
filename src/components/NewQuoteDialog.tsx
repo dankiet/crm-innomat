@@ -87,12 +87,6 @@ type Line = {
   product_code: string;
   /** Tên hiển thị trên BG (có thể khác tên catalog) */
   product_name: string;
-  /** Kích thước snapshot (dòng ngoài catalog / override dòng catalog) */
-  size: string;
-  /** Chất liệu snapshot (hiển thị trên BG PDF) */
-  material: string;
-  /** Số thùng / quy cách đóng gói snapshot (hiển thị trên BG PDF) */
-  packing: string;
   quantity_m2: number;
   /** Chuỗi thô đang gõ trong ô SL — giữ được "0", "0." khi nhập thập phân */
   quantity_raw: string;
@@ -227,35 +221,31 @@ export function NewQuoteDialog({
           const productMap = new Map(ps.map((p) => [p.id, p]));
           const loadedLines: Line[] = detail.items.map((item) => {
             const product =
-              item.product_id != null
-                ? (productMap.get(item.product_id) ?? ({
-                    id: item.product_id,
-                    code: item.product_code,
-                    name: item.product_name,
-                    size: item.size,
-                    material: item.material || "",
-                    category: "",
-                    supplier: "",
-                    color: "",
-                    retail_price: item.retail_price,
-                    discount_tp: null,
-                    discount_b2b: null,
-                    total_stock: null,
-                    multi_codes_list: "",
-                    note: "",
-                    is_hot: 0,
-                    image_path: "",
-                  } satisfies Product))
-                : null;
+              productMap.get(item.product_id) ??
+              ({
+                id: item.product_id,
+                code: item.product_code,
+                name: item.product_name,
+                size: item.size,
+                material: "",
+                category: "",
+                supplier: "",
+
+                color: "",
+                retail_price: item.retail_price,
+                discount_tp: null,
+                discount_b2b: null,
+                total_stock: null, multi_codes_list: "",
+                note: "",
+                is_hot: 0,
+                image_path: "",
+              } satisfies Product);
             return {
               key: Math.random().toString(36).slice(2),
               collapsed: false,
               product,
-              product_code: item.product_code || product?.code || "",
-              product_name: item.product_name || product?.name || "",
-              size: item.size || product?.size || "",
-              material: item.material || product?.material || "",
-              packing: item.packing || "",
+              product_code: item.product_code || product.code,
+              product_name: item.product_name || product.name,
               quantity_m2: item.quantity_m2,
               quantity_raw:
                 item.quantity_m2 == null ? "" : String(item.quantity_m2),
@@ -265,20 +255,12 @@ export function NewQuoteDialog({
             };
           });
           setLines(loadedLines.length ? loadedLines : [emptyLine()]);
-          // Tự bật nếu BG cũ đã sửa mã/tên/kích thước/chất liệu khác catalog
+          // Tự bật nếu BG cũ đã sửa mã/tên khác catalog
           const customized = loadedLines.some(
             (l) =>
               l.product &&
               (l.product_code.trim() !== l.product.code.trim() ||
-                l.product_name.trim() !== l.product.name.trim() ||
-                Boolean(
-                  l.size &&
-                    l.size.trim() !== (l.product.size || "").trim(),
-                ) ||
-                Boolean(
-                  l.material &&
-                    l.material.trim() !== (l.product.material || "").trim(),
-                )),
+                l.product_name.trim() !== l.product.name.trim()),
           );
           setEditQuoteLabels(customized);
         } else {
@@ -309,9 +291,6 @@ export function NewQuoteDialog({
                 product,
                 product_code: product.code,
                 product_name: product.name,
-                size: product.size || "",
-                material: product.material || "",
-                packing: "",
                 quantity_m2: 1,
                 quantity_raw: "1",
                 discount_pct: 0,
@@ -340,7 +319,7 @@ export function NewQuoteDialog({
 
   function applyDiscountType(type: DiscountType, current: Line[]): Line[] {
     return current.map((line) => {
-      if (!line.product) return { ...line, discount_pct: 0 };
+      if (!line.product) return line;
       let pct = 0;
       if (type === "tp") pct = line.product.discount_tp ?? 0;
       else if (type === "b2b") pct = line.product.discount_b2b ?? 0;
@@ -365,38 +344,12 @@ export function NewQuoteDialog({
           product,
           product_code: product.code,
           product_name: product.name,
-          size: product.size || "",
-          material: product.material || "",
-          packing: "",
           discount_pct: pct,
           unit_price: unit,
         };
       });
       return next;
     });
-    setActiveLineKey(null);
-    setProductSearch("");
-  }
-
-  /** Chuyển dòng thành SP ngoài catalog — tự nhập mã/tên/kích thước/giá. */
-  function setCustomProductForLine(key: string) {
-    setLines((prev) =>
-      prev.map((l) =>
-        l.key === key
-          ? {
-              ...l,
-              product: null,
-              product_code: "",
-              product_name: "",
-              size: "",
-              material: "",
-              packing: "",
-              discount_pct: 0,
-              collapsed: false,
-            }
-          : l,
-      ),
-    );
     setActiveLineKey(null);
     setProductSearch("");
   }
@@ -424,13 +377,8 @@ export function NewQuoteDialog({
     let retail = 0;
     let after = 0;
     for (const l of lines) {
-      const hasItem =
-        l.product ||
-        Boolean(l.product_code.trim() || l.product_name.trim());
-      if (!hasItem || !l.quantity_m2) continue;
-      retail += l.product
-        ? l.product.retail_price * l.quantity_m2
-        : (l.unit_price || 0) * l.quantity_m2;
+      if (!l.product || !l.quantity_m2) continue;
+      retail += l.product.retail_price * l.quantity_m2;
       after += (l.unit_price || 0) * l.quantity_m2;
     }
     return { retail: Math.round(retail), after: Math.round(after) };
@@ -464,35 +412,13 @@ export function NewQuoteDialog({
       toast.error("Chọn khách hàng");
       return null;
     }
-    // Dòng hợp lệ: có SP catalog, hoặc SP ngoài catalog đã có mã/tên.
-    const unnamedCustom = lines.find(
-      (l) =>
-        !l.product &&
-        !l.product_code.trim() &&
-        !l.product_name.trim() &&
-        l.quantity_m2 >= 0,
-    );
-    if (unnamedCustom) {
-      toast.error(
-        "Dòng SP ngoài catalog cần nhập ít nhất mã hoặc tên sản phẩm",
-      );
-      return null;
-    }
     const items = lines
-      // Cho phép SL = 0 (dòng tham khảo giá) — chỉ cần đã xác định sản phẩm
-      .filter(
-        (l) =>
-          (l.product ||
-            Boolean(l.product_code.trim() || l.product_name.trim())) &&
-          l.quantity_m2 >= 0,
-      )
+      // Cho phép SL = 0 (dòng tham khảo giá) — chỉ cần đã chọn sản phẩm
+      .filter((l) => l.product && l.quantity_m2 >= 0)
       .map((l) => ({
-        product_id: l.product?.id ?? null,
-        product_code: l.product_code.trim() || l.product?.code || "KDM",
-        product_name: l.product_name.trim() || l.product?.name || "",
-        size: (l.size ?? "").trim(),
-        material: (l.material ?? "").trim(),
-        packing: (l.packing ?? "").trim(),
+        product_id: l.product!.id,
+        product_code: l.product_code.trim() || l.product!.code,
+        product_name: l.product_name.trim() || l.product!.name,
         quantity_m2: l.quantity_m2,
         discount_pct: l.discount_pct,
         unit_price: Math.round(Number(l.unit_price) || 0),
@@ -727,22 +653,13 @@ export function NewQuoteDialog({
                       <span className="text-muted-foreground font-normal"> · dòng {activeIdx + 1}</span>
                     )}
                   </p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="text-xs text-terracotta font-medium px-2 py-1 rounded-md hover:bg-orange-50"
-                      onClick={() => setCustomProductForLine(activeLineKey)}
-                    >
-                      + SP ngoài catalog
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground px-2 py-1 rounded-md hover:bg-surface-strong"
-                      onClick={() => { setActiveLineKey(null); setProductSearch(""); }}
-                    >
-                      Đóng
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground px-2 py-1 rounded-md hover:bg-surface-strong"
+                    onClick={() => { setActiveLineKey(null); setProductSearch(""); }}
+                  >
+                    Đóng
+                  </button>
                 </div>
                 <div className="p-2 border-b border-border flex items-center gap-2">
                   <Search className="size-3.5 text-muted-foreground flex-shrink-0" />
@@ -880,17 +797,8 @@ export function NewQuoteDialog({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                Sản phẩm (
-                {
-                  lines.filter(
-                    (l) =>
-                      l.product ||
-                      Boolean(
-                        l.product_code.trim() || l.product_name.trim(),
-                      ),
-                  ).length
-                }
-                /{lines.length} dòng)
+                Sản phẩm ({lines.filter((l) => l.product).length}/{lines.length}{" "}
+                dòng)
               </span>
               <div className="flex items-center gap-3">
                 <button
@@ -937,7 +845,7 @@ export function NewQuoteDialog({
                     disabled={locked}
                     onChange={(e) => setEditQuoteLabels(e.target.checked)}
                   />
-                  Sửa mã/tên/kích thước/chất liệu trên BG
+                  Sửa mã/tên trên BG
                 </label>
                 {!locked ? (
                   <button
@@ -1002,9 +910,7 @@ export function NewQuoteDialog({
                           <span className="truncate text-sm">
                             {line.product
                               ? `${line.product_code || line.product.code} — ${line.product_name || line.product.name}`
-                              : line.product_code || line.product_name
-                                ? `${line.product_code || "KDM"} — ${line.product_name || "SP ngoài catalog"}`
-                                : "Chọn sản phẩm"}
+                              : "Chọn sản phẩm"}
                           </span>
                           <ChevronDown
                             className={`size-3.5 flex-shrink-0 text-muted-foreground transition-transform ${
@@ -1129,66 +1035,6 @@ export function NewQuoteDialog({
                                 }
                               />
                             </label>
-                            <label className="block">
-                              <span className="text-[10px] text-muted-foreground">
-                                Kích thước
-                              </span>
-                              <input
-                                className={inputCls}
-                                placeholder={line.product?.size || ""}
-                                value={line.size || ""}
-                                disabled={locked}
-                                onChange={(e) =>
-                                  setLines((prev) =>
-                                    prev.map((l) =>
-                                      l.key === line.key
-                                        ? { ...l, size: e.target.value }
-                                        : l,
-                                    ),
-                                  )
-                                }
-                              />
-                            </label>
-                            <label className="block">
-                              <span className="text-[10px] text-muted-foreground">
-                                Chất liệu
-                              </span>
-                              <input
-                                className={inputCls}
-                                placeholder={line.product?.material || ""}
-                                value={line.material || ""}
-                                disabled={locked}
-                                onChange={(e) =>
-                                  setLines((prev) =>
-                                    prev.map((l) =>
-                                      l.key === line.key
-                                        ? { ...l, material: e.target.value }
-                                        : l,
-                                    ),
-                                  )
-                                }
-                              />
-                            </label>
-                            <label className="block">
-                              <span className="text-[10px] text-muted-foreground">
-                                Số thùng / quy cách
-                              </span>
-                              <input
-                                className={inputCls}
-                                placeholder="VD: 24 thùng"
-                                value={line.packing || ""}
-                                disabled={locked}
-                                onChange={(e) =>
-                                  setLines((prev) =>
-                                    prev.map((l) =>
-                                      l.key === line.key
-                                        ? { ...l, packing: e.target.value }
-                                        : l,
-                                    ),
-                                  )
-                                }
-                              />
-                            </label>
                           </div>
                         ) : null}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1272,7 +1118,7 @@ export function NewQuoteDialog({
                                     if (l.key !== line.key) return l;
                                     const unitPrice = l.product
                                       ? calcUnit(l.product, "custom", pct)
-                                      : l.unit_price;
+                                      : 0;
                                     return {
                                       ...l,
                                       discount_pct: pct,
@@ -1310,9 +1156,10 @@ export function NewQuoteDialog({
                                     return {
                                       ...l,
                                       unit_price: unitPrice,
-                                      discount_pct: l.product
-                                        ? effectiveDiscountPct(retail, unitPrice)
-                                        : 0,
+                                      discount_pct: effectiveDiscountPct(
+                                        retail,
+                                        unitPrice,
+                                      ),
                                     };
                                   }),
                                 );
@@ -1329,9 +1176,10 @@ export function NewQuoteDialog({
                                     return {
                                       ...l,
                                       unit_price: unitPrice,
-                                      discount_pct: l.product
-                                        ? effectiveDiscountPct(retail, unitPrice)
-                                        : 0,
+                                      discount_pct: effectiveDiscountPct(
+                                        retail,
+                                        unitPrice,
+                                      ),
                                     };
                                   }),
                                 );
@@ -1381,256 +1229,9 @@ export function NewQuoteDialog({
                         )}
                       </>
                     ) : (
-                      <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              Mã trên BG
-                            </span>
-                            <input
-                              className={inputCls}
-                              placeholder="VD: SP-001"
-                              value={line.product_code || ""}
-                              disabled={locked}
-                              onChange={(e) =>
-                                setLines((prev) =>
-                                  prev.map((l) =>
-                                    l.key === line.key
-                                      ? {
-                                          ...l,
-                                          product_code: e.target.value,
-                                        }
-                                      : l,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              Tên trên BG *
-                            </span>
-                            <input
-                              className={inputCls}
-                              placeholder="Tên sản phẩm (bắt buộc)"
-                              value={line.product_name || ""}
-                              disabled={locked}
-                              onChange={(e) =>
-                                setLines((prev) =>
-                                  prev.map((l) =>
-                                    l.key === line.key
-                                      ? {
-                                          ...l,
-                                          product_name: e.target.value,
-                                        }
-                                      : l,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              Kích thước
-                            </span>
-                            <input
-                              className={inputCls}
-                              placeholder="VD: 600x1200 mm"
-                              value={line.size || ""}
-                              disabled={locked}
-                              onChange={(e) =>
-                                setLines((prev) =>
-                                  prev.map((l) =>
-                                    l.key === line.key
-                                      ? { ...l, size: e.target.value }
-                                      : l,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              Chất liệu
-                            </span>
-                            <input
-                              className={inputCls}
-                              placeholder="VD: Cement & Mineral Pigment"
-                              value={line.material || ""}
-                              disabled={locked}
-                              onChange={(e) =>
-                                setLines((prev) =>
-                                  prev.map((l) =>
-                                    l.key === line.key
-                                      ? { ...l, material: e.target.value }
-                                      : l,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              Số thùng / quy cách
-                            </span>
-                            <input
-                              className={inputCls}
-                              placeholder="VD: 24 thùng"
-                              value={line.packing || ""}
-                              disabled={locked}
-                              onChange={(e) =>
-                                setLines((prev) =>
-                                  prev.map((l) =>
-                                    l.key === line.key
-                                      ? { ...l, packing: e.target.value }
-                                      : l,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              SL (m²)
-                            </span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="0"
-                              className={inputCls}
-                              value={line.quantity_raw}
-                              disabled={locked}
-                              onChange={(e) => {
-                                const raw = sanitizeQuantityInput(
-                                  e.target.value,
-                                );
-                                setLines((prev) =>
-                                  prev.map((l) =>
-                                    l.key === line.key
-                                      ? {
-                                          ...l,
-                                          quantity_raw: raw,
-                                          quantity_m2: parseQuantityInput(raw),
-                                        }
-                                      : l,
-                                  ),
-                                );
-                              }}
-                              onBlur={() => {
-                                setLines((prev) =>
-                                  prev.map((l) => {
-                                    if (l.key !== line.key) return l;
-                                    const qty = parseQuantityInput(
-                                      l.quantity_raw,
-                                    );
-                                    return {
-                                      ...l,
-                                      quantity_raw:
-                                        l.quantity_raw.trim() === ""
-                                          ? ""
-                                          : String(qty),
-                                      quantity_m2: qty,
-                                    };
-                                  }),
-                                );
-                              }}
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              CK %
-                            </span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step={0.01}
-                              className={inputCls}
-                              value={line.discount_pct || 0}
-                              disabled={
-                                locked || discountType !== "custom"
-                              }
-                              onChange={(e) => {
-                                const pct = Number(e.target.value) || 0;
-                                setLines((prev) =>
-                                  prev.map((l) => {
-                                    if (l.key !== line.key) return l;
-                                    return {
-                                      ...l,
-                                      discount_pct: pct,
-                                    };
-                                  }),
-                                );
-                              }}
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              Giá bán (đ/m²)
-                            </span>
-                            <input
-                              type="number"
-                              min={0}
-                              step={10}
-                              inputMode="numeric"
-                              className={inputCls}
-                              value={line.unit_price || ""}
-                              disabled={locked}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                const unitPrice =
-                                  raw === ""
-                                    ? 0
-                                    : Math.max(
-                                        0,
-                                        Math.round(Number(raw) || 0),
-                                      );
-                                setLines((prev) =>
-                                  prev.map((l) => {
-                                    if (l.key !== line.key) return l;
-                                    return {
-                                      ...l,
-                                      unit_price: unitPrice,
-                                      discount_pct: 0,
-                                    };
-                                  }),
-                                );
-                              }}
-                              onBlur={() => {
-                                setLines((prev) =>
-                                  prev.map((l) => {
-                                    if (l.key !== line.key) return l;
-                                    const unitPrice =
-                                      Math.round((l.unit_price || 0) / 10) * 10;
-                                    return {
-                                      ...l,
-                                      unit_price: unitPrice,
-                                      discount_pct: 0,
-                                    };
-                                  }),
-                                );
-                              }}
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[10px] text-muted-foreground">
-                              Thành tiền
-                            </span>
-                            <div
-                              className={`${inputCls} bg-surface-strong/40 font-medium tabular-nums`}
-                            >
-                              {line.quantity_raw.trim() !== ""
-                                ? formatVND(lineTotal)
-                                : "—"}
-                            </div>
-                          </label>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          SP ngoài catalog — thông tin nhập tay sẽ in trên BG PDF.
-                        </p>
-                      </>
+                      <p className="text-[11px] text-muted-foreground pl-9">
+                        Chọn sản phẩm từ danh sách để nhập số lượng và giá.
+                      </p>
                     ))}
                   </div>
                 );
@@ -1805,9 +1406,6 @@ function emptyLine(): Line {
     product: null,
     product_code: "",
     product_name: "",
-    size: "",
-    material: "",
-    packing: "",
     quantity_m2: 0,
     quantity_raw: "",
     discount_pct: 0,

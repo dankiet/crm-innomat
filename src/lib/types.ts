@@ -264,12 +264,10 @@ export type Quote = {
 export type QuoteItem = {
   id: number;
   quote_id: number;
-  product_id: number | null;
+  product_id: number;
   product_code: string;
   product_name: string;
   size: string;
-  material: string;
-  packing: string;
   quantity_m2: number;
   retail_price: number;
   discount_pct: number;

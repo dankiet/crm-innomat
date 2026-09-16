@@ -94,10 +94,7 @@ export async function exportQuoteToHtml(
     .trim() || "QT";
 
   const items = (await db.prepare(
-      `SELECT qi.*, p.internal_code,
-       COALESCE(NULLIF(qi.material, ''), p.material, '') AS material,
-       NULLIF(qi.packing, '') AS packing,
-       p.packing_pcs, p.packing_m2, p.note as p_note,
+      `SELECT qi.*, p.internal_code, p.material, p.packing, p.packing_pcs, p.packing_m2, p.note as p_note,
        COALESCE(
          (SELECT path FROM product_images pi
           WHERE pi.product_id = qi.product_id
@@ -144,11 +141,7 @@ export async function exportQuoteToHtml(
       : item.unit_price;
     const subtotal = unitPreVat * item.quantity_m2;
     const numThung = item.packing_m2 ? (item.quantity_m2 / item.packing_m2).toFixed(1) : "";
-    const finalNote = item.packing
-      ? item.packing
-      : numThung
-        ? `~${numThung} Thùng`
-        : "—";
+    const finalNote = numThung ? `~${numThung} Thùng` : "—";
     return { ...item, unitPreVat, subtotal, finalNote };
   });
 
