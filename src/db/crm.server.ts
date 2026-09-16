@@ -1802,7 +1802,7 @@ export async function createQuote(input: {
   /** Phí vận chuyển nhập tay (chưa VAT) */
   shipping_fee?: number;
   items: Array<{
-    product_id: number;
+    product_id?: number | null;
     quantity_m2: number;
     discount_pct?: number;
     unit_price?: number | null;
@@ -1810,6 +1810,9 @@ export async function createQuote(input: {
     product_name?: string;
     /** Mã hiển thị trên BG (có thể khác catalog) */
     product_code?: string;
+    size?: string;
+    material?: string;
+    packing?: string;
     area?: string;
   }>;
 }): Promise<Quote> {
@@ -1844,46 +1847,63 @@ export async function createQuote(input: {
     const quoteId = Number(info.lastInsertRowid);
     const insertItem = db.prepare(
       `INSERT INTO quote_items (
-        quote_id, product_id, product_code, product_name, size,
+        quote_id, product_id, product_code, product_name, size, material, packing,
         quantity_m2, retail_price, discount_pct, unit_price, area, line_total
       ) VALUES (
-        @quote_id, @product_id, @product_code, @product_name, @size,
+        @quote_id, @product_id, @product_code, @product_name, @size, @material, @packing,
         @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total
       )`,
     );
 
     for (const item of input.items) {
-      const product = await getProduct(item.product_id);
-      if (!product) throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
+      const product =
+        item.product_id != null ? await getProduct(item.product_id) : null;
+      if (item.product_id != null && !product) {
+        throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
+      }
 
-      const { unit, discountPct } = resolveQuoteItemPricing(product, discountType, item);
+      const { unit, discountPct } = product
+        ? resolveQuoteItemPricing(product, discountType, item)
+        : {
+            unit: Math.max(0, Math.round(Number(item.unit_price) || 0)),
+            discountPct: Math.max(0, Math.min(100, Number(item.discount_pct) || 0)),
+          };
       const qty = Number(item.quantity_m2) || 0;
       const lineTotal = Math.round(unit * qty);
 
-      const productCode = (item.product_code ?? "").trim() || product.code;
-      const productName = (item.product_name ?? "").trim() || product.name;
+      const productCode =
+        (item.product_code ?? "").trim() || product?.code || "KDM";
+      const productName =
+        (item.product_name ?? "").trim() || product?.name || "SP ngoài catalog";
+      const size = (item.size ?? "").trim() || product?.size || "";
+      const material = (item.material ?? "").trim() || product?.material || "";
+      const packing = (item.packing ?? "").trim() || product?.packing || "";
 
       await insertItem.run({
         quote_id: quoteId,
-        product_id: product.id,
+        product_id: product?.id ?? null,
         product_code: productCode,
         product_name: productName,
-        size: product.size,
+        size,
+        material,
+        packing,
         quantity_m2: qty,
-        retail_price: product.retail_price,
+        retail_price: product?.retail_price ?? unit,
         discount_pct: discountPct,
         unit_price: unit,
         area: item.area ?? "",
         line_total: lineTotal,
       } as unknown as SqlValue);
 
-      await upsertCustomerProductSampleFromQuote(
-        db,
-        input.customer_id,
-        product.id,
-        productCode,
-        productName,
-      );
+      if (product) {
+        await upsertCustomerProductSampleFromQuote(
+          db,
+          input.customer_id,
+          product.id,
+          productCode,
+          productName,
+        );
+      }
     }
 
     // Auto-update customer status when quoted
@@ -1951,12 +1971,15 @@ export async function updateQuote(input: {
   /** Phí vận chuyển nhập tay (chưa VAT) */
   shipping_fee?: number;
   items: Array<{
-    product_id: number;
+    product_id?: number | null;
     quantity_m2: number;
     discount_pct?: number;
     unit_price?: number | null;
     product_name?: string;
     product_code?: string;
+    size?: string;
+    material?: string;
+    packing?: string;
     area?: string;
   }>;
 }): Promise<Quote> {
@@ -2006,47 +2029,62 @@ export async function updateQuote(input: {
 
     const insertItem = db.prepare(
       `INSERT INTO quote_items (
-        quote_id, product_id, product_code, product_name, size,
+        quote_id, product_id, product_code, product_name, size, material, packing,
         quantity_m2, retail_price, discount_pct, unit_price, area, line_total
       ) VALUES (
-        @quote_id, @product_id, @product_code, @product_name, @size,
+        @quote_id, @product_id, @product_code, @product_name, @size, @material, @packing,
         @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total
       )`,
     );
 
     for (const item of input.items) {
-      const product = await getProduct(item.product_id);
-      if (!product) {
+      const product =
+        item.product_id != null ? await getProduct(item.product_id) : null;
+      if (item.product_id != null && !product) {
         throw new Error(`Sản phẩm #${item.product_id} không tồn tại`);
       }
 
-      const { unit, discountPct } = resolveQuoteItemPricing(product, discountType, item);
+      const { unit, discountPct } = product
+        ? resolveQuoteItemPricing(product, discountType, item)
+        : {
+            unit: Math.max(0, Math.round(Number(item.unit_price) || 0)),
+            discountPct: Math.max(0, Math.min(100, Number(item.discount_pct) || 0)),
+          };
       const qty = Number(item.quantity_m2) || 0;
       const lineTotal = Math.round(unit * qty);
-      const productCode = (item.product_code ?? "").trim() || product.code;
-      const productName = (item.product_name ?? "").trim() || product.name;
+      const productCode =
+        (item.product_code ?? "").trim() || product?.code || "KDM";
+      const productName =
+        (item.product_name ?? "").trim() || product?.name || "SP ngoài catalog";
+      const size = (item.size ?? "").trim() || product?.size || "";
+      const material = (item.material ?? "").trim() || product?.material || "";
+      const packing = (item.packing ?? "").trim() || product?.packing || "";
 
       await insertItem.run({
         quote_id: input.id,
-        product_id: product.id,
+        product_id: product?.id ?? null,
         product_code: productCode,
         product_name: productName,
-        size: product.size,
+        size,
+        material,
+        packing,
         quantity_m2: qty,
-        retail_price: product.retail_price,
+        retail_price: product?.retail_price ?? unit,
         discount_pct: discountPct,
         unit_price: unit,
         area: item.area ?? "",
         line_total: lineTotal,
       } as unknown as SqlValue);
 
-      await upsertCustomerProductSampleFromQuote(
-        db,
-        input.customer_id,
-        product.id,
-        productCode,
-        productName,
-      );
+      if (product) {
+        await upsertCustomerProductSampleFromQuote(
+          db,
+          input.customer_id,
+          product.id,
+          productCode,
+          productName,
+        );
+      }
     }
   });
 
