@@ -1810,6 +1810,11 @@ export async function createQuote(input: {
     product_name?: string;
     /** Mã hiển thị trên BG (có thể khác catalog) */
     product_code?: string;
+    size?: string;
+    /** Chất liệu hiển thị trên BG (có thể khác catalog) */
+    material?: string;
+    /** Số thùng nhập tay (lưu số thuần như "10") */
+    packing?: string;
     area?: string;
   }>;
 }): Promise<Quote> {
@@ -1844,10 +1849,10 @@ export async function createQuote(input: {
     const quoteId = Number(info.lastInsertRowid);
     const insertItem = db.prepare(
       `INSERT INTO quote_items (
-        quote_id, product_id, product_code, product_name, size,
+        quote_id, product_id, product_code, product_name, size, material, packing,
         quantity_m2, retail_price, discount_pct, unit_price, area, line_total
       ) VALUES (
-        @quote_id, @product_id, @product_code, @product_name, @size,
+        @quote_id, @product_id, @product_code, @product_name, @size, @material, @packing,
         @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total
       )`,
     );
@@ -1868,7 +1873,9 @@ export async function createQuote(input: {
         product_id: product.id,
         product_code: productCode,
         product_name: productName,
-        size: product.size,
+        size: (item.size ?? "").trim() || product.size,
+        material: (item.material ?? "").trim() || product.material || "",
+        packing: (item.packing ?? "").trim(),
         quantity_m2: qty,
         retail_price: product.retail_price,
         discount_pct: discountPct,
@@ -1957,6 +1964,9 @@ export async function updateQuote(input: {
     unit_price?: number | null;
     product_name?: string;
     product_code?: string;
+    size?: string;
+    material?: string;
+    packing?: string;
     area?: string;
   }>;
 }): Promise<Quote> {
@@ -2006,10 +2016,10 @@ export async function updateQuote(input: {
 
     const insertItem = db.prepare(
       `INSERT INTO quote_items (
-        quote_id, product_id, product_code, product_name, size,
+        quote_id, product_id, product_code, product_name, size, material, packing,
         quantity_m2, retail_price, discount_pct, unit_price, area, line_total
       ) VALUES (
-        @quote_id, @product_id, @product_code, @product_name, @size,
+        @quote_id, @product_id, @product_code, @product_name, @size, @material, @packing,
         @quantity_m2, @retail_price, @discount_pct, @unit_price, @area, @line_total
       )`,
     );
@@ -2031,7 +2041,9 @@ export async function updateQuote(input: {
         product_id: product.id,
         product_code: productCode,
         product_name: productName,
-        size: product.size,
+        size: (item.size ?? "").trim() || product.size,
+        material: (item.material ?? "").trim() || product.material || "",
+        packing: (item.packing ?? "").trim(),
         quantity_m2: qty,
         retail_price: product.retail_price,
         discount_pct: discountPct,

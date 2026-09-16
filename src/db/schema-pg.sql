@@ -133,13 +133,14 @@ CREATE TABLE IF NOT EXISTS quote_items (
   product_code TEXT NOT NULL,
   product_name TEXT NOT NULL,
   size TEXT NOT NULL DEFAULT '',
+  material TEXT NOT NULL DEFAULT '',
+  packing TEXT NOT NULL DEFAULT '',
   quantity_m2 DOUBLE PRECISION NOT NULL DEFAULT 0,
   retail_price BIGINT NOT NULL,
   discount_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
   unit_price BIGINT NOT NULL,
   area TEXT NOT NULL DEFAULT '',
-  line_total BIGINT NOT NULL DEFAULT 0,
-  origin TEXT NOT NULL DEFAULT ''
+  line_total BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);
 CREATE INDEX IF NOT EXISTS idx_quote_items_product ON quote_items(product_id);
@@ -428,6 +429,12 @@ CREATE TABLE IF NOT EXISTS lp_settings (
   updated_at TEXT NOT NULL DEFAULT ''
 );
 -- ─── Row Level Security ─────────────────────────────────────
+-- Quote items: per-line overrides (mã/tên/kt hiển thị + chất liệu + số thùng).
+-- Live DB đã có từ migration cũ — idempotent cho DB tạo từ schema trước đó.
+ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS material TEXT NOT NULL DEFAULT '';
+ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS packing TEXT NOT NULL DEFAULT '';
+-- Dọn cột thừa (không được code dùng): origin → marker đã có product_id NOT NULL.
+ALTER TABLE quote_items DROP COLUMN IF EXISTS origin;
 -- CRM truy cập Postgres qua DATABASE_URL (role server / bypass RLS).
 -- Browser không dùng Supabase PostgREST + anon key cho bảng CRM.
 -- Bật RLS trên mọi bảng public, KHÔNG tạo policy anon/authenticated

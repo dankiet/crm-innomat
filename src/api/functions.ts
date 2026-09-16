@@ -1148,6 +1148,9 @@ export const saveQuote = createServerFn({ method: "POST" })
         unit_price?: number | null;
         product_name?: string;
         product_code?: string;
+        size?: string;
+        material?: string;
+        packing?: string;
         area?: string;
       }>;
     }) => data,
@@ -1186,6 +1189,9 @@ export const updateQuoteFn = createServerFn({ method: "POST" })
         unit_price?: number | null;
         product_name?: string;
         product_code?: string;
+        size?: string;
+        material?: string;
+        packing?: string;
         area?: string;
       }>;
     }) => data,

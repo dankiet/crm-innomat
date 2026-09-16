@@ -268,6 +268,10 @@ export type QuoteItem = {
   product_code: string;
   product_name: string;
   size: string;
+  /** Snapshot chất liệu hiển thị trên BG (có thể khác catalog) */
+  material: string;
+  /** Số thùng nhập tay (lưu số thuần như "10", hiển thị "10 thùng") */
+  packing: string;
   quantity_m2: number;
   retail_price: number;
   discount_pct: number;

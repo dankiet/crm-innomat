@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { NewProductDialog } from "@/components/NewProductDialog";
 import {
   Dialog,
   DialogContent,
@@ -87,6 +88,12 @@ type Line = {
   product_code: string;
   /** Tên hiển thị trên BG (có thể khác tên catalog) */
   product_name: string;
+  /** Kích thước hiển thị trên BG (có thể khác catalog) */
+  size: string;
+  /** Chất liệu hiển thị trên BG (có thể khác catalog) */
+  material: string;
+  /** Số thùng nhập tay — lưu số thuần (VD "10"), hiển thị "10 thùng" */
+  packing: string;
   quantity_m2: number;
   /** Chuỗi thô đang gõ trong ô SL — giữ được "0", "0." khi nhập thập phân */
   quantity_raw: string;
@@ -177,6 +184,10 @@ export function NewQuoteDialog({
   const [locked, setLocked] = useState(false);
   /** Hiện ô sửa mã/tên trên BG (mặc định ẩn — dùng giá trị tự điền từ catalog) */
   const [editQuoteLabels, setEditQuoteLabels] = useState(false);
+  /** Dialog tạo SP mới trong catalog từ dòng BG — sau khi tạo tự chọn vào dòng */
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  /** Dòng đang chờ chọn SP mới tạo */
+  const [quoteProductKey, setQuoteProductKey] = useState<string | null>(null);
   /** Xác nhận xóa 2 bước inline (thay window.confirm) */
   const [confirmDelete, setConfirmDelete] = useState(false);
   /** Hiện check V trong nút Lưu sau khi lưu xong (thay toast) */
@@ -246,6 +257,9 @@ export function NewQuoteDialog({
               product,
               product_code: item.product_code || product.code,
               product_name: item.product_name || product.name,
+              size: item.size || product.size || "",
+              material: item.material || product.material || "",
+              packing: item.packing || "",
               quantity_m2: item.quantity_m2,
               quantity_raw:
                 item.quantity_m2 == null ? "" : String(item.quantity_m2),
@@ -255,12 +269,15 @@ export function NewQuoteDialog({
             };
           });
           setLines(loadedLines.length ? loadedLines : [emptyLine()]);
-          // Tự bật nếu BG cũ đã sửa mã/tên khác catalog
+          // Tự bật nếu BG cũ đã sửa mã/tên/kt/chất liệu/số thùng khác catalog
           const customized = loadedLines.some(
             (l) =>
               l.product &&
               (l.product_code.trim() !== l.product.code.trim() ||
-                l.product_name.trim() !== l.product.name.trim()),
+                l.product_name.trim() !== l.product.name.trim() ||
+                (l.size || "").trim() !== (l.product.size || "").trim() ||
+                (l.material || "").trim() !== (l.product.material || "").trim() ||
+                (l.packing || "").trim() !== ""),
           );
           setEditQuoteLabels(customized);
         } else {
@@ -291,6 +308,9 @@ export function NewQuoteDialog({
                 product,
                 product_code: product.code,
                 product_name: product.name,
+                size: product.size || "",
+                material: product.material || "",
+                packing: "",
                 quantity_m2: 1,
                 quantity_raw: "1",
                 discount_pct: 0,
@@ -344,6 +364,9 @@ export function NewQuoteDialog({
           product,
           product_code: product.code,
           product_name: product.name,
+          size: product.size || "",
+          material: product.material || "",
+          packing: "",
           discount_pct: pct,
           unit_price: unit,
         };
@@ -419,6 +442,9 @@ export function NewQuoteDialog({
         product_id: l.product!.id,
         product_code: l.product_code.trim() || l.product!.code,
         product_name: l.product_name.trim() || l.product!.name,
+        size: l.size.trim() || l.product!.size || "",
+        material: l.material.trim() || l.product!.material || "",
+        packing: l.packing.trim(),
         quantity_m2: l.quantity_m2,
         discount_pct: l.discount_pct,
         unit_price: Math.round(Number(l.unit_price) || 0),
@@ -558,11 +584,13 @@ export function NewQuoteDialog({
 
   function closeDialog(nextOpen: boolean) {
     if (!nextOpen && (saving || exporting || deleting)) return;
+    if (!nextOpen) setQuoteProductKey(null);
     onOpenChange(nextOpen);
   }
 
   return (
-    <Dialog open={open} onOpenChange={closeDialog}>
+    <>
+      <Dialog open={open} onOpenChange={closeDialog}>
       <DialogContent
         className="sm:max-w-3xl max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
         onPointerDownOutside={(e) => e.preventDefault()}
@@ -845,7 +873,7 @@ export function NewQuoteDialog({
                     disabled={locked}
                     onChange={(e) => setEditQuoteLabels(e.target.checked)}
                   />
-                  Sửa mã/tên trên BG
+                  Sửa mã/tên/kích thước/chất liệu/số thùng trên BG
                 </label>
                 {!locked ? (
                   <button
@@ -938,6 +966,21 @@ export function NewQuoteDialog({
                         />
                       </div>
 
+                      {!locked ? (
+                        <button
+                          type="button"
+                          title="Tạo sản phẩm mới trong catalog và chọn vào dòng này"
+                          aria-label={`Tạo sản phẩm mới cho dòng ${index + 1}`}
+                          onClick={() => {
+                            setQuoteProductKey(line.key);
+                            setCreateProductOpen(true);
+                          }}
+                          className="size-8 flex-shrink-0 grid place-items-center rounded-md text-terracotta hover:bg-terracotta/10"
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                      ) : null}
+
                       <button
                         type="button"
                         title={line.collapsed ? "Mở rộng dòng" : "Thu gọn dòng"}
@@ -1028,6 +1071,75 @@ export function NewQuoteDialog({
                                         ? {
                                             ...l,
                                             product_name: e.target.value,
+                                          }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Kích thước
+                              </span>
+                              <input
+                                className={inputCls}
+                                placeholder={line.product?.size || ""}
+                                value={line.size || ""}
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? { ...l, size: e.target.value }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Chất liệu
+                              </span>
+                              <input
+                                className={inputCls}
+                                placeholder={line.product?.material || ""}
+                                value={line.material || ""}
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? { ...l, material: e.target.value }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Số thùng
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                className={inputCls}
+                                placeholder="VD: 10"
+                                value={line.packing || ""}
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? {
+                                            ...l,
+                                            // Chỉ nhận số nguyên dương
+                                            packing: e.target.value.replace(
+                                              /\D/g,
+                                              "",
+                                            ),
                                           }
                                         : l,
                                     ),
@@ -1396,6 +1508,23 @@ export function NewQuoteDialog({
         )}
       </DialogContent>
     </Dialog>
+    {/* Tạo SP mới trong catalog trực tiếp từ dòng BG — sau khi tạo tự chọn vào dòng */}
+    <NewProductDialog
+      open={createProductOpen}
+      onOpenChange={setCreateProductOpen}
+      onCreated={(product) => {
+        setProducts((prev) =>
+          prev.some((p) => p.id === product.id) ? prev : [...prev, product],
+        );
+        if (quoteProductKey) {
+          setProductForLine(quoteProductKey, product);
+          setActiveLineKey(null);
+          setProductSearch("");
+          setQuoteProductKey(null);
+        }
+      }}
+    />
+    </>
   );
 }
 
@@ -1406,6 +1535,9 @@ function emptyLine(): Line {
     product: null,
     product_code: "",
     product_name: "",
+    size: "",
+    material: "",
+    packing: "",
     quantity_m2: 0,
     quantity_raw: "",
     discount_pct: 0,

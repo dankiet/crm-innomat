@@ -8,6 +8,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ProductImage";
+import type { Product } from "@/lib/types";
 import {
   createProductFn,
   fetchProductFieldValues,
@@ -37,7 +38,8 @@ type Props = {
   /** Prefill danh mục khi đang filter 1 nhóm SP */
   defaultCategory?: string;
   canManageOptions?: boolean;
-  onCreated?: () => void;
+  /** Được gọi sau khi tạo SP thành công và người dùng đóng dialog — kèm sản phẩm mới */
+  onCreated?: (product: Product) => void;
 };
 
 const emptyForm = {
@@ -81,6 +83,7 @@ export function NewProductDialog({
   );
   const savedSinceOpenRef = useRef(false);
   const [createdId, setCreatedId] = useState<number | null>(null);
+  const createdProductRef = useRef<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [fieldOptions, setFieldOptions] = useState<Record<SuggestField, string[]>>({
     color: [],
@@ -140,8 +143,8 @@ export function NewProductDialog({
   }
 
   async function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen && savedSinceOpenRef.current) {
-      onCreated?.();
+    if (!nextOpen && savedSinceOpenRef.current && createdProductRef.current) {
+      onCreated?.(createdProductRef.current);
       await router.invalidate();
     }
     onOpenChange(nextOpen);
@@ -256,6 +259,7 @@ export function NewProductDialog({
       }
 
       setCreatedId(product.id);
+      createdProductRef.current = product;
       savedSinceOpenRef.current = true;
       toast.success(`Đã tạo sản phẩm ${product.code}`);
     } catch (err) {
