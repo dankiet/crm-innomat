@@ -1,24 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -57,22 +39,7 @@ import {
   unitPriceForProduct,
 } from "@/lib/pricing";
 import { toast } from "sonner";
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  ChevronsDownUp,
-  ChevronsUpDown,
-  Copy,
-  FileDown,
-  GripVertical,
-  Loader2,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, FileDown, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Thumbnail gọn cho form BG — có ảnh thì hiện; lỗi/không có thì ô xám (không icon vỡ layout). */
@@ -159,582 +126,6 @@ function calcUnit(
     discountType === "custom" ? discountPct : undefined,
   );
 }
-const inputCls =
-  "w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground placeholder:text-muted-foreground/70 disabled:opacity-60";
-type SortableQuoteLineProps = {
-  line: Line;
-  index: number;
-  totalLines: number;
-  locked: boolean;
-  activeLineKey: string | null;
-  setActiveLineKey: React.Dispatch<React.SetStateAction<string | null>>;
-  setProductSearch: React.Dispatch<React.SetStateAction<string>>;
-  setManualProductKey: React.Dispatch<React.SetStateAction<string | null>>;
-  editQuoteLabels: boolean;
-  pricesIncludeVat: boolean;
-  setLines: React.Dispatch<React.SetStateAction<Line[]>>;
-};
-
-function SortableQuoteLine({
-  line,
-  index,
-  totalLines,
-  locked,
-  activeLineKey,
-  setActiveLineKey,
-  setProductSearch,
-  setManualProductKey,
-  editQuoteLabels,
-  pricesIncludeVat,
-  setLines,
-}: SortableQuoteLineProps) {
-  const isPickerOpen = activeLineKey === line.key;
-  const unit = line.unit_price || 0;
-  const lineTotal = Math.round(unit * (line.quantity_m2 || 0));
-  const profitInfo = estimateLineProfitInfo(
-    unit,
-    line.quantity_m2 || 0,
-    line.product?.trade_price,
-    pricesIncludeVat,
-  );
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: line.key,
-    disabled: locked || totalLines <= 1,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }}
-      className={cn(
-        "rounded-lg ring-1 ring-black/8 bg-card p-2.5 sm:p-3 space-y-2 transition-shadow",
-        isDragging && "z-10 opacity-80 ring-2 ring-terracotta/40 shadow-lg",
-      )}
-    >
-      {/* Row header: # + thumb + product + khu vực + actions */}
-      <div className="flex gap-2 items-center">
-        {!locked && totalLines > 1 ? (
-          <button
-            type="button"
-            className="size-7 flex-shrink-0 touch-none grid place-items-center rounded-md text-muted-foreground hover:bg-surface-strong hover:text-foreground cursor-grab active:cursor-grabbing"
-            aria-label={`Kéo để đổi vị trí dòng ${index + 1}`}
-            title="Kéo để đổi vị trí"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="size-3.5" />
-          </button>
-        ) : null}
-        <span
-          className="size-7 flex-shrink-0 grid place-items-center rounded-md bg-surface-strong text-[11px] font-semibold text-muted-foreground tabular-nums"
-          title={`Dòng ${index + 1}`}
-        >
-          {index + 1}
-        </span>
-        <QuoteThumb
-          src={
-            line.customProduct?.imagePath ||
-            line.customProduct?.imageDataUrl ||
-            line.product?.image_path
-          }
-          alt={line.product?.code ?? line.customProduct?.code ?? ""}
-          className="size-10"
-        />
-        <div className="flex-1 min-w-0">
-          {line.customProduct ? (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={locked}
-                onClick={() => {
-                  if (locked) return;
-                  setManualProductKey(line.key);
-                }}
-                className={`${inputCls} text-left flex items-center justify-between gap-2 flex-1 min-w-0`}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-200/80 shrink-0">
-                    Ngoài catalog
-                  </span>
-                  <span className="truncate text-sm font-medium text-foreground">
-                    {line.product_name || line.customProduct.name}
-                  </span>
-                </div>
-                <Pencil className="size-3.5 flex-shrink-0 text-muted-foreground hover:text-foreground" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={locked}
-                className={`${inputCls} text-left flex items-center justify-between gap-2 flex-1 min-w-0 ${
-                  !line.product
-                    ? "text-muted-foreground"
-                    : "text-foreground"
-                }`}
-                onClick={() => {
-                  if (locked) return;
-                  setActiveLineKey(isPickerOpen ? null : line.key);
-                  setProductSearch("");
-                }}
-              >
-                <span className="truncate text-sm">
-                  {line.product
-                    ? `${line.product_code || line.product.code} — ${line.product_name || line.product.name}`
-                    : "Chọn sản phẩm"}
-                </span>
-                <ChevronDown
-                  className={`size-3.5 flex-shrink-0 text-muted-foreground transition-transform ${
-                    isPickerOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-              {!locked && !line.product ? (
-                <button
-                  type="button"
-                  onClick={() => setManualProductKey(line.key)}
-                  title="Thêm mã gạch ngoài catalog"
-                  aria-label="Thêm mã gạch ngoài catalog"
-                  className="size-8 shrink-0 grid place-items-center rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition-colors"
-                >
-                  <Plus className="size-4" />
-                </button>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        <div className="w-24 sm:w-32 flex-shrink-0">
-          <input
-            className={`${inputCls} text-xs`}
-            placeholder="Khu vực"
-            value={line.area || ""}
-            disabled={locked}
-            onChange={(e) =>
-              setLines((prev) =>
-                prev.map((l) =>
-                  l.key === line.key
-                    ? { ...l, area: e.target.value }
-                    : l,
-                ),
-              )
-            }
-          />
-        </div>
-
-        {!locked && totalLines > 1 ? (
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              title="Di chuyển lên"
-              aria-label={`Di chuyển dòng ${index + 1} lên`}
-              disabled={index === 0}
-              onClick={() => {
-                if (index === 0) return;
-                setLines((prev) => arrayMove(prev, index, index - 1));
-              }}
-              className="size-7 grid place-items-center rounded text-muted-foreground hover:bg-surface-strong hover:text-foreground disabled:opacity-25 disabled:pointer-events-none"
-            >
-              <ArrowUp className="size-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Di chuyển xuống"
-              aria-label={`Di chuyển dòng ${index + 1} xuống`}
-              disabled={index === totalLines - 1}
-              onClick={() => {
-                if (index === totalLines - 1) return;
-                setLines((prev) => arrayMove(prev, index, index + 1));
-              }}
-              className="size-7 grid place-items-center rounded text-muted-foreground hover:bg-surface-strong hover:text-foreground disabled:opacity-25 disabled:pointer-events-none"
-            >
-              <ArrowDown className="size-3.5" />
-            </button>
-          </div>
-        ) : null}
-
-        <button
-          type="button"
-          title={line.collapsed ? "Mở rộng dòng" : "Thu gọn dòng"}
-          aria-label={
-            line.collapsed
-              ? `Mở rộng dòng ${index + 1}`
-              : `Thu gọn dòng ${index + 1}`
-          }
-          aria-expanded={!line.collapsed}
-          onClick={() =>
-            setLines((prev) =>
-              prev.map((item) =>
-                item.key === line.key
-                  ? { ...item, collapsed: !item.collapsed }
-                  : item,
-              ),
-            )
-          }
-          className="size-8 flex-shrink-0 grid place-items-center rounded-md text-muted-foreground hover:bg-surface-strong hover:text-foreground"
-        >
-          <ChevronDown
-            className={cn(
-              "size-3.5 transition-transform",
-              line.collapsed && "-rotate-90",
-            )}
-          />
-        </button>
-
-        {!locked ? (
-          <button
-            type="button"
-            title="Xóa dòng"
-            onClick={() => {
-              setLines((prev) =>
-                prev.length === 1
-                  ? [emptyLine()]
-                  : prev.filter((l) => l.key !== line.key),
-              );
-              if (activeLineKey === line.key) {
-                setActiveLineKey(null);
-              }
-            }}
-            className="size-8 flex-shrink-0 grid place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        ) : null}
-      </div>
-
-      {!line.collapsed && ((line.product || line.customProduct) ? (
-        <>
-          {editQuoteLabels ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-              <label className="block">
-                <span className="text-[10px] text-muted-foreground">
-                  Mã trên BG
-                </span>
-                <input
-                  className={inputCls}
-                  value={line.product_code || ""}
-                  disabled={locked}
-                  onChange={(e) =>
-                    setLines((prev) =>
-                      prev.map((l) =>
-                        l.key === line.key
-                          ? {
-                              ...l,
-                              product_code: e.target.value,
-                            }
-                          : l,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label className="block">
-                <span className="text-[10px] text-muted-foreground">
-                  Tên trên BG
-                </span>
-                <input
-                  className={inputCls}
-                  value={line.product_name || ""}
-                  disabled={locked}
-                  onChange={(e) =>
-                    setLines((prev) =>
-                      prev.map((l) =>
-                        l.key === line.key
-                          ? {
-                              ...l,
-                              product_name: e.target.value,
-                            }
-                          : l,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label className="block">
-                <span className="text-[10px] text-muted-foreground">
-                  Kích thước trên BG
-                </span>
-                <input
-                  className={inputCls}
-                  placeholder={
-                    line.product?.size ||
-                    line.customProduct?.size ||
-                    "VD: 60x60 cm"
-                  }
-                  value={
-                    line.size ??
-                    line.product?.size ??
-                    line.customProduct?.size ??
-                    ""
-                  }
-                  disabled={locked}
-                  onChange={(e) =>
-                    setLines((prev) =>
-                      prev.map((l) =>
-                        l.key === line.key
-                          ? {
-                              ...l,
-                              size: e.target.value,
-                            }
-                          : l,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label className="block">
-                <span className="text-[10px] text-muted-foreground">
-                  Chất liệu trên BG
-                </span>
-                <input
-                  className={inputCls}
-                  placeholder={
-                    line.product?.material ||
-                    line.customProduct?.material ||
-                    "VD: Gốm, Porcelain..."
-                  }
-                  value={
-                    line.material ??
-                    line.product?.material ??
-                    line.customProduct?.material ??
-                    ""
-                  }
-                  disabled={locked}
-                  onChange={(e) =>
-                    setLines((prev) =>
-                      prev.map((l) =>
-                        l.key === line.key
-                          ? {
-                              ...l,
-                              material: e.target.value,
-                            }
-                          : l,
-                      ),
-                    )
-                  }
-                />
-              </label>
-            </div>
-          ) : null}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <label className="block">
-              <div className="flex justify-between items-baseline mb-1">
-                <span className="text-[10px] text-muted-foreground">
-                  SL (m²)
-                </span>
-                {line.product?.packing_m2 ? (
-                  <span 
-                    className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/60" 
-                    title={`Quy cách: ${line.product.packing_m2} m²/thùng${line.product.packing_pcs ? ` - ${line.product.packing_pcs} viên` : ''}`}
-                  >
-                    {line.quantity_m2 
-                      ? `~ ${+(line.quantity_m2 / line.product.packing_m2).toFixed(2)} thùng${line.product.packing_pcs ? ` (${Math.round((line.quantity_m2 / line.product.packing_m2) * line.product.packing_pcs)} viên)` : ''}` 
-                      : `${line.product.packing_m2}m²/th`}
-                  </span>
-                ) : null}
-              </div>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="0"
-                className={inputCls}
-                value={line.quantity_raw}
-                disabled={locked}
-                onChange={(e) => {
-                  const raw = sanitizeQuantityInput(
-                    e.target.value,
-                  );
-                  setLines((prev) =>
-                    prev.map((l) =>
-                      l.key === line.key
-                        ? {
-                            ...l,
-                            quantity_raw: raw,
-                            quantity_m2: parseQuantityInput(raw),
-                          }
-                        : l,
-                    ),
-                  );
-                }}
-                onBlur={() => {
-                  setLines((prev) =>
-                    prev.map((l) => {
-                      if (l.key !== line.key) return l;
-                      const qty = parseQuantityInput(
-                        l.quantity_raw,
-                      );
-                      return {
-                        ...l,
-                        quantity_raw:
-                          l.quantity_raw.trim() === ""
-                            ? ""
-                            : String(qty),
-                        quantity_m2: qty,
-                      };
-                    }),
-                  );
-                }}
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] text-muted-foreground">
-                CK %
-              </span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                step={0.5}
-                className={inputCls}
-                value={
-                  line.discount_pct === 0 ? "" : line.discount_pct
-                }
-                disabled={locked}
-                onChange={(e) => {
-                  const pct = Math.max(
-                    0,
-                    Math.min(100, Number(e.target.value) || 0),
-                  );
-                  setLines((prev) =>
-                    prev.map((l) => {
-                      if (l.key !== line.key) return l;
-                      if (!l.product) {
-                        return { ...l, discount_pct: pct };
-                      }
-                      const unit = calcUnit(l.product, "custom", pct);
-                      return {
-                        ...l,
-                        discount_pct: pct,
-                        unit_price: unit,
-                      };
-                    }),
-                  );
-                }}
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] text-muted-foreground">
-                Giá bán (đ/m²)
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                className={cn(inputCls, "tabular-nums text-right")}
-                placeholder="0"
-                value={
-                  line.unit_price
-                    ? Number(line.unit_price).toLocaleString("vi-VN")
-                    : ""
-                }
-                disabled={locked}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "");
-                  const unitPrice = digits === "" ? 0 : Number(digits) || 0;
-                  setLines((prev) =>
-                    prev.map((l) => {
-                      if (l.key !== line.key) return l;
-                      if (l.customProduct && !l.product) {
-                        return {
-                          ...l,
-                          unit_price: unitPrice,
-                          discount_pct: 0,
-                          customProduct: {
-                            ...l.customProduct,
-                            retailPrice: String(unitPrice),
-                          },
-                        };
-                      }
-                      const retail = l.product?.retail_price ?? 0;
-                      return {
-                        ...l,
-                        unit_price: unitPrice,
-                        discount_pct: effectiveDiscountPct(
-                          retail,
-                          unitPrice,
-                        ),
-                      };
-                    }),
-                  );
-                }}
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] text-muted-foreground">
-                Thành tiền
-              </span>
-              <div
-                className={`${inputCls} bg-surface-strong/40 font-medium tabular-nums`}
-              >
-                {line.quantity_raw.trim() !== ""
-                  ? formatVND(lineTotal)
-                  : "—"}
-              </div>
-            </label>
-          </div>
-          {line.product ? (
-            <p className="text-[10px] text-muted-foreground truncate">
-              DB: {line.product.code}
-              {line.size || line.product.size
-                ? ` · ${line.size || line.product.size}`
-                : ""}
-              {" · lẻ "}
-              {formatVND(line.product.retail_price)}/m²
-            </p>
-          ) : line.customProduct ? (
-            <p className="text-[10px] text-muted-foreground truncate">
-              Ngoài catalog: {line.customProduct.code || "KDM"}
-              {line.size || line.customProduct.size
-                ? ` · ${line.size || line.customProduct.size}`
-                : ""}
-              {line.customProduct.surface
-                ? ` · ${line.customProduct.surface}`
-                : ""}
-              {line.unit_price || line.customProduct.retailPrice
-                ? ` · lẻ ${formatVND(Number(String(line.unit_price || line.customProduct.retailPrice).replace(/\D/g, "")) || 0)}`
-                : ""}
-            </p>
-          ) : null}
-          {profitInfo ? (
-            <p
-              className={cn(
-                "text-[11px] font-medium tabular-nums truncate",
-                profitInfo.amount > 0
-                  ? "text-emerald-700"
-                  : profitInfo.amount < 0
-                    ? "text-red-600"
-                    : "text-muted-foreground",
-              )}
-            >
-              Lợi nhuận dự kiến:{" "}
-              {formatVND(profitInfo.amount)} (
-              {profitInfo.pct.toFixed(1)}%)
-            </p>
-          ) : (
-            <p className="text-[11px] text-muted-foreground/60 italic truncate">
-              Không có giá vốn
-            </p>
-          )}
-        </>
-      ) : (
-        <p className="text-[11px] text-muted-foreground pl-9">
-          Chọn sản phẩm từ danh sách để nhập số lượng và giá.
-        </p>
-      ))}
-    </div>
-  );
-}
 
 type Props = {
   open: boolean;
@@ -798,22 +189,6 @@ export function NewQuoteDialog({
   const [justSaved, setJustSaved] = useState(false);
   const savedTimer = useRef<number | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setLines((current) => {
-      const oldIndex = current.findIndex((l) => l.key === active.id);
-      const newIndex = current.findIndex((l) => l.key === over.id);
-      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return current;
-      return arrayMove(current, oldIndex, newIndex);
-    });
-  }
   useEffect(() => {
     if (!open) return;
     setConfirmDelete(false);
@@ -854,12 +229,6 @@ export function NewQuoteDialog({
             const isCustom = item.product_id == null;
             const product =
               item.product_id != null ? productMap.get(item.product_id) ?? null : null;
-            const numUnitPrice = Math.round(
-              Number(item.unit_price) || Number(item.retail_price) || 0,
-            );
-            const numRetailPrice = Math.round(
-              Number(item.retail_price) || numUnitPrice || 0,
-            );
             const customProduct: CustomProduct | null = isCustom
               ? {
                   code: item.product_code || "",
@@ -867,7 +236,7 @@ export function NewQuoteDialog({
                   size: item.size || "",
                   surface: item.surface || "",
                   material: item.material || "",
-                  retailPrice: String(numRetailPrice || ""),
+                  retailPrice: String(item.retail_price || item.unit_price || ""),
                   imagePath: item.image_path || "",
                   imageDataUrl: null,
                   imageName: "",
@@ -886,7 +255,7 @@ export function NewQuoteDialog({
               quantity_raw:
                 item.quantity_m2 == null ? "" : String(item.quantity_m2),
               discount_pct: item.discount_pct,
-              unit_price: numUnitPrice,
+              unit_price: item.unit_price,
               area: item.area,
             };
           });
@@ -1081,11 +450,6 @@ export function NewQuoteDialog({
                 // Giữ nguyên nếu upload ảnh thất bại
               }
             }
-            const customPrice = Math.round(
-              Number(l.unit_price) ||
-                Number(String(l.customProduct.retailPrice || "").replace(/\D/g, "")) ||
-                0,
-            );
             return {
               product_id: null,
               product_code:
@@ -1096,13 +460,17 @@ export function NewQuoteDialog({
                 "Sản phẩm ngoài danh mục",
               quantity_m2: l.quantity_m2,
               discount_pct: l.discount_pct,
-              unit_price: customPrice,
+              unit_price: Math.round(Number(l.unit_price) || 0),
               area: l.area,
               size: (l.size ?? l.customProduct.size).trim(),
               surface: l.customProduct.surface.trim(),
               material: (l.material ?? l.customProduct.material ?? "").trim(),
               image_path: customProductImagePath,
-              retail_price: customPrice,
+              retail_price: Math.round(
+                Number(l.customProduct.retailPrice.replace(/\D/g, "")) ||
+                  l.unit_price ||
+                  0,
+              ),
               sort_order: index,
             };
           }
@@ -1559,35 +927,500 @@ export function NewQuoteDialog({
               </div>
             </div>
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={lines.map((l) => l.key)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-2">
-                  {lines.map((line, index) => (
-                    <SortableQuoteLine
-                      key={line.key}
-                      line={line}
-                      index={index}
-                      totalLines={lines.length}
-                      locked={locked}
-                      activeLineKey={activeLineKey}
-                      setActiveLineKey={setActiveLineKey}
-                      setProductSearch={setProductSearch}
-                      setManualProductKey={setManualProductKey}
-                      editQuoteLabels={editQuoteLabels}
-                      pricesIncludeVat={pricesIncludeVat}
-                      setLines={setLines}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+            <div className="space-y-2">
+              {lines.map((line, index) => {
+                const unit = line.unit_price || 0;
+                const lineTotal = Math.round(unit * (line.quantity_m2 || 0));
+                const isPickerOpen = activeLineKey === line.key;
+                const profitInfo = estimateLineProfitInfo(
+                  unit,
+                  line.quantity_m2 || 0,
+                  line.product?.trade_price,
+                  pricesIncludeVat,
+                );
+                return (
+                  <div
+                    key={line.key}
+                    className="rounded-lg ring-1 ring-black/8 bg-card p-2.5 sm:p-3 space-y-2"
+                  >
+                    {/* Row header: # + thumb + product + khu vực + delete */}
+                    <div className="flex gap-2 items-center">
+                      <span
+                        className="size-7 flex-shrink-0 grid place-items-center rounded-md bg-surface-strong text-[11px] font-semibold text-muted-foreground tabular-nums"
+                        title={`Dòng ${index + 1}`}
+                      >
+                        {index + 1}
+                      </span>
+                      <QuoteThumb
+                        src={
+                          line.customProduct?.imagePath ||
+                          line.customProduct?.imageDataUrl ||
+                          line.product?.image_path
+                        }
+                        alt={line.product?.code ?? line.customProduct?.code ?? ""}
+                        className="size-10"
+                      />
+                      <div className="flex-1 min-w-0">
+                        {line.customProduct ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={locked}
+                              onClick={() => {
+                                if (locked) return;
+                                setManualProductKey(line.key);
+                              }}
+                              className={`${inputCls} text-left flex items-center justify-between gap-2 flex-1 min-w-0`}
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-200/80 shrink-0">
+                                  Ngoài catalog
+                                </span>
+                                <span className="truncate text-sm font-medium text-foreground">
+                                  {line.product_name || line.customProduct.name}
+                                </span>
+                              </div>
+                              <Pencil className="size-3.5 flex-shrink-0 text-muted-foreground hover:text-foreground" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={locked}
+                              className={`${inputCls} text-left flex items-center justify-between gap-2 flex-1 min-w-0 ${
+                                !line.product
+                                  ? "text-muted-foreground"
+                                  : "text-foreground"
+                              }`}
+                              onClick={() => {
+                                if (locked) return;
+                                setActiveLineKey(isPickerOpen ? null : line.key);
+                                setProductSearch("");
+                              }}
+                            >
+                              <span className="truncate text-sm">
+                                {line.product
+                                  ? `${line.product_code || line.product.code} — ${line.product_name || line.product.name}`
+                                  : "Chọn sản phẩm"}
+                              </span>
+                              <ChevronDown
+                                className={`size-3.5 flex-shrink-0 text-muted-foreground transition-transform ${
+                                  isPickerOpen ? "rotate-180" : ""
+                                }`}
+                              />
+                            </button>
+                            {!locked && !line.product ? (
+                              <button
+                                type="button"
+                                onClick={() => setManualProductKey(line.key)}
+                                title="Thêm mã gạch ngoài catalog"
+                                aria-label="Thêm mã gạch ngoài catalog"
+                                className="size-8 shrink-0 grid place-items-center rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition-colors"
+                              >
+                                <Plus className="size-4" />
+                              </button>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="w-24 sm:w-32 flex-shrink-0">
+                        <input
+                          className={`${inputCls} text-xs`}
+                          placeholder="Khu vực"
+                          value={line.area || ""}
+                          disabled={locked}
+                          onChange={(e) =>
+                            setLines((prev) =>
+                              prev.map((l) =>
+                                l.key === line.key
+                                  ? { ...l, area: e.target.value }
+                                  : l,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        title={line.collapsed ? "Mở rộng dòng" : "Thu gọn dòng"}
+                        aria-label={
+                          line.collapsed
+                            ? `Mở rộng dòng ${index + 1}`
+                            : `Thu gọn dòng ${index + 1}`
+                        }
+                        aria-expanded={!line.collapsed}
+                        onClick={() =>
+                          setLines((prev) =>
+                            prev.map((item) =>
+                              item.key === line.key
+                                ? { ...item, collapsed: !item.collapsed }
+                                : item,
+                            ),
+                          )
+                        }
+                        className="size-8 flex-shrink-0 grid place-items-center rounded-md text-muted-foreground hover:bg-surface-strong hover:text-foreground"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            "size-3.5 transition-transform",
+                            line.collapsed && "-rotate-90",
+                          )}
+                        />
+                      </button>
+
+                      {!locked ? (
+                        <button
+                          type="button"
+                          title="Xóa dòng"
+                          onClick={() => {
+                            setLines((prev) =>
+                              prev.length === 1
+                                ? [emptyLine()]
+                                : prev.filter((l) => l.key !== line.key),
+                            );
+                            if (activeLineKey === line.key) {
+                              setActiveLineKey(null);
+                            }
+                          }}
+                          className="size-8 flex-shrink-0 grid place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {!line.collapsed && ((line.product || line.customProduct) ? (
+                      <>
+                        {editQuoteLabels ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Mã trên BG
+                              </span>
+                              <input
+                                className={inputCls}
+                                value={line.product_code || ""}
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? {
+                                            ...l,
+                                            product_code: e.target.value,
+                                          }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Tên trên BG
+                              </span>
+                              <input
+                                className={inputCls}
+                                value={line.product_name || ""}
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? {
+                                            ...l,
+                                            product_name: e.target.value,
+                                          }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Kích thước trên BG
+                              </span>
+                              <input
+                                className={inputCls}
+                                placeholder={
+                                  line.product?.size ||
+                                  line.customProduct?.size ||
+                                  "VD: 60x60 cm"
+                                }
+                                value={
+                                  line.size ??
+                                  line.product?.size ??
+                                  line.customProduct?.size ??
+                                  ""
+                                }
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? {
+                                            ...l,
+                                            size: e.target.value,
+                                          }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-muted-foreground">
+                                Chất liệu trên BG
+                              </span>
+                              <input
+                                className={inputCls}
+                                placeholder={
+                                  line.product?.material ||
+                                  line.customProduct?.material ||
+                                  "VD: Gốm, Porcelain..."
+                                }
+                                value={
+                                  line.material ??
+                                  line.product?.material ??
+                                  line.customProduct?.material ??
+                                  ""
+                                }
+                                disabled={locked}
+                                onChange={(e) =>
+                                  setLines((prev) =>
+                                    prev.map((l) =>
+                                      l.key === line.key
+                                        ? {
+                                            ...l,
+                                            material: e.target.value,
+                                          }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                          </div>
+                        ) : null}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <label className="block">
+                            <div className="flex justify-between items-baseline mb-1">
+                              <span className="text-[10px] text-muted-foreground">
+                                SL (m²)
+                              </span>
+                              {line.product?.packing_m2 ? (
+                                <span 
+                                  className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/60" 
+                                  title={`Quy cách: ${line.product.packing_m2} m²/thùng${line.product.packing_pcs ? ` - ${line.product.packing_pcs} viên` : ''}`}
+                                >
+                                  {line.quantity_m2 
+                                    ? `~ ${+(line.quantity_m2 / line.product.packing_m2).toFixed(2)} thùng${line.product.packing_pcs ? ` (${Math.round((line.quantity_m2 / line.product.packing_m2) * line.product.packing_pcs)} viên)` : ''}` 
+                                    : `${line.product.packing_m2}m²/th`}
+                                </span>
+                              ) : null}
+                            </div>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0"
+                              className={inputCls}
+                              value={line.quantity_raw}
+                              disabled={locked}
+                              onChange={(e) => {
+                                const raw = sanitizeQuantityInput(
+                                  e.target.value,
+                                );
+                                setLines((prev) =>
+                                  prev.map((l) =>
+                                    l.key === line.key
+                                      ? {
+                                          ...l,
+                                          quantity_raw: raw,
+                                          quantity_m2: parseQuantityInput(raw),
+                                        }
+                                      : l,
+                                  ),
+                                );
+                              }}
+                              onBlur={() => {
+                                setLines((prev) =>
+                                  prev.map((l) => {
+                                    if (l.key !== line.key) return l;
+                                    const qty = parseQuantityInput(
+                                      l.quantity_raw,
+                                    );
+                                    return {
+                                      ...l,
+                                      quantity_raw:
+                                        l.quantity_raw.trim() === ""
+                                          ? ""
+                                          : String(qty),
+                                      quantity_m2: qty,
+                                    };
+                                  }),
+                                );
+                              }}
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[10px] text-muted-foreground">
+                              CK %
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              className={inputCls}
+                              value={line.discount_pct || 0}
+                              disabled={
+                                locked || discountType !== "custom"
+                              }
+                              onChange={(e) => {
+                                const pct = Number(e.target.value) || 0;
+                                setLines((prev) =>
+                                  prev.map((l) => {
+                                    if (l.key !== line.key) return l;
+                                    const unitPrice = l.product
+                                      ? calcUnit(l.product, "custom", pct)
+                                      : 0;
+                                    return {
+                                      ...l,
+                                      discount_pct: pct,
+                                      unit_price: unitPrice,
+                                    };
+                                  }),
+                                );
+                              }}
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[10px] text-muted-foreground">
+                              Giá bán (đ/m²)
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={10}
+                              inputMode="numeric"
+                              className={inputCls}
+                              value={line.unit_price || ""}
+                              disabled={locked}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                // step=10: spinner theo hàng chục; gõ tự do vẫn được
+                                const unitPrice =
+                                  raw === ""
+                                    ? 0
+                                    : Math.max(0, Math.round(Number(raw) || 0));
+                                setLines((prev) =>
+                                  prev.map((l) => {
+                                    if (l.key !== line.key) return l;
+                                    const retail =
+                                      l.product?.retail_price ?? 0;
+                                    return {
+                                      ...l,
+                                      unit_price: unitPrice,
+                                      discount_pct: effectiveDiscountPct(
+                                        retail,
+                                        unitPrice,
+                                      ),
+                                    };
+                                  }),
+                                );
+                              }}
+                              onBlur={() => {
+                                // Chuẩn hóa về bội số 10 khi rời ô
+                                setLines((prev) =>
+                                  prev.map((l) => {
+                                    if (l.key !== line.key) return l;
+                                    const unitPrice =
+                                      Math.round((l.unit_price || 0) / 10) * 10;
+                                    const retail =
+                                      l.product?.retail_price ?? 0;
+                                    return {
+                                      ...l,
+                                      unit_price: unitPrice,
+                                      discount_pct: effectiveDiscountPct(
+                                        retail,
+                                        unitPrice,
+                                      ),
+                                    };
+                                  }),
+                                );
+                              }}
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[10px] text-muted-foreground">
+                              Thành tiền
+                            </span>
+                            <div
+                              className={`${inputCls} bg-surface-strong/40 font-medium tabular-nums`}
+                            >
+                              {line.quantity_raw.trim() !== ""
+                                ? formatVND(lineTotal)
+                                : "—"}
+                            </div>
+                          </label>
+                        </div>
+                        {line.product ? (
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            DB: {line.product.code}
+                            {line.size || line.product.size
+                              ? ` · ${line.size || line.product.size}`
+                              : ""}
+                            {" · lẻ "}
+                            {formatVND(line.product.retail_price)}/m²
+                          </p>
+                        ) : line.customProduct ? (
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            Ngoài catalog: {line.customProduct.code || "KDM"}
+                            {line.size || line.customProduct.size
+                              ? ` · ${line.size || line.customProduct.size}`
+                              : ""}
+                            {line.customProduct.surface
+                              ? ` · ${line.customProduct.surface}`
+                              : ""}
+                            {line.customProduct.retailPrice
+                              ? ` · lẻ ${formatVND(Number(line.customProduct.retailPrice.replace(/\D/g, "")) || 0)}`
+                              : ""}
+                          </p>
+                        ) : null}
+                        {profitInfo ? (
+                          <p
+                            className={cn(
+                              "text-[11px] font-medium tabular-nums truncate",
+                              profitInfo.amount > 0
+                                ? "text-emerald-700"
+                                : profitInfo.amount < 0
+                                  ? "text-red-600"
+                                  : "text-muted-foreground",
+                            )}
+                          >
+                            Lợi nhuận dự kiến:{" "}
+                            {formatVND(profitInfo.amount)} (
+                            {profitInfo.pct.toFixed(1)}%)
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground/70 truncate">
+                            Lợi nhuận dự kiến: — (chưa có giá vốn TP)
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground pl-9">
+                        Chọn sản phẩm từ danh sách để nhập số lượng và giá.
+                      </p>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <label className="block">
@@ -1748,33 +1581,20 @@ export function NewQuoteDialog({
         {manualProductKey ? (
           <ManualProductDialog
             open={Boolean(manualProductKey)}
-            value={(() => {
-              const targetLine = lines.find((l) => l.key === manualProductKey);
-              if (!targetLine?.customProduct) return null;
-              const priceDigits = String(
-                targetLine.unit_price ||
-                targetLine.customProduct.retailPrice ||
-                "",
-              ).replace(/\D/g, "");
-              return {
-                ...targetLine.customProduct,
-                retailPrice: priceDigits,
-              };
-            })()}
+            value={
+              lines.find((l) => l.key === manualProductKey)?.customProduct ?? null
+            }
             onClose={() => setManualProductKey(null)}
             onSave={(customProduct) => {
               setLines((prev) =>
                 prev.map((l) => {
                   if (l.key !== manualProductKey) return l;
                   const price =
-                    Number(String(customProduct.retailPrice || "").replace(/\D/g, "")) || 0;
+                    Number(customProduct.retailPrice.replace(/\D/g, "")) || 0;
                   return {
                     ...l,
                     product: null,
-                    customProduct: {
-                      ...customProduct,
-                      retailPrice: String(price),
-                    },
+                    customProduct,
                     product_code: customProduct.code.trim() || "KDM",
                     product_name:
                       customProduct.name.trim() || "Sản phẩm ngoài danh mục",
@@ -1812,3 +1632,6 @@ function emptyLine(): Line {
     area: "",
   };
 }
+
+const inputCls =
+  "w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground placeholder:text-muted-foreground/70 disabled:opacity-60";

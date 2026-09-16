@@ -277,7 +277,7 @@ export function ManualProductDialog({
                   className={cn(inputClass, "mt-1 tabular-nums")}
                   value={
                     draft.retailPrice
-                      ? Number(String(draft.retailPrice).replace(/\D/g, "")).toLocaleString("vi-VN")
+                      ? Number(draft.retailPrice).toLocaleString("vi-VN")
                       : ""
                   }
                   onChange={(event) =>
@@ -309,8 +309,7 @@ export function ManualProductDialog({
                 toast.error("Vui lòng nhập tên sản phẩm ngoài danh mục");
                 return;
               }
-              const cleanPrice = String(draft.retailPrice || "").replace(/\D/g, "");
-              onSave({ ...draft, name: draft.name.trim(), retailPrice: cleanPrice });
+              onSave({ ...draft, name: draft.name.trim() });
             }}
             className="h-9 px-4 rounded-lg bg-terracotta hover:opacity-90 text-primary-foreground text-xs font-medium shadow-xs"
           >
