@@ -605,10 +605,9 @@ function SortableQuoteLine({
                   setLines((prev) =>
                     prev.map((l) => {
                       if (l.key !== line.key) return l;
-                      if (!l.product) {
-                        return { ...l, discount_pct: 0 };
-                      }
-                      const unitPrice = calcUnit(l.product, "custom", pct);
+                      const unitPrice = l.product
+                        ? calcUnit(l.product, "custom", pct)
+                        : (l.unit_price || 0);
                       return {
                         ...l,
                         discount_pct: pct,
