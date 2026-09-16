@@ -37,6 +37,9 @@ type Props = {
   /** Prefill danh mục khi đang filter 1 nhóm SP */
   defaultCategory?: string;
   canManageOptions?: boolean;
+  /** Khi true, bỏ router.invalidate() khi đóng dialog — dùng khi nested trong dialog khác
+   *  để tránh reload route loaders trong khi popup cha vẫn đang mở (AGENTS.md rule). */
+  skipRouteInvalidate?: boolean;
   /** Được gọi sau khi tạo SP thành công và người dùng đóng dialog — kèm sản phẩm mới */
   onCreated?: (product: Product) => void;
 };
@@ -71,6 +74,7 @@ export function NewProductDialog({
   onOpenChange,
   defaultCategory = "",
   canManageOptions = false,
+  skipRouteInvalidate = false,
   onCreated,
 }: Props) {
   const router = useRouter();
@@ -145,7 +149,7 @@ export function NewProductDialog({
   async function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && savedSinceOpenRef.current && createdProductRef.current) {
       onCreated?.(createdProductRef.current);
-      await router.invalidate();
+      if (!skipRouteInvalidate) await router.invalidate();
     }
     onOpenChange(nextOpen);
   }
@@ -170,6 +174,7 @@ export function NewProductDialog({
     setPendingInternalCodeDelete(null);
     setCreatedId(null);
     createdProductRef.current = null;
+    savedSinceOpenRef.current = false;
   }
 
   async function handleSubmit(e: React.FormEvent) {

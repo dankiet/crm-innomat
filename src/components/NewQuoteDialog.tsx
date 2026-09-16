@@ -1513,6 +1513,7 @@ export function NewQuoteDialog({
       open={createProductOpen}
       onOpenChange={setCreateProductOpen}
       canManageOptions={false}
+      skipRouteInvalidate={true}
       onCreated={(product) => {
         setProducts((prev) =>
           prev.some((p) => p.id === product.id) ? prev : [...prev, product],
