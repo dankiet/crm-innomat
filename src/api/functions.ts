@@ -72,14 +72,21 @@ export const authGoogleStart = createServerFn({ method: "POST" })
     const { getRequestHeader } = await import("@tanstack/react-start/server");
     const host = getRequestHeader("host") || "";
     const proto =
-      getRequestHeader("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+      getRequestHeader("x-forwarded-proto") ||
+      (host.includes("localhost") ? "http" : "https");
     const headerOrigin = host ? `${proto}://${host}` : "";
     const origin = data?.origin || headerOrigin || "";
     return getGoogleOAuthUrl(data?.returnTo || "/", origin);
   });
 
 export const authGoogleCallback = createServerFn({ method: "POST" })
-  .inputValidator((data: { code?: string; accessToken?: string; returnTo?: string }) => data)
+  .inputValidator(
+    (data: {
+      code?: string;
+      accessToken?: string;
+      returnTo?: string;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     const { handleSupabaseCallback } = await import("@/db/auth-public.server");
     const { getRequestHeader } = await import("@tanstack/react-start/server");
@@ -517,8 +524,11 @@ export const setPrimaryProductImageFn = createServerFn({ method: "POST" })
 
 export const setProductImageKindFn = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: { productId: number; imageId: number; kind: import("@/lib/types").ProductImageKind }) =>
-      data,
+    (data: {
+      productId: number;
+      imageId: number;
+      kind: import("@/lib/types").ProductImageKind;
+    }) => data,
   )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
@@ -547,7 +557,11 @@ export const fetchProductImageRoomTagsFn = createServerFn({ method: "GET" })
 
 export const setProductImageRoomTagsFn = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: { productId: number; imageId: number; roomSlugs: ImageRoomTagSlug[] }) => data,
+    (data: {
+      productId: number;
+      imageId: number;
+      roomSlugs: ImageRoomTagSlug[];
+    }) => data,
   )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
@@ -1076,7 +1090,13 @@ export const deleteCustomerFn = createServerFn({ method: "POST" })
 // ─── Quotes ─────────────────────────────────────────────────
 
 export const fetchQuotes = createServerFn({ method: "GET" })
-  .inputValidator((data?: { search?: string; statuses?: QuoteStatus[]; limit?: number }) => data)
+  .inputValidator(
+    (data?: {
+      search?: string;
+      statuses?: QuoteStatus[];
+      limit?: number;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     const { requireUser, ownerFilter } = await import("@/db/auth.server");
     const me = await requireUser();
@@ -1225,7 +1245,13 @@ export const deleteQuoteFn = createServerFn({ method: "POST" })
 // ─── Orders ─────────────────────────────────────────────────
 
 export const fetchOrders = createServerFn({ method: "GET" })
-  .inputValidator((data?: { search?: string; statuses?: OrderStatus[]; limit?: number }) => data)
+  .inputValidator(
+    (data?: {
+      search?: string;
+      statuses?: OrderStatus[];
+      limit?: number;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     const { requireUser, ownerFilter } = await import("@/db/auth.server");
     const me = await requireUser();
@@ -1718,7 +1744,12 @@ export const fetchFlatMediaImagesFn = createServerFn({ method: "GET" })
   });
 
 export const bulkSetProductImageKindFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { imageIds: number[]; kind: ProductImageKind }) => data)
+  .inputValidator(
+    (data: {
+      imageIds: number[];
+      kind: ProductImageKind;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
@@ -1736,7 +1767,12 @@ export const bulkSetProductImageKindFn = createServerFn({ method: "POST" })
   });
 
 export const setImageRoomTagsDirectFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { imageId: number; roomSlugs: ImageRoomTagSlug[] }) => data)
+  .inputValidator(
+    (data: {
+      imageId: number;
+      roomSlugs: ImageRoomTagSlug[];
+    }) => data,
+  )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();

@@ -18,11 +18,12 @@ async function imageRefToDataUrl(ref: string): Promise<string> {
   if (!ref) return "";
   const buf = await readImageBytes(ref);
   if (!buf) return "";
-  const mime = ref.match(/\.png$/i)
-    ? "image/png"
-    : ref.match(/\.webp$/i)
-      ? "image/webp"
-      : "image/jpeg";
+  const mime =
+    ref.match(/\.png$/i)
+      ? "image/png"
+      : ref.match(/\.webp$/i)
+        ? "image/webp"
+        : "image/jpeg";
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
@@ -57,8 +58,7 @@ export async function exportQuoteToHtml(
   const db = getDb();
 
   // ── Load quote ──────────────────────────────────────────────
-  const quote = (await db
-    .prepare(
+  const quote = (await db.prepare(
       `SELECT q.*, c.name AS customer_name, c.phone AS customer_phone,
               c.company AS customer_company, c.short_name AS customer_short_name, c.region AS customer_region,
               u.display_name AS owner_name, u.phone AS owner_phone
@@ -89,13 +89,11 @@ export async function exportQuoteToHtml(
   if (!quote) throw new Error("Không tìm thấy báo giá");
 
   // 1 nguồn sự thật: mã BG trong DB (QT-YYMMDD-INM-CODE). BG cũ fallback sanitize code.
-  const generatedFilename =
-    String(quote.code || "QT")
-      .replace(/[\\/:*?"<>|]+/g, "-")
-      .trim() || "QT";
+  const generatedFilename = String(quote.code || "QT")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .trim() || "QT";
 
-  const items = (await db
-    .prepare(
+  const items = (await db.prepare(
       `SELECT qi.id, qi.product_code, qi.product_name, qi.size, qi.quantity_m2,
        qi.retail_price, qi.discount_pct, qi.unit_price, qi.area, qi.line_total,
        p.internal_code, p.packing_pcs, p.packing_m2, p.note as p_note,
@@ -136,12 +134,15 @@ export async function exportQuoteToHtml(
 
   const includeVat = Boolean(quote.prices_include_vat);
   const shippingFeeInput = Number(quote.shipping_fee) || 0;
-  const shippingFeePreVat =
-    includeVat && !hideVat ? shippingFeeInput / (1 + VAT_RATE) : shippingFeeInput;
+  const shippingFeePreVat = (includeVat && !hideVat)
+    ? shippingFeeInput / (1 + VAT_RATE)
+    : shippingFeeInput;
 
-  // Pre-VAT unit prices and subtotals, plus image base64 (async, giới hạn concurrency)
+// Pre-VAT unit prices and subtotals, plus image base64 (async, giới hạn concurrency)
   const unitRows = items.map((item) => {
-    const unitPreVat = includeVat && !hideVat ? item.unit_price / (1 + VAT_RATE) : item.unit_price;
+    const unitPreVat = (includeVat && !hideVat)
+      ? item.unit_price / (1 + VAT_RATE)
+      : item.unit_price;
     const subtotal = unitPreVat * item.quantity_m2;
     const thung = Number(item.packing) > 0 ? `${Number(item.packing)} thùng` : "";
     const numThung = item.packing_m2 ? (item.quantity_m2 / item.packing_m2).toFixed(1) : "";
@@ -149,7 +150,9 @@ export async function exportQuoteToHtml(
     return { ...item, unitPreVat, subtotal, finalNote };
   });
 
-  const imageDataUrls = await mapLimit(unitRows, 6, (r) => imageRefToDataUrl(r.image_path));
+  const imageDataUrls = await mapLimit(unitRows, 6, (r) =>
+    imageRefToDataUrl(r.image_path),
+  );
   const rows = unitRows.map((item, i) => ({
     ...item,
     imgBase64: imageDataUrls[i] ?? "",
@@ -378,10 +381,7 @@ export async function exportQuoteToHtml(
         <td class="center bold">${vnd(vatBase)}</td>
         <td colspan="${trailingColumnCount}"></td>
       </tr>
-      ${
-        hideVat
-          ? ""
-          : `
+      ${hideVat ? "" : `
       <tr class="totals-row">
         <td colspan="9" class="center bold">THUẾ VAT (8%)</td>
         <td class="center bold">${vnd(vatAmount)}</td>
@@ -391,8 +391,7 @@ export async function exportQuoteToHtml(
         <td colspan="9" class="center bold">TỔNG THANH TOÁN</td>
         <td class="center bold">${vnd(grandTotal)}</td>
         <td colspan="${trailingColumnCount}"></td>
-      </tr>`
-      }
+      </tr>`}
     </tbody>
   </table>
   <div class="vat-note">${vatNote}</div>
@@ -405,10 +404,7 @@ export async function exportQuoteToHtml(
       <h5>1. Phương thức thanh toán:</h5>
       ${
         paymentTerms
-          ? paymentTerms
-              .split("\n")
-              .map((line) => `<p class="dash">${line}</p>`)
-              .join("\n      ")
+          ? paymentTerms.split('\n').map(line => `<p class="dash">${line}</p>`).join('\n      ')
           : `<p class="dash">Tạm ứng 40% giá trị đơn hàng.</p>
              <p class="dash">Thanh toán số tiền còn lại trong vòng 10 ngày kể từ ngày nhận đủ hàng.</p>`
       }
@@ -428,10 +424,7 @@ export async function exportQuoteToHtml(
       <h5>3. Thời gian giao hàng:</h5>
       ${
         deliveryTerms
-          ? deliveryTerms
-              .split("\n")
-              .map((line) => `<p class="dash">${line}</p>`)
-              .join("\n      ")
+          ? deliveryTerms.split('\n').map(line => `<p class="dash">${line}</p>`).join('\n      ')
           : `<p class="dash">Trong vòng 3-5 ngày kể từ ngày xác nhận đặt hàng và tạm ứng.</p>`
       }
     </div>
@@ -490,3 +483,5 @@ export async function exportQuoteToHtml(
     mimeType: "text/html; charset=utf-8",
   };
 }
+
+

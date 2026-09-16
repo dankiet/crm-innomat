@@ -81,7 +81,9 @@ export function NewProductDialog({
   const [saving, setSaving] = useState(false);
   const [internalCodes, setInternalCodes] = useState<string[]>([]);
   const [newInternalCode, setNewInternalCode] = useState("");
-  const [pendingInternalCodeDelete, setPendingInternalCodeDelete] = useState<string | null>(null);
+  const [pendingInternalCodeDelete, setPendingInternalCodeDelete] = useState<string | null>(
+    null,
+  );
   const savedSinceOpenRef = useRef(false);
   const [createdId, setCreatedId] = useState<number | null>(null);
   const createdProductRef = useRef<Product | null>(null);
@@ -282,8 +284,8 @@ export function NewProductDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           {createdId ? (
             <p className="rounded-lg bg-emerald-50 text-emerald-800 text-xs px-3 py-2 ring-1 ring-emerald-200/80">
-              Đã tạo thành công (#{createdId}). Bấm «Tạo sản phẩm khác» để nhập tiếp, hoặc «Đóng» để
-              làm mới danh sách. Ảnh có thể thêm sau bằng Sửa hình trên thẻ SP.
+              Đã tạo thành công (#{createdId}). Bấm «Tạo sản phẩm khác» để nhập tiếp, hoặc «Đóng»
+              để làm mới danh sách. Ảnh có thể thêm sau bằng Sửa hình trên thẻ SP.
             </p>
           ) : null}
 
@@ -438,9 +440,7 @@ export function NewProductDialog({
                 <ProductSuggestionField
                   value={form.texture}
                   onChange={(v) => setForm((f) => ({ ...f, texture: v }))}
-                  options={Array.from(
-                    new Set([...PRODUCT_TEXTURES, ...(fieldOptions.texture || [])]),
-                  )}
+                  options={Array.from(new Set([...PRODUCT_TEXTURES, ...(fieldOptions.texture || [])]))}
                   placeholder="— Chọn hiệu ứng vân —"
                   label="hiệu ứng vân"
                   canManageOptions={canManageOptions}
