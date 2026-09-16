@@ -596,28 +596,24 @@ function SortableQuoteLine({
                 type="number"
                 min={0}
                 max={100}
-                step={0.5}
+                step={0.01}
                 className={inputCls}
-                value={
-                  line.discount_pct === 0 ? "" : line.discount_pct
+                value={line.discount_pct || 0}
+                disabled={
+                  locked || discountType !== "custom" || Boolean(!line.product)
                 }
-                disabled={locked}
                 onChange={(e) => {
-                  const pct = Math.max(
-                    0,
-                    Math.min(100, Number(e.target.value) || 0),
-                  );
+                  const pct = Number(e.target.value) || 0;
                   setLines((prev) =>
                     prev.map((l) => {
                       if (l.key !== line.key) return l;
-                      if (!l.product) {
-                        return { ...l, discount_pct: pct };
-                      }
-                      const unit = calcUnit(l.product, "custom", pct);
+                      const unitPrice = l.product
+                        ? calcUnit(l.product, "custom", pct)
+                        : (l.unit_price || 0);
                       return {
                         ...l,
                         discount_pct: pct,
-                        unit_price: unit,
+                        unit_price: unitPrice,
                       };
                     }),
                   );
