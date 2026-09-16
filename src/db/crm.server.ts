@@ -185,7 +185,9 @@ export async function listProductFieldValues(
   const params = category && category !== "all" ? [category] : [];
   return (
     (await db
-      .prepare(`SELECT DISTINCT ${field} AS v FROM products WHERE ${field} != ''${where} ORDER BY ${field}`)
+      .prepare(
+        `SELECT DISTINCT ${field} AS v FROM products WHERE ${field} != ''${where} ORDER BY ${field}`,
+      )
       .all<{ v: string }>(...params)) as { v: string }[]
   ).map((r) => r.v);
 }
@@ -326,9 +328,7 @@ async function loadProductImageRoomTags(
   return tagsByImage;
 }
 
-async function attachProductImageRoomTags(
-  rows: ProductImageRow[],
-): Promise<ProductImageRow[]> {
+async function attachProductImageRoomTags(rows: ProductImageRow[]): Promise<ProductImageRow[]> {
   const tagsByImage = await loadProductImageRoomTags(rows.map((row) => row.id));
   return rows.map((row) => ({
     ...row,
@@ -344,9 +344,7 @@ function normalizeRoomSlugs(roomSlugs: ImageRoomTagSlug[]): ImageRoomTagSlug[] {
   return unique;
 }
 
-export async function listProductImageRoomTags(
-  imageId: number,
-): Promise<ProductImageRoomTag[]> {
+export async function listProductImageRoomTags(imageId: number): Promise<ProductImageRoomTag[]> {
   const row = (await getDb()
     .prepare("SELECT * FROM product_images WHERE id = ?")
     .get<ProductImageRow>(imageId)) as ProductImageRow | undefined;
@@ -364,8 +362,7 @@ export async function setProductImageRoomTags(
   const row = (await db
     .prepare("SELECT id, kind FROM product_images WHERE id = ? AND product_id = ?")
     .get<{ id: number; kind: ProductImageKind }>(imageId, productId)) as
-    | { id: number; kind: ProductImageKind }
-    | undefined;
+    { id: number; kind: ProductImageKind } | undefined;
   if (!row) throw new Error("Không tìm thấy ảnh của sản phẩm này");
   const slugs = normalizeRoomSlugs(roomSlugs);
   if (slugs.length > 0 && row.kind !== "concept") {
@@ -373,9 +370,7 @@ export async function setProductImageRoomTags(
   }
   const now = nowLocal();
   await db.transaction(async (tx) => {
-    await tx
-      .prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?")
-      .run(imageId);
+    await tx.prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?").run(imageId);
     for (const roomSlug of slugs) {
       await tx
         .prepare(
@@ -539,7 +534,8 @@ export async function setProductImageKind(
   const db = getDb();
   const row = (await db
     .prepare("SELECT id, path FROM product_images WHERE id = ? AND product_id = ?")
-    .get<{ id: number; path: string }>(imageId, productId)) as { id: number; path: string } | undefined;
+    .get<{ id: number; path: string }>(imageId, productId)) as
+    { id: number; path: string } | undefined;
   if (!row) throw new Error("Không tìm thấy ảnh của sản phẩm này");
 
   const runTx = db.transaction(async (tx) => {
@@ -550,15 +546,11 @@ export async function setProductImageKind(
         )
         .run(productId, imageId);
       // Đồng bộ ảnh đại diện sản phẩm products.image_path và is_primary
-      await tx
-        .prepare("UPDATE products SET image_path = ? WHERE id = ?")
-        .run(row.path, productId);
+      await tx.prepare("UPDATE products SET image_path = ? WHERE id = ?").run(row.path, productId);
       await tx
         .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ? AND id <> ?")
         .run(productId, imageId);
-      await tx
-        .prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?")
-        .run(imageId);
+      await tx.prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?").run(imageId);
     }
     await tx.prepare("UPDATE product_images SET kind = ? WHERE id = ?").run(kind, imageId);
     if (kind !== "concept") {
@@ -599,9 +591,7 @@ export async function deleteProductImage(imageId: number): Promise<{
     if (galleryRows.length) {
       const placeholders = galleryRows.map(() => "?").join(", ");
       await tx
-        .prepare(
-          `DELETE FROM gallery_collection_items WHERE id IN (${placeholders})`,
-        )
+        .prepare(`DELETE FROM gallery_collection_items WHERE id IN (${placeholders})`)
         .run(...galleryRows.map((g) => g.id));
       for (const collectionId of touchedCollectionIds) {
         const next = await tx
@@ -672,7 +662,10 @@ function clampListLimit(limit: number | undefined, fallback: number): number | n
 
 function likePattern(raw: string): string {
   // NFC để khớp dữ liệu đã lưu (DB lưu NFC); một số bàn phím gõ tiếng Việt cho ra NFD.
-  return `%${raw.normalize("NFC").trim().replace(/[%_\\]/g, "")}%`;
+  return `%${raw
+    .normalize("NFC")
+    .trim()
+    .replace(/[%_\\]/g, "")}%`;
 }
 
 /** ownerId = null → tất cả (admin); số → chỉ KH của sales đó */
@@ -1682,7 +1675,7 @@ async function listQuotesForCustomer(
        ORDER BY q.created_at DESC
        ${limit != null ? "LIMIT ?" : ""}`,
     )
-    .all<Quote>(...(limit != null ? [...params, limit] : params) as SqlValue[])) as Quote[];
+    .all<Quote>(...((limit != null ? [...params, limit] : params) as SqlValue[]))) as Quote[];
 }
 
 async function getQuoteItemsForQuotes(quoteIds: number[]): Promise<Map<number, QuoteItem[]>> {
@@ -2138,7 +2131,7 @@ async function listOrdersForCustomer(
        ORDER BY o.created_at DESC
        ${limit != null ? "LIMIT ?" : ""}`,
     )
-    .all<Order>(...(limit != null ? [...params, limit] : params) as SqlValue[])) as Order[];
+    .all<Order>(...((limit != null ? [...params, limit] : params) as SqlValue[]))) as Order[];
 }
 
 async function createOrder(input: {
@@ -2660,15 +2653,21 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       packing: String(input.packing ?? existing.packing ?? "").trim(),
       packing_m2:
         input.packing_m2 !== undefined
-          ? (input.packing_m2 != null && !Number.isNaN(Number(input.packing_m2)) ? Number(input.packing_m2) : null)
+          ? input.packing_m2 != null && !Number.isNaN(Number(input.packing_m2))
+            ? Number(input.packing_m2)
+            : null
           : existing.packing_m2,
       packing_pcs:
         input.packing_pcs !== undefined
-          ? (input.packing_pcs != null && !Number.isNaN(Number(input.packing_pcs)) ? Number(input.packing_pcs) : null)
+          ? input.packing_pcs != null && !Number.isNaN(Number(input.packing_pcs))
+            ? Number(input.packing_pcs)
+            : null
           : existing.packing_pcs,
       packing_kg:
         input.packing_kg !== undefined
-          ? (input.packing_kg != null && !Number.isNaN(Number(input.packing_kg)) ? Number(input.packing_kg) : null)
+          ? input.packing_kg != null && !Number.isNaN(Number(input.packing_kg))
+            ? Number(input.packing_kg)
+            : null
           : existing.packing_kg,
       retail_price: retail,
       trade_price: tradePrice,
@@ -2986,10 +2985,11 @@ export async function listFlatMediaImages(opts?: {
     GROUP BY rt.room_slug
   `;
 
-  const roomCountRows = (await db.prepare(roomCountsSql).all<{
-    room_slug: string;
-    count: number | string;
-  }>(...baseParams)) ?? [];
+  const roomCountRows =
+    (await db.prepare(roomCountsSql).all<{
+      room_slug: string;
+      count: number | string;
+    }>(...baseParams)) ?? [];
 
   const roomCounts: Record<string, number> = {};
   for (const r of roomCountRows) {
@@ -3108,7 +3108,9 @@ export async function bulkSetProductImageKind(
       // Lấy danh sách ảnh cùng product_id và path
       const placeholders = cleanIds.map(() => "?").join(", ");
       const rows = await tx
-        .prepare(`SELECT id, product_id, path FROM product_images WHERE id IN (${placeholders}) ORDER BY id ASC`)
+        .prepare(
+          `SELECT id, product_id, path FROM product_images WHERE id IN (${placeholders}) ORDER BY id ASC`,
+        )
         .all<{ id: number; product_id: number; path: string }>(...cleanIds);
 
       // Nếu cùng 1 SP có nhiều ảnh được chọn, lấy ảnh cuối cùng làm MAP
@@ -3120,10 +3122,14 @@ export async function bulkSetProductImageKind(
       for (const [productId, targetImg] of targetImageByProduct.entries()) {
         // Hạ các ảnh MAP cũ của SP này về normal
         await tx
-          .prepare("UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?")
+          .prepare(
+            "UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?",
+          )
           .run(productId, targetImg.id);
         // Set ảnh được chọn thành MAP
-        const res = await tx.prepare("UPDATE product_images SET kind = 'map' WHERE id = ?").run(targetImg.id);
+        const res = await tx
+          .prepare("UPDATE product_images SET kind = 'map' WHERE id = ?")
+          .run(targetImg.id);
         // Đồng bộ products.image_path và is_primary
         await tx
           .prepare("UPDATE products SET image_path = ? WHERE id = ?")
@@ -3131,9 +3137,7 @@ export async function bulkSetProductImageKind(
         await tx
           .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ? AND id <> ?")
           .run(productId, targetImg.id);
-        await tx
-          .prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?")
-          .run(targetImg.id);
+        await tx.prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?").run(targetImg.id);
         updated += Number(res.changes) || 0;
       }
     } else {
@@ -3166,9 +3170,9 @@ export async function setImageRoomTagsDirect(
   roomSlugs: ImageRoomTagSlug[],
 ): Promise<ProductImageRoomTag[]> {
   const db = getDb();
-  const row = (await db
+  const row = await db
     .prepare("SELECT id, kind, product_id FROM product_images WHERE id = ?")
-    .get<{ id: number; kind: ProductImageKind; product_id: number }>(imageId));
+    .get<{ id: number; kind: ProductImageKind; product_id: number }>(imageId);
   if (!row) throw new Error("Không tìm thấy ảnh này");
   const slugs = normalizeRoomSlugs(roomSlugs);
   const now = nowLocal();
@@ -3176,9 +3180,7 @@ export async function setImageRoomTagsDirect(
     if (slugs.length > 0 && row.kind !== "concept") {
       await tx.prepare("UPDATE product_images SET kind = 'concept' WHERE id = ?").run(imageId);
     }
-    await tx
-      .prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?")
-      .run(imageId);
+    await tx.prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?").run(imageId);
     for (const roomSlug of slugs) {
       await tx
         .prepare(
@@ -3213,7 +3215,9 @@ export async function bulkSetProductImageRoomTags(
     if (slugs.length > 0 && mode !== "remove") {
       const placeholders = cleanIds.map(() => "?").join(", ");
       await tx
-        .prepare(`UPDATE product_images SET kind = 'concept' WHERE id IN (${placeholders}) AND kind <> 'concept'`)
+        .prepare(
+          `UPDATE product_images SET kind = 'concept' WHERE id IN (${placeholders}) AND kind <> 'concept'`,
+        )
         .run(...cleanIds);
     }
 
@@ -3267,4 +3271,3 @@ export async function bulkSetProductImageRoomTags(
 
   return { updated };
 }
-
