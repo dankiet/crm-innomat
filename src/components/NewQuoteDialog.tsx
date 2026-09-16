@@ -599,9 +599,7 @@ function SortableQuoteLine({
                 step={0.01}
                 className={inputCls}
                 value={line.discount_pct || 0}
-                disabled={
-                  locked || discountType !== "custom" || Boolean(!line.product)
-                }
+                disabled={locked || discountType !== "custom"}
                 onChange={(e) => {
                   const pct = Number(e.target.value) || 0;
                   setLines((prev) =>
@@ -625,22 +623,51 @@ function SortableQuoteLine({
                 Giá bán (đ/m²)
               </span>
               <input
-                type="text"
+                type="number"
+                min={0}
+                step={10}
                 inputMode="numeric"
-                className={cn(inputCls, "tabular-nums text-right")}
-                placeholder="0"
-                value={
-                  line.unit_price
-                    ? Number(line.unit_price).toLocaleString("vi-VN")
-                    : ""
-                }
+                className={inputCls}
+                value={line.unit_price || ""}
                 disabled={locked}
                 onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "");
-                  const unitPrice = digits === "" ? 0 : Number(digits) || 0;
+                  const raw = e.target.value;
+                  const unitPrice =
+                    raw === ""
+                      ? 0
+                      : Math.max(0, Math.round(Number(raw) || 0));
                   setLines((prev) =>
                     prev.map((l) => {
                       if (l.key !== line.key) return l;
+                      if (l.customProduct && !l.product) {
+                        return {
+                          ...l,
+                          unit_price: unitPrice,
+                          discount_pct: 0,
+                          customProduct: {
+                            ...l.customProduct,
+                            retailPrice: String(unitPrice),
+                          },
+                        };
+                      }
+                      const retail = l.product?.retail_price ?? 0;
+                      return {
+                        ...l,
+                        unit_price: unitPrice,
+                        discount_pct: effectiveDiscountPct(
+                          retail,
+                          unitPrice,
+                        ),
+                      };
+                    }),
+                  );
+                }}
+                onBlur={() => {
+                  setLines((prev) =>
+                    prev.map((l) => {
+                      if (l.key !== line.key) return l;
+                      const unitPrice =
+                        Math.round((l.unit_price || 0) / 10) * 10;
                       if (l.customProduct && !l.product) {
                         return {
                           ...l,
