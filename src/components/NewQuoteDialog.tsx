@@ -1155,8 +1155,8 @@ export function NewQuoteDialog({
                         ) : null}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <label className="block">
-                            <div className="flex justify-between items-baseline mb-1">
-                              <span className="text-[10px] text-muted-foreground">
+                            <div className="flex items-baseline gap-1.5 mb-1 min-h-[15px]">
+                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                                 SL (m²)
                               </span>
                               {line.product ? (
@@ -1170,52 +1170,45 @@ export function NewQuoteDialog({
                                     Math.round(tiles * area * 10000) / 10000;
                                   const isExact =
                                     Math.abs(exactTiles - tiles) < 1e-9;
-                                  return (
+                                  return qty > 0 && !isExact ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setLines((prev) =>
+                                          prev.map((l) =>
+                                            l.key === line.key
+                                              ? {
+                                                  ...l,
+                                                  quantity_raw:
+                                                    String(roundedSqm),
+                                                  quantity_m2: roundedSqm,
+                                                }
+                                              : l,
+                                          ),
+                                        )
+                                      }
+                                      className="min-w-0 truncate rounded-full bg-terracotta/10 px-2 py-px text-[10px] font-medium text-terracotta ring-1 ring-terracotta/25 transition hover:bg-terracotta/20"
+                                      title={`Khách cần ${formatSqm(qty)} m² — lẻ ${formatSqm(roundedSqm - qty)} m². Bấm để làm tròn lên ${tiles} viên (${formatSqm(roundedSqm)} m²).`}
+                                    >
+                                      ≈ {tiles} viên · làm tròn {formatSqm(roundedSqm)} m²
+                                    </button>
+                                  ) : (
                                     <span
-                                      className="inline-flex flex-wrap items-center gap-1.5"
+                                      className="min-w-0 truncate text-[10px] text-muted-foreground"
                                       title={
                                         qty > 0
-                                          ? `Khách cần ${formatSqm(qty)} m² — ${isExact ? `chẵn ${tiles} viên` : `lẻ ${formatSqm(roundedSqm - qty)} m², cần ${tiles} viên (${formatSqm(roundedSqm)} m²)`}`
+                                          ? `Chẵn ${tiles} viên (${formatSqm(roundedSqm)} m²)`
                                           : `Kích thước viên: ${line.product.size} → ${formatSqm(area)} m²/viên`
                                       }
                                     >
-                                      <span
-                                        className={
-                                          qty <= 0
-                                            ? "text-[9px] font-medium px-1.5 py-0.5 rounded bg-surface-strong text-muted-foreground border border-border"
-                                            : isExact
-                                              ? "text-[9px] font-semibold px-1.5 py-0.5 rounded bg-terracotta/10 text-terracotta border border-terracotta/30"
-                                              : "text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300/70"
-                                        }
-                                      >
-                                        {qty <= 0
-                                          ? `${formatSqm(area)} m²/viên`
-                                          : isExact
-                                            ? `✓ ${tiles} viên · ${formatSqm(roundedSqm)} m²`
-                                            : `≈ ${tiles} viên · cần ${formatSqm(roundedSqm)} m²`}
-                                      </span>
-                                      {qty > 0 && !isExact ? (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setLines((prev) =>
-                                              prev.map((l) =>
-                                                l.key === line.key
-                                                  ? {
-                                                      ...l,
-                                                      quantity_raw:
-                                                        String(roundedSqm),
-                                                      quantity_m2: roundedSqm,
-                                                    }
-                                                  : l,
-                                              ),
-                                            )
-                                          }
-                                          className="rounded bg-amber-600 px-1.5 py-0.5 text-[9px] font-semibold text-white transition hover:bg-amber-700"
-                                        >
-                                          Làm tròn
-                                        </button>
-                                      ) : null}
+                                      {qty > 0 ? (
+                                        <>
+                                          {tiles} viên ·{" "}
+                                          {formatSqm(roundedSqm)} m²
+                                        </>
+                                      ) : (
+                                        <>{formatSqm(area)} m²/viên</>
+                                      )}
                                     </span>
                                   );
                                 })()
