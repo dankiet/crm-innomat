@@ -904,27 +904,9 @@ export function NewQuoteDialog({
                     className="size-3.5 rounded border-border accent-terracotta"
                     checked={editQuoteLabels}
                     disabled={locked}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setEditQuoteLabels(checked);
-                      if (!checked) {
-                        setLines((prev) =>
-                          prev.map((l) =>
-                            l.product
-                              ? {
-                                  ...l,
-                                  product_code: l.product.code,
-                                  product_name: l.product.name,
-                                  size: l.product.size || "",
-                                  material: l.product.material || "",
-                                }
-                              : l,
-                          ),
-                        );
-                      }
-                    }}
+                    onChange={(e) => setEditQuoteLabels(e.target.checked)}
                   />
-                  Sửa chi tiết trên BG (mã, tên...)
+                  Sửa thủ công
                 </label>
                 {!locked ? (
                   <button
