@@ -118,17 +118,23 @@ function parseQuantityInput(raw: string): number {
 }
 
 /**
- * Diện tích 1 viên (m²) từ kích thước dạng "WxH" (mm) — ví dụ "300x600" → 0.18.
- * Chỉ nhận size đơn: mosaic nhiều kích thước ("290x274/90.5x83.5") không tính
- * được viên chuẩn → trả null (không gợi ý làm tròn viên).
+ * Diện tích 1 viên (m²) từ kích thước "WxH" (mm) — ví dụ "300x600" → 0.18.
+ * Với mosaic nhiều cỡ ("85x85/256x273") lấy cặp LỚN NHẤT làm chuẩn viên
+ * ("256x273" → 0.0699 m²). Không có kích thước hợp lệ → null (không gợi ý).
  */
 function tileAreaM2(product: Product): number | null {
   const size = (product.size || "").trim();
-  if (!size || size.includes("/")) return null;
-  const m = /^(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i.exec(size);
-  if (!m) return null;
-  const area = (parseFloat(m[1]) * parseFloat(m[2])) / 1_000_000;
-  return Number.isFinite(area) && area > 0 ? area : null;
+  if (!size) return null;
+  let best: number | null = null;
+  const re = /(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(size)) !== null) {
+    const area = (parseFloat(m[1]) * parseFloat(m[2])) / 1_000_000;
+    if (Number.isFinite(area) && area > 0 && (best === null || area > best)) {
+      best = area;
+    }
+  }
+  return best;
 }
 
 /** Số viên tròn LÊN cho diện tích — null nếu chưa biết quy cách viên.
