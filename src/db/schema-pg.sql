@@ -418,7 +418,6 @@ CREATE TABLE IF NOT EXISTS public_users (
   last_seen_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_public_users_email ON public_users(email);
-CREATE INDEX IF NOT EXISTS idx_public_users_supabase ON public_users(supabase_id);
 
 CREATE TABLE IF NOT EXISTS public_sessions (
   token TEXT PRIMARY KEY,
