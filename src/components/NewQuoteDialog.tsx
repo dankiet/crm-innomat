@@ -117,6 +117,37 @@ function parseQuantityInput(raw: string): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
+/**
+ * Diện tích 1 viên (m²) từ kích thước dạng "WxH" (mm) — ví dụ "300x600" → 0.18.
+ * Chỉ nhận size đơn: mosaic nhiều kích thước ("290x274/90.5x83.5") không tính
+ * được viên chuẩn → trả null (không gợi ý làm tròn viên).
+ */
+function tileAreaM2(product: Product): number | null {
+  const size = (product.size || "").trim();
+  if (!size || size.includes("/")) return null;
+  const m = /^(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i.exec(size);
+  if (!m) return null;
+  const area = (parseFloat(m[1]) * parseFloat(m[2])) / 1_000_000;
+  return Number.isFinite(area) && area > 0 ? area : null;
+}
+
+/** Số viên tròn LÊN cho diện tích — null nếu chưa biết quy cách viên.
+ *  Trừ epsilon để float noise (5.4/0.18 = 30.000000000000004) không đẩy
+ *  số viên chuẩn thành 31. */
+function ceilTiles(quantityM2: number, areaPerTile: number): number | null {
+  if (!(quantityM2 > 0) || !(areaPerTile > 0)) return null;
+  return Math.ceil(quantityM2 / areaPerTile - 1e-9);
+}
+
+/** Format số m² với tối đa 2 chữ số thập phân (dấu phẩy kiểu VN). */
+function formatSqm(value: number): string {
+  if (Number.isNaN(value)) return "0";
+  return value.toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
 function calcUnit(
   product: Product,
   discountType: DiscountType,
@@ -1155,15 +1186,52 @@ export function NewQuoteDialog({
                               <span className="text-[10px] text-muted-foreground">
                                 SL (m²)
                               </span>
-                              {line.product?.packing_m2 ? (
-                                <span 
-                                  className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/60" 
-                                  title={`Quy cách: ${line.product.packing_m2} m²/thùng${line.product.packing_pcs ? ` - ${line.product.packing_pcs} viên` : ''}`}
-                                >
-                                  {line.quantity_m2 
-                                    ? `~ ${+(line.quantity_m2 / line.product.packing_m2).toFixed(2)} thùng${line.product.packing_pcs ? ` (${Math.round((line.quantity_m2 / line.product.packing_m2) * line.product.packing_pcs)} viên)` : ''}` 
-                                    : `${line.product.packing_m2}m²/th`}
-                                </span>
+                              {line.product ? (
+                                (() => {
+                                  const area = tileAreaM2(line.product);
+                                  if (!area) return null;
+                                  const qty = line.quantity_m2 || 0;
+                                  const exactTiles = qty / area;
+                                  const tiles = ceilTiles(qty, area) ?? 1;
+                                  const roundedSqm = tiles * area;
+                                  const isExact = Math.abs(exactTiles - tiles) < 1e-9;
+                                  return (
+                                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                                      <span
+                                        className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/60"
+                                        title={`Kích thước viên: ${line.product.size} → ${formatSqm(area)} m²/viên`}
+                                      >
+                                        {qty > 0
+                                          ? `≈ ${tiles} viên (${formatSqm(roundedSqm)} m²)`
+                                          : `${formatSqm(area)} m²/viên`}
+                                      </span>
+                                      {qty > 0 && !isExact ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setLines((prev) =>
+                                              prev.map((l) =>
+                                                l.key === line.key
+                                                  ? {
+                                                      ...l,
+                                                      quantity_raw: String(
+                                                        roundedSqm,
+                                                      ),
+                                                      quantity_m2: roundedSqm,
+                                                    }
+                                                  : l,
+                                              ),
+                                            )
+                                          }
+                                          className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 border border-amber-300/70 transition hover:bg-amber-200"
+                                          title={`Khách cần ${formatSqm(qty)} m² — lẻ ${formatSqm(roundedSqm - qty)} m²; làm tròn lên ${tiles} viên (${formatSqm(roundedSqm)} m²)`}
+                                        >
+                                          Làm tròn lên {tiles} viên
+                                        </button>
+                                      ) : null}
+                                    </span>
+                                  );
+                                })()
                               ) : null}
                             </div>
                             <input
