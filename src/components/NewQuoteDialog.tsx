@@ -38,7 +38,7 @@ import {
   unitPriceForProduct,
 } from "@/lib/pricing";
 import { toast } from "sonner";
-import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUp, ChevronsUpDown, Copy, FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Thumbnail gọn cho form BG — có ảnh thì hiện; lỗi/không có thì ô xám (không icon vỡ layout). */
@@ -904,9 +904,27 @@ export function NewQuoteDialog({
                     className="size-3.5 rounded border-border accent-terracotta"
                     checked={editQuoteLabels}
                     disabled={locked}
-                    onChange={(e) => setEditQuoteLabels(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditQuoteLabels(checked);
+                      if (!checked) {
+                        setLines((prev) =>
+                          prev.map((l) =>
+                            l.product
+                              ? {
+                                  ...l,
+                                  product_code: l.product.code,
+                                  product_name: l.product.name,
+                                  size: l.product.size || "",
+                                  material: l.product.material || "",
+                                }
+                              : l,
+                          ),
+                        );
+                      }
+                    }}
                   />
-                  Sửa mã/tên/kích thước/chất liệu trên BG
+                  Sửa chi tiết trên BG (mã, tên...)
                 </label>
                 {!locked ? (
                   <button
@@ -1155,7 +1173,7 @@ export function NewQuoteDialog({
                         ) : null}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <label className="block">
-                            <div className="flex items-baseline gap-1.5 mb-1 min-h-[15px]">
+                            <div className="flex items-center justify-between mb-1 min-h-[15px]">
                               <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                                 SL (m²)
                               </span>
@@ -1170,7 +1188,8 @@ export function NewQuoteDialog({
                                     Math.round(tiles * area * 10000) / 10000;
                                   const isExact =
                                     Math.abs(exactTiles - tiles) < 1e-9;
-                                  return qty > 0 && !isExact ? (
+                                  if (!(qty > 0 && !isExact)) return null;
+                                  return (
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -1187,29 +1206,11 @@ export function NewQuoteDialog({
                                           ),
                                         )
                                       }
-                                      className="min-w-0 truncate rounded-full bg-terracotta/10 px-2 py-px text-[10px] font-medium text-terracotta ring-1 ring-terracotta/25 transition hover:bg-terracotta/20"
-                                      title={`Khách cần ${formatSqm(qty)} m² — lẻ ${formatSqm(roundedSqm - qty)} m². Bấm để làm tròn lên ${tiles} viên (${formatSqm(roundedSqm)} m²).`}
+                                      className="grid size-5 place-items-center rounded-full bg-terracotta/15 text-terracotta ring-1 ring-terracotta/30 transition hover:bg-terracotta/25"
+                                      title={`Khách cần ${formatSqm(qty)} m² — lẻ ${formatSqm(roundedSqm - qty)} m². Làm tròn lên ${tiles} viên (${formatSqm(roundedSqm)} m²).`}
                                     >
-                                      ≈ {tiles} viên · làm tròn {formatSqm(roundedSqm)} m²
+                                      <ChevronsUp className="size-3" />
                                     </button>
-                                  ) : (
-                                    <span
-                                      className="min-w-0 truncate text-[10px] text-muted-foreground"
-                                      title={
-                                        qty > 0
-                                          ? `Chẵn ${tiles} viên (${formatSqm(roundedSqm)} m²)`
-                                          : `Kích thước viên: ${line.product.size} → ${formatSqm(area)} m²/viên`
-                                      }
-                                    >
-                                      {qty > 0 ? (
-                                        <>
-                                          {tiles} viên ·{" "}
-                                          {formatSqm(roundedSqm)} m²
-                                        </>
-                                      ) : (
-                                        <>{formatSqm(area)} m²/viên</>
-                                      )}
-                                    </span>
                                   );
                                 })()
                               ) : null}
@@ -1256,6 +1257,39 @@ export function NewQuoteDialog({
                                 );
                               }}
                             />
+                            <div className="mt-1 min-h-[14px] truncate text-[10px] leading-3 text-muted-foreground">
+                              {line.product ? (
+                                (() => {
+                                  const area = tileAreaM2(line.product);
+                                  if (!area) return null;
+                                  const qty = line.quantity_m2 || 0;
+                                  const tiles = ceilTiles(qty, area) ?? 1;
+                                  const roundedSqm =
+                                    Math.round(tiles * area * 10000) / 10000;
+                                  const isExact =
+                                    Math.abs(qty / area - tiles) < 1e-9;
+                                  return qty > 0 ? (
+                                    <span
+                                      className={
+                                        isExact
+                                          ? undefined
+                                          : "font-medium text-amber-700"
+                                      }
+                                    >
+                                      {qty > 0 && !isExact ? "≈ " : "= "}
+                                      {tiles} viên ·{" "}
+                                      {formatSqm(roundedSqm)} m²
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      {formatSqm(area)} m²/viên
+                                    </span>
+                                  );
+                                })()
+                              ) : (
+                                <span>&nbsp;</span>
+                              )}
+                            </div>
                           </label>
                           <label className="block">
                             <span className="text-[10px] text-muted-foreground">
