@@ -1215,7 +1215,7 @@ export function NewQuoteDialog({
                                                   ? {
                                                       ...l,
                                                       quantity_raw: String(
-                                                        roundedSqm,
+                                                        Math.round(roundedSqm * 10000) / 10000,
                                                       ),
                                                       quantity_m2: roundedSqm,
                                                     }
