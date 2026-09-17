@@ -186,6 +186,8 @@ type ThuVienSearch = {
   sort?: GallerySort;
   /** Lọc BST theo danh mục SP liên kết (slug PRODUCT_GROUPS) */
   cat?: LibraryCategorySlug;
+  /** Từ khóa tìm tên thư viện / mã SP (URL-sync như sort, cat) */
+  q?: string;
   /** Collection đang mở — back trình duyệt / máy đóng được */
   c?: number;
   /** Index ảnh trong viewer (cần kèm c) */
@@ -251,9 +253,11 @@ function parseViewerIndex(v: unknown): number | undefined {
 export const Route = createFileRoute("/_app/thu-vien")({
   validateSearch: (search: Record<string, unknown>): ThuVienSearch => {
     const c = parsePositiveInt(search.c);
+    const q = typeof search.q === "string" ? search.q.slice(0, 120) : undefined;
     return {
       sort: parseGallerySort(search.sort),
       cat: parseLibraryCategory(search.cat),
+      q,
       c,
       // Viewer only valid while a collection is open
       v: c != null ? parseViewerIndex(search.v) : undefined,
@@ -293,6 +297,10 @@ const FACETS: Array<{ key: FacetKey; label: string }> = [
 
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/10";
+
+/** Search box ở toolbar list Thư viện (có nút clear bên phải). */
+const inputSearchClass =
+  "h-9 w-full rounded-lg border border-border bg-card pl-9 text-sm outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/10";
 
 function normalizeSearchText(value: string): string {
   return value
@@ -421,8 +429,9 @@ function GalleryPage() {
   const [reordering, setReordering] = useState(false);
   /** Inside open collection: false = saved drag order; true = stock high→low (view-only). */
   const [sortByStock, setSortByStock] = useState(false);
-  const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  /** Từ khóa search — URL-sync qua ?q= (giống cat/sort) */
+  const searchQuery = searchParams.q ?? "";
+  const deferredSearch = useDeferredValue(searchQuery);
   const uploadRef = useRef<HTMLInputElement>(null);
   /** True when this session pushed collection onto history (not deep-link / F5). */
   const pushedCollectionRef = useRef(false);
@@ -454,6 +463,7 @@ function GalleryPage() {
         const next: ThuVienSearch = { ...base };
         if (!next.sort || next.sort === "created_desc") delete next.sort;
         if (!next.cat) delete next.cat;
+        if (!next.q) delete next.q;
         if (next.c == null) {
           delete next.c;
           delete next.v;
@@ -481,9 +491,39 @@ function GalleryPage() {
     );
   }
 
+  /** Gõ từ khóa — URL-sync qua ?q= (replace để không spam history). */
+  function setSearchQuery(value: string) {
+    patchSearch(
+      (prev) => {
+        const next: ThuVienSearch = { ...prev };
+        if (value) next.q = value;
+        else delete next.q;
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  /** Bỏ toàn bộ bộ lọc (danh mục + từ khóa) — nút "Bỏ lọc". */
+  function clearFilters() {
+    patchSearch(
+      (prev) => {
+        const next: ThuVienSearch = { ...prev };
+        delete next.cat;
+        delete next.q;
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
   const activeCategory = useMemo(
     () => LIBRARY_CATEGORY_CHIPS.find((chip) => chip.slug === categorySlug),
     [categorySlug],
+  );
+
+  const hasActiveFilters = Boolean(
+    activeCategory || searchQuery.trim(),
   );
 
   /** collectionId → set category string (từ SP liên kết trong candidates) */
@@ -651,7 +691,11 @@ function GalleryPage() {
     const matchingCollectionNames = needle
       ? new Set(
           candidates
-            .filter((candidate) => normalizeSearchText(candidate.code).includes(needle))
+            .filter(
+              (candidate) =>
+                normalizeSearchText(candidate.code).includes(needle) ||
+                normalizeSearchText(candidate.internal_codes).includes(needle),
+            )
             .map((candidate) => candidate.collections),
         )
       : null;
@@ -665,6 +709,7 @@ function GalleryPage() {
       if (!needle) return true;
       return (
         normalizeSearchText(collection.name).includes(needle) ||
+        normalizeSearchText(collection.description).includes(needle) ||
         Boolean(matchingCollectionNames?.has(collection.name))
       );
     });
@@ -1072,8 +1117,21 @@ function GalleryPage() {
                 </button>
               );
             })}
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-strong/60 hover:text-foreground"
+              >
+                <X className="size-3.5" />
+                <span>Bỏ lọc</span>
+              </button>
+            ) : null}
           </div>
           <div className="ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:flex-none">
+            <p className="text-xs tabular-nums text-muted-foreground">
+              {sortedCollections.length} / {collections.length} bộ sưu tập
+            </p>
             <SortMenu
               value={sortParam}
               defaultValue="created_desc"
@@ -1086,11 +1144,24 @@ function GalleryPage() {
             <label className="relative min-w-56 flex-1 sm:max-w-sm">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Tìm tên thư viện hoặc mã sản phẩm..."
-                className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/10"
+                className={cn(
+                  inputSearchClass,
+                  searchQuery ? "pr-9" : "pr-3",
+                )}
               />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-1 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground hover:bg-surface-strong hover:text-foreground"
+                  aria-label="Xóa nội dung tìm kiếm"
+                >
+                  <X className="size-3.5" />
+                </button>
+              ) : null}
             </label>
           </div>
         </div>
