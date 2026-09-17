@@ -56,9 +56,7 @@ const emptyForm = {
   category: "",
   supplier: "",
   color: "",
-  packing_m2: "",
-  packing_pcs: "",
-  packing_kg: "",
+  area_per_tile_m2: "",
   retail_price: "",
   trade_price: "",
   b2b_price: "",
@@ -201,32 +199,14 @@ export function NewProductDialog({
       toast.error("Giá B2B không hợp lệ");
       return;
     }
-    let packing_m2: number | null = null;
-    if ((form.packing_m2 || "").trim() !== "") {
-      const val = Number((form.packing_m2 || "").trim().replace(",", "."));
+    let area_per_tile_m2: number | null = null;
+    if ((form.area_per_tile_m2 || "").trim() !== "") {
+      const val = Number((form.area_per_tile_m2 || "").trim().replace(",", "."));
       if (Number.isNaN(val) || val < 0) {
-        toast.error("Quy cách m²/Thùng không hợp lệ");
+        toast.error("Diện tích m²/viên không hợp lệ");
         return;
       }
-      packing_m2 = val;
-    }
-    let packing_pcs: number | null = null;
-    if ((form.packing_pcs || "").trim() !== "") {
-      const val = Number((form.packing_pcs || "").trim());
-      if (Number.isNaN(val) || val < 0 || !Number.isInteger(val)) {
-        toast.error("Số lượng viên/Thùng không hợp lệ");
-        return;
-      }
-      packing_pcs = val;
-    }
-    let packing_kg: number | null = null;
-    if ((form.packing_kg || "").trim() !== "") {
-      const val = Number((form.packing_kg || "").trim().replace(",", "."));
-      if (Number.isNaN(val) || val < 0) {
-        toast.error("Khối lượng Kg/Thùng không hợp lệ");
-        return;
-      }
-      packing_kg = val;
+      area_per_tile_m2 = val;
     }
     setSaving(true);
     try {
@@ -243,9 +223,7 @@ export function NewProductDialog({
           supplier: form.supplier.trim(),
           collections: form.collections.trim(),
           color: form.color.trim(),
-          packing_m2,
-          packing_pcs,
-          packing_kg,
+          area_per_tile_m2,
           retail_price: price,
           trade_price,
           b2b_price,
@@ -491,31 +469,13 @@ export function NewProductDialog({
                   onDeleteOption={(option) => void handleDeleteOption("color", option)}
                 />
               </Field>
-              <Field label="m² / Thùng">
+              <Field label="m² / viên">
                 <input
                   className={inputCls}
                   inputMode="decimal"
-                  value={form.packing_m2}
-                  onChange={(e) => setForm((f) => ({ ...f, packing_m2: e.target.value }))}
-                  placeholder="vd. 1.44"
-                />
-              </Field>
-              <Field label="Số lượng / Thùng">
-                <input
-                  className={inputCls}
-                  inputMode="numeric"
-                  value={form.packing_pcs}
-                  onChange={(e) => setForm((f) => ({ ...f, packing_pcs: e.target.value }))}
-                  placeholder="vd. 4"
-                />
-              </Field>
-              <Field label="Kg / Thùng">
-                <input
-                  className={inputCls}
-                  inputMode="decimal"
-                  value={form.packing_kg}
-                  onChange={(e) => setForm((f) => ({ ...f, packing_kg: e.target.value }))}
-                  placeholder="vd. 17"
+                  value={form.area_per_tile_m2}
+                  onChange={(e) => setForm((f) => ({ ...f, area_per_tile_m2: e.target.value }))}
+                  placeholder="vd. 0.18 — trống = tự tính từ size"
                 />
               </Field>
             </div>

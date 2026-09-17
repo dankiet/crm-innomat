@@ -17,10 +17,7 @@ CREATE TABLE IF NOT EXISTS products (
   image_path TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT '',
   color TEXT NOT NULL DEFAULT '',
-  packing TEXT NOT NULL DEFAULT '',
-  packing_m2 DOUBLE PRECISION,
-  packing_pcs DOUBLE PRECISION,
-  packing_kg DOUBLE PRECISION,
+  area_per_tile_m2 DOUBLE PRECISION,
   trade_price BIGINT,
   b2b_price BIGINT,
   surface TEXT NOT NULL DEFAULT '',
@@ -43,7 +40,12 @@ BEGIN
 END $$;
 
 -- Khối lượng đóng gói (Kg/thùng) & Cột Texture (Hiệu ứng vân) — idempotent cho DB đã tạo trước đó.
-ALTER TABLE products ADD COLUMN IF NOT EXISTS packing_kg DOUBLE PRECISION;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS area_per_tile_m2 DOUBLE PRECISION;
+-- Bỏ khái niệm thùng/packing khỏi products — diện tích 1 viên chuẩn ở area_per_tile_m2.
+ALTER TABLE products DROP COLUMN IF EXISTS packing;
+ALTER TABLE products DROP COLUMN IF EXISTS packing_m2;
+ALTER TABLE products DROP COLUMN IF EXISTS packing_pcs;
+ALTER TABLE products DROP COLUMN IF EXISTS packing_kg;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS texture TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_products_texture ON products(texture);
 

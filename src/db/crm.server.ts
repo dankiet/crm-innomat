@@ -2555,10 +2555,7 @@ export type ProductUpdate = {
   category?: string;
   supplier?: string;
   color?: string;
-  packing?: string;
-  packing_m2?: number | null;
-  packing_pcs?: number | null;
-  packing_kg?: number | null;
+  area_per_tile_m2?: number | null;
   retail_price?: number;
   trade_price?: number | null;
   b2b_price?: number | null;
@@ -2628,10 +2625,7 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
         category = @category,
         supplier = @supplier,
         color = @color,
-        packing = @packing,
-        packing_m2 = @packing_m2,
-        packing_pcs = @packing_pcs,
-        packing_kg = @packing_kg,
+        area_per_tile_m2 = @area_per_tile_m2,
         retail_price = @retail_price,
         trade_price = @trade_price,
         b2b_price = @b2b_price,
@@ -2657,19 +2651,10 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       category: String(input.category ?? existing.category ?? "").trim(),
       supplier: String(input.supplier ?? existing.supplier ?? "").trim(),
       color: String(input.color ?? existing.color ?? "").trim(),
-      packing: String(input.packing ?? existing.packing ?? "").trim(),
-      packing_m2:
-        input.packing_m2 !== undefined
-          ? (input.packing_m2 != null && !Number.isNaN(Number(input.packing_m2)) ? Number(input.packing_m2) : null)
-          : existing.packing_m2,
-      packing_pcs:
-        input.packing_pcs !== undefined
-          ? (input.packing_pcs != null && !Number.isNaN(Number(input.packing_pcs)) ? Number(input.packing_pcs) : null)
-          : existing.packing_pcs,
-      packing_kg:
-        input.packing_kg !== undefined
-          ? (input.packing_kg != null && !Number.isNaN(Number(input.packing_kg)) ? Number(input.packing_kg) : null)
-          : existing.packing_kg,
+      area_per_tile_m2:
+        input.area_per_tile_m2 !== undefined
+          ? (input.area_per_tile_m2 != null && !Number.isNaN(Number(input.area_per_tile_m2)) ? Number(input.area_per_tile_m2) : null)
+          : (existing.area_per_tile_m2 ?? null),
       retail_price: retail,
       trade_price: tradePrice,
       b2b_price: b2bPrice,
@@ -2701,10 +2686,7 @@ export type ProductCreateInput = {
   category?: string;
   supplier?: string;
   color?: string;
-  packing?: string;
-  packing_m2?: number | null;
-  packing_pcs?: number | null;
-  packing_kg?: number | null;
+  area_per_tile_m2?: number | null;
   retail_price: number;
   trade_price?: number | null;
   b2b_price?: number | null;
@@ -2747,12 +2729,12 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
     .prepare(
       `INSERT INTO products (
         code, name, size, material, surface, shape, texture, collections, category, supplier,
-        color, packing, packing_m2, packing_pcs, packing_kg,
+        color, area_per_tile_m2,
         retail_price, trade_price, b2b_price, discount_tp, discount_b2b,
         note, is_hot, is_public, featured_rank, image_path
       ) VALUES (
         @code, @name, @size, @material, @surface, @shape, @texture, @collections, @category, @supplier,
-        @color, @packing, @packing_m2, @packing_pcs, @packing_kg,
+        @color, @area_per_tile_m2,
         @retail_price, @trade_price, @b2b_price, @discount_tp, @discount_b2b,
         @note, @is_hot, @is_public, @featured_rank, @image_path
       )`,
@@ -2769,18 +2751,9 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
       category: (input.category ?? "").trim(),
       supplier: (input.supplier ?? "").trim(),
       color: (input.color ?? "").trim(),
-      packing: (input.packing ?? "").trim(),
-      packing_m2:
-        input.packing_m2 != null && input.packing_m2 !== ("" as unknown)
-          ? Number(input.packing_m2)
-          : null,
-      packing_pcs:
-        input.packing_pcs != null && input.packing_pcs !== ("" as unknown)
-          ? Number(input.packing_pcs)
-          : null,
-      packing_kg:
-        input.packing_kg != null && input.packing_kg !== ("" as unknown)
-          ? Number(input.packing_kg)
+      area_per_tile_m2:
+        input.area_per_tile_m2 != null && input.area_per_tile_m2 !== ("" as unknown)
+          ? Number(input.area_per_tile_m2)
           : null,
       retail_price: retail,
       trade_price: tradePrice,

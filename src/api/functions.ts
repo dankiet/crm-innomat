@@ -353,10 +353,7 @@ export const updateProductFn = createServerFn({ method: "POST" })
       category?: string;
       supplier?: string;
       color?: string;
-      packing?: string;
-      packing_m2?: number | null;
-      packing_pcs?: number | null;
-      packing_kg?: number | null;
+      area_per_tile_m2?: number | null;
       retail_price?: number;
       trade_price?: number | null;
       b2b_price?: number | null;
@@ -400,10 +397,7 @@ export const createProductFn = createServerFn({ method: "POST" })
       category?: string;
       supplier?: string;
       color?: string;
-      packing?: string;
-      packing_m2?: number | null;
-      packing_pcs?: number | null;
-      packing_kg?: number | null;
+      area_per_tile_m2?: number | null;
       retail_price: number;
       trade_price?: number | null;
       b2b_price?: number | null;

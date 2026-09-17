@@ -96,7 +96,7 @@ export async function exportQuoteToHtml(
   const items = (await db.prepare(
       `SELECT qi.id, qi.product_code, qi.product_name, qi.size, qi.quantity_m2,
        qi.retail_price, qi.discount_pct, qi.unit_price, qi.area, qi.line_total,
-       p.internal_code, p.packing_pcs, p.packing_m2, p.note as p_note,
+       p.internal_code, p.area_per_tile_m2, p.note as p_note,
        COALESCE(NULLIF(qi.material, ''), p.material, '') AS material,
        NULLIF(qi.packing, '') AS packing,
        COALESCE(
@@ -126,8 +126,7 @@ export async function exportQuoteToHtml(
     internal_code: string;
     material: string;
     packing: string;
-    packing_pcs: number;
-    packing_m2: number;
+    area_per_tile_m2: number;
     p_note: string;
     image_path: string;
   }>;
@@ -145,8 +144,10 @@ export async function exportQuoteToHtml(
       : item.unit_price;
     const subtotal = unitPreVat * item.quantity_m2;
     const thung = Number(item.packing) > 0 ? `${Number(item.packing)} thùng` : "";
-    const numThung = item.packing_m2 ? (item.quantity_m2 / item.packing_m2).toFixed(1) : "";
-    const finalNote = thung || (numThung ? `~${numThung} Thùng` : "—");
+    const tiles = item.area_per_tile_m2
+      ? Math.ceil(item.quantity_m2 / item.area_per_tile_m2 - 1e-9)
+      : null;
+    const finalNote = thung || (tiles ? `~${tiles} viên` : "—");
     return { ...item, unitPreVat, subtotal, finalNote };
   });
 

@@ -118,11 +118,15 @@ function parseQuantityInput(raw: string): number {
 }
 
 /**
- * Diện tích 1 viên (m²) từ kích thước "WxH" (mm) — ví dụ "300x600" → 0.18.
- * Với mosaic nhiều cỡ ("85x85/256x273") lấy cặp LỚN NHẤT làm chuẩn viên
- * ("256x273" → 0.0699 m²). Không có kích thước hợp lệ → null (không gợi ý).
+ * Diện tích 1 viên (m²) — ưu tiên cột area_per_tile_m2 (admin chỉnh tay được);
+ * nếu null thì parse từ size "WxH" (mm): size đơn "300x600" → 0.18, mosaic
+ * nhiều cỡ ("85x85/256x273") lấy cặp LỚN NHẤT ("256x273" → 0.0699 m²).
+ * Không xác định được → null (không gợi ý).
  */
 function tileAreaM2(product: Product): number | null {
+  if (product.area_per_tile_m2 != null && Number.isFinite(product.area_per_tile_m2) && product.area_per_tile_m2 > 0) {
+    return product.area_per_tile_m2;
+  }
   const size = (product.size || "").trim();
   if (!size) return null;
   let best: number | null = null;

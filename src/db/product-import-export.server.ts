@@ -23,10 +23,7 @@ const PRODUCT_XLSX_COLUMNS = [
   { key: "category", header: "category" },
   { key: "supplier", header: "supplier" },
   { key: "color", header: "color" },
-  { key: "packing", header: "packing" },
-  { key: "packing_m2", header: "packing_m2" },
-  { key: "packing_pcs", header: "packing_pcs" },
-  { key: "packing_kg", header: "packing_kg" },
+  { key: "area_per_tile_m2", header: "area_per_tile_m2" },
   { key: "retail_price", header: "retail_price" },
   { key: "trade_price", header: "trade_price" },
   { key: "b2b_price", header: "b2b_price" },
@@ -53,10 +50,7 @@ type ProductImportRow = {
   category?: string;
   supplier?: string;
   color?: string;
-  packing?: string;
-  packing_m2?: number | null;
-  packing_pcs?: number | null;
-  packing_kg?: number | null;
+  area_per_tile_m2?: number | null;
   retail_price?: number | null;
   trade_price?: number | null;
   b2b_price?: number | null;
@@ -127,10 +121,7 @@ function productToRow(p: Product): Record<string, string | number | null> {
     category: p.category || "",
     supplier: p.supplier || "",
     color: p.color || "",
-    packing: p.packing || "",
-    packing_m2: p.packing_m2 ?? "",
-    packing_pcs: p.packing_pcs ?? "",
-    packing_kg: p.packing_kg ?? "",
+    area_per_tile_m2: p.area_per_tile_m2 ?? "",
     retail_price: p.retail_price ?? "",
     trade_price: p.trade_price ?? "",
     b2b_price: p.b2b_price ?? "",
@@ -173,10 +164,7 @@ export async function exportProductsXlsx(opts?: {
             category: "",
             supplier: "",
             color: "",
-            packing: "",
-            packing_m2: "",
-            packing_pcs: "",
-            packing_kg: "",
+            area_per_tile_m2: "",
             retail_price: 350000,
             trade_price: "",
             b2b_price: "",
@@ -264,17 +252,9 @@ function mapHeaders(headers: string[]): Map<string, ProductXlsxKey> {
     supplier: "supplier",
     color: "color",
     mau: "color",
-    packing: "packing",
-    "quy cach": "packing",
-    packing_m2: "packing_m2",
-    "m2/thung": "packing_m2",
-    packing_pcs: "packing_pcs",
-    "vien/thung": "packing_pcs",
-    packing_kg: "packing_kg",
-    "kg/thung": "packing_kg",
-    "kg/ thung": "packing_kg",
-    "khoi luong": "packing_kg",
-    "trong luong": "packing_kg",
+    area_per_tile_m2: "area_per_tile_m2",
+    "m2/vien": "area_per_tile_m2",
+    "m2/viên": "area_per_tile_m2",
     retail_price: "retail_price",
     "gia le": "retail_price",
     "gia ban le": "retail_price",
@@ -356,15 +336,6 @@ function mapHeaders(headers: string[]): Map<string, ProductXlsxKey> {
       {
         test: (h) => h.includes("ghi chu"),
         key: "note",
-      },
-      {
-        test: (h) =>
-          h.includes("kg/thung") ||
-          h.includes("kg/ thung") ||
-          (h.includes("kg") && h.includes("thung")) ||
-          h.includes("khoi luong") ||
-          h.includes("trong luong"),
-        key: "packing_kg",
       },
     ];
 
@@ -468,7 +439,6 @@ export function parseProductImportRows(
         case "category":
         case "supplier":
         case "color":
-        case "packing":
         case "note":
         case "surface":
         case "shape":
@@ -479,9 +449,7 @@ export function parseProductImportRows(
           // @ts-ignore
           row[key] = str(val);
           break;
-        case "packing_m2":
-        case "packing_pcs":
-        case "packing_kg":
+        case "area_per_tile_m2":
         case "retail_price":
         case "trade_price":
         case "b2b_price":
@@ -602,13 +570,10 @@ export async function previewProductImport(
     pushStr("Danh mục", existing.category, row.category);
     pushStr("Bộ sưu tập", existing.supplier, row.supplier);
     pushStr("Màu", existing.color, row.color);
-    pushStr("Quy cách", existing.packing, row.packing);
     pushStr("Bề mặt", existing.surface, row.surface);
     pushStr("Kiểu dáng", existing.shape, row.shape);
     pushStr("Hiệu ứng vân/mặt gạch", existing.collections, row.collections);
-    pushNum("m²/thùng", existing.packing_m2, row.packing_m2);
-    pushNum("Viên/thùng", existing.packing_pcs, row.packing_pcs);
-    pushNum("Kg/thùng", existing.packing_kg, row.packing_kg);
+    pushNum("m²/viên", existing.area_per_tile_m2, row.area_per_tile_m2);
     pushNumRequired("Giá lẻ", existing.retail_price, row.retail_price);
     pushNum("Giá TP", existing.trade_price, row.trade_price);
     pushNum("Giá B2B", existing.b2b_price, row.b2b_price);
@@ -659,10 +624,7 @@ function rowToUpdate(row: ProductImportRow): ProductUpdate {
   if (row.category !== undefined) u.category = row.category;
   if (row.supplier !== undefined) u.supplier = row.supplier;
   if (row.color !== undefined) u.color = row.color;
-  if (row.packing !== undefined) u.packing = row.packing;
-  if (row.packing_m2 !== undefined) u.packing_m2 = row.packing_m2;
-  if (row.packing_pcs !== undefined) u.packing_pcs = row.packing_pcs;
-  if (row.packing_kg !== undefined) u.packing_kg = row.packing_kg;
+  if (row.area_per_tile_m2 !== undefined) u.area_per_tile_m2 = row.area_per_tile_m2;
   if (row.retail_price !== undefined && row.retail_price !== null) u.retail_price = Math.round(row.retail_price);
   if (row.trade_price !== undefined) u.trade_price = row.trade_price !== null ? Math.round(row.trade_price) : (null as any);
   if (row.b2b_price !== undefined) u.b2b_price = row.b2b_price !== null ? Math.round(row.b2b_price) : (null as any);
@@ -687,10 +649,7 @@ function rowToCreate(row: ProductImportRow): ProductCreateInput {
     category: row.category ?? "",
     supplier: row.supplier ?? "",
     color: row.color ?? "",
-    packing: row.packing ?? "",
-    packing_m2: row.packing_m2 ?? null,
-    packing_pcs: row.packing_pcs ?? null,
-    packing_kg: row.packing_kg ?? null,
+    area_per_tile_m2: row.area_per_tile_m2 ?? null,
     retail_price: row.retail_price !== undefined && row.retail_price !== null ? Math.round(row.retail_price) : 0,
     trade_price: row.trade_price !== undefined && row.trade_price !== null ? Math.round(row.trade_price) : null,
     b2b_price: row.b2b_price !== undefined && row.b2b_price !== null ? Math.round(row.b2b_price) : null,

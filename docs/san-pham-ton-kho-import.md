@@ -28,8 +28,8 @@ Tên cột DB **không khớp** nhãn nghiệp vụ (di sản đổi tên trong 
 | `collections`                | **Hiệu ứng vân / mặt gạch**    |
 | `shape`                      | Kiểu dáng                      |
 | `surface`                    | Bề mặt                         |
-| `material`                   | Chất liệu                      |
-| `packing_m2` / `packing_pcs` | Quy cách: m²/thùng, viên/thùng |
+| `material`                    | Chất liệu                      |
+| `area_per_tile_m2`            | Diện tích 1 viên/vỉ (m²)       |
 
 Hai field ảo trên type `Product` (không có trong bảng, do query tính ra):
 
@@ -101,7 +101,7 @@ Import nhận **hai loại file**:
 
 **1. File do CRM xuất ra** — header là tên cột DB snake_case
 (`PRODUCT_XLSX_COLUMNS`): `id`, `code` (bắt buộc), `name`, `size`, `material`, `category`,
-`supplier`, `color`, `packing`, `packing_m2`, `packing_pcs`, `retail_price`, `trade_price`,
+`supplier`, `color`, `area_per_tile_m2`, `retail_price`, `trade_price`,
 `b2b_price`, `discount_tp`, `discount_b2b`, `surface`, `shape`, `collections`, `unit`,
 `image_path`, `created_at`, `note`, `is_hot`.
 

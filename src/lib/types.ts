@@ -151,12 +151,8 @@ export type Product = {
   supplier: string;
   /** Màu sắc (lọc) */
   color: string;
-  /** Quy cách đóng gói hiển thị: "100 viên/1m2" */
-  packing?: string;
-  packing_m2?: number | null;
-  packing_pcs?: number | null;
-  /** Khối lượng đóng gói: Kg/thùng */
-  packing_kg?: number | null;
+  /** Diện tích 1 viên chuẩn (m²) — mosaic lấy viên lớn nhất; null = tự tính từ size */
+  area_per_tile_m2?: number | null;
   retail_price: number;
   /** Giá Thương Mại = Trade Price (+VAT) — dùng trực tiếp khi CK TP */
   trade_price?: number | null;
