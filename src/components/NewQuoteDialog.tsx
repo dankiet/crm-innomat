@@ -222,6 +222,18 @@ export function NewQuoteDialog({
   const [locked, setLocked] = useState(false);
   /** Hiện ô sửa mã/tên trên BG (mặc định ẩn — dùng giá trị tự điền từ catalog) */
   const [editQuoteLabels, setEditQuoteLabels] = useState(false);
+  /** Bản sửa tay đã chụp khi unstick — stick lại thì phục hồi (theo key dòng) */
+  const [manualLabels, setManualLabels] = useState<
+    Record<
+      string,
+      {
+        product_code: string;
+        product_name: string;
+        size: string;
+        material: string;
+      }
+    >
+  >({});
   /** Dialog tạo SP mới trong catalog từ dòng BG — sau khi tạo tự chọn vào dòng */
   const [createProductOpen, setCreateProductOpen] = useState(false);
   /** Dòng đang chờ chọn SP mới tạo */
@@ -315,6 +327,22 @@ export function NewQuoteDialog({
                 (l.size || "").trim() !== (l.product.size || "").trim() ||
                 (l.material || "").trim() !== (l.product.material || "").trim()),
           );
+          // Chụp sẵn bản đang hiển thị (có thể đã sửa từ lần lưu trước) vào stash
+          setManualLabels(
+            Object.fromEntries(
+              loadedLines
+                .filter((l) => l.product)
+                .map((l) => [
+                  l.key,
+                  {
+                    product_code: l.product_code,
+                    product_name: l.product_name,
+                    size: l.size,
+                    material: l.material,
+                  },
+                ]),
+            ),
+          );
           setEditQuoteLabels(customized);
         } else {
           setSavedQuote(null);
@@ -329,6 +357,7 @@ export function NewQuoteDialog({
           setShippingFee(0);
           setLocked(false);
           setEditQuoteLabels(false);
+          setManualLabels({});
 
           // Prefill từ catalog (chọn nhiều SP → tạo BG)
           const ids = defaultProductIds?.filter((id) => Number.isFinite(id));
@@ -904,7 +933,56 @@ export function NewQuoteDialog({
                     className="size-3.5 rounded border-border accent-terracotta"
                     checked={editQuoteLabels}
                     disabled={locked}
-                    onChange={(e) => setEditQuoteLabels(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditQuoteLabels(checked);
+                      if (checked) {
+                        // Stick lại: phục hồi bản đã sửa tay (nếu từng chụp)
+                        setLines((prev) =>
+                          prev.map((l) => {
+                            const saved = manualLabels[l.key];
+                            return saved && l.product
+                              ? {
+                                  ...l,
+                                  product_code: saved.product_code,
+                                  product_name: saved.product_name,
+                                  size: saved.size,
+                                  material: saved.material,
+                                }
+                              : l;
+                          }),
+                        );
+                      } else {
+                        // Unstick: chụp bản đang sửa tay, rồi về catalog gốc
+                        setManualLabels((old) => {
+                          const next = { ...old };
+                          for (const l of lines) {
+                            if (l.product) {
+                              next[l.key] = {
+                                product_code: l.product_code,
+                                product_name: l.product_name,
+                                size: l.size,
+                                material: l.material,
+                              };
+                            }
+                          }
+                          return next;
+                        });
+                        setLines((prev) =>
+                          prev.map((l) =>
+                            l.product
+                              ? {
+                                  ...l,
+                                  product_code: l.product.code,
+                                  product_name: l.product.name,
+                                  size: l.product.size || "",
+                                  material: l.product.material || "",
+                                }
+                              : l,
+                          ),
+                        );
+                      }
+                    }}
                   />
                   Sửa thủ công
                 </label>
