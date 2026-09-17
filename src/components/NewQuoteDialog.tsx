@@ -92,9 +92,6 @@ type Line = {
   size: string;
   /** Chất liệu hiển thị trên BG (có thể khác catalog) */
   material: string;
-  /** Số thùng nhập tay — lưu số thuần (VD "10"), hiển thị "10 thùng" */
-  packing: string;
-  quantity_m2: number;
   /** Chuỗi thô đang gõ trong ô SL — giữ được "0", "0." khi nhập thập phân */
   quantity_raw: string;
   discount_pct: number;
@@ -300,7 +297,6 @@ export function NewQuoteDialog({
               product_name: item.product_name || product.name,
               size: item.size || product.size || "",
               material: item.material || product.material || "",
-              packing: item.packing || "",
               quantity_m2: item.quantity_m2,
               quantity_raw:
                 item.quantity_m2 == null ? "" : String(item.quantity_m2),
@@ -310,15 +306,14 @@ export function NewQuoteDialog({
             };
           });
           setLines(loadedLines.length ? loadedLines : [emptyLine()]);
-          // Tự bật nếu BG cũ đã sửa mã/tên/kt/chất liệu/số thùng khác catalog
+          // Tự bật nếu BG cũ đã sửa mã/tên/kt/chất liệu khác catalog
           const customized = loadedLines.some(
             (l) =>
               l.product &&
               (l.product_code.trim() !== l.product.code.trim() ||
                 l.product_name.trim() !== l.product.name.trim() ||
                 (l.size || "").trim() !== (l.product.size || "").trim() ||
-                (l.material || "").trim() !== (l.product.material || "").trim() ||
-                (l.packing || "").trim() !== ""),
+                (l.material || "").trim() !== (l.product.material || "").trim()),
           );
           setEditQuoteLabels(customized);
         } else {
@@ -351,7 +346,6 @@ export function NewQuoteDialog({
                 product_name: product.name,
                 size: product.size || "",
                 material: product.material || "",
-                packing: "",
                 quantity_m2: 1,
                 quantity_raw: "1",
                 discount_pct: 0,
@@ -407,7 +401,6 @@ export function NewQuoteDialog({
           product_name: product.name,
           size: product.size || "",
           material: product.material || "",
-          packing: "",
           discount_pct: pct,
           unit_price: unit,
         };
@@ -485,7 +478,6 @@ export function NewQuoteDialog({
         product_name: l.product_name.trim() || l.product!.name,
         size: l.size.trim() || l.product!.size || "",
         material: l.material.trim() || l.product!.material || "",
-        packing: l.packing.trim(),
         quantity_m2: l.quantity_m2,
         discount_pct: l.discount_pct,
         unit_price: Math.round(Number(l.unit_price) || 0),
@@ -914,7 +906,7 @@ export function NewQuoteDialog({
                     disabled={locked}
                     onChange={(e) => setEditQuoteLabels(e.target.checked)}
                   />
-                  Sửa mã/tên/kích thước/chất liệu/số thùng trên BG
+                  Sửa mã/tên/kích thước/chất liệu trên BG
                 </label>
                 {!locked ? (
                   <button
@@ -1159,35 +1151,6 @@ export function NewQuoteDialog({
                                 }
                               />
                             </label>
-                            <label className="block">
-                              <span className="text-[10px] text-muted-foreground">
-                                Số thùng
-                              </span>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                className={inputCls}
-                                placeholder="VD: 10"
-                                value={line.packing || ""}
-                                disabled={locked}
-                                onChange={(e) =>
-                                  setLines((prev) =>
-                                    prev.map((l) =>
-                                      l.key === line.key
-                                        ? {
-                                            ...l,
-                                            // Chỉ nhận số nguyên dương
-                                            packing: e.target.value.replace(
-                                              /\D/g,
-                                              "",
-                                            ),
-                                          }
-                                        : l,
-                                    ),
-                                  )
-                                }
-                              />
-                            </label>
                           </div>
                         ) : null}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1203,17 +1166,33 @@ export function NewQuoteDialog({
                                   const qty = line.quantity_m2 || 0;
                                   const exactTiles = qty / area;
                                   const tiles = ceilTiles(qty, area) ?? 1;
-                                  const roundedSqm = tiles * area;
-                                  const isExact = Math.abs(exactTiles - tiles) < 1e-9;
+                                  const roundedSqm =
+                                    Math.round(tiles * area * 10000) / 10000;
+                                  const isExact =
+                                    Math.abs(exactTiles - tiles) < 1e-9;
                                   return (
-                                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                                    <span
+                                      className="inline-flex flex-wrap items-center gap-1.5"
+                                      title={
+                                        qty > 0
+                                          ? `Khách cần ${formatSqm(qty)} m² — ${isExact ? `chẵn ${tiles} viên` : `lẻ ${formatSqm(roundedSqm - qty)} m², cần ${tiles} viên (${formatSqm(roundedSqm)} m²)`}`
+                                          : `Kích thước viên: ${line.product.size} → ${formatSqm(area)} m²/viên`
+                                      }
+                                    >
                                       <span
-                                        className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/60"
-                                        title={`Kích thước viên: ${line.product.size} → ${formatSqm(area)} m²/viên`}
+                                        className={
+                                          qty <= 0
+                                            ? "text-[9px] font-medium px-1.5 py-0.5 rounded bg-surface-strong text-muted-foreground border border-border"
+                                            : isExact
+                                              ? "text-[9px] font-semibold px-1.5 py-0.5 rounded bg-terracotta/10 text-terracotta border border-terracotta/30"
+                                              : "text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300/70"
+                                        }
                                       >
-                                        {qty > 0
-                                          ? `≈ ${tiles} viên (${formatSqm(roundedSqm)} m²)`
-                                          : `${formatSqm(area)} m²/viên`}
+                                        {qty <= 0
+                                          ? `${formatSqm(area)} m²/viên`
+                                          : isExact
+                                            ? `✓ ${tiles} viên · ${formatSqm(roundedSqm)} m²`
+                                            : `≈ ${tiles} viên · cần ${formatSqm(roundedSqm)} m²`}
                                       </span>
                                       {qty > 0 && !isExact ? (
                                         <button
@@ -1224,20 +1203,17 @@ export function NewQuoteDialog({
                                                 l.key === line.key
                                                   ? {
                                                       ...l,
-                                                      quantity_raw: String(
-                                                        Math.round(roundedSqm * 10000) / 10000,
-                                                      ),
-                                                      quantity_m2:
-                                                        Math.round(roundedSqm * 10000) / 10000,
+                                                      quantity_raw:
+                                                        String(roundedSqm),
+                                                      quantity_m2: roundedSqm,
                                                     }
                                                   : l,
                                               ),
                                             )
                                           }
-                                          className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 border border-amber-300/70 transition hover:bg-amber-200"
-                                          title={`Khách cần ${formatSqm(qty)} m² — lẻ ${formatSqm(roundedSqm - qty)} m²; làm tròn lên ${tiles} viên (${formatSqm(roundedSqm)} m²)`}
+                                          className="rounded bg-amber-600 px-1.5 py-0.5 text-[9px] font-semibold text-white transition hover:bg-amber-700"
                                         >
-                                          Làm tròn lên {tiles} viên
+                                          Làm tròn
                                         </button>
                                       ) : null}
                                     </span>
@@ -1618,7 +1594,6 @@ function emptyLine(): Line {
     product_name: "",
     size: "",
     material: "",
-    packing: "",
     quantity_m2: 0,
     quantity_raw: "",
     discount_pct: 0,
