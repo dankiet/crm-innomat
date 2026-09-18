@@ -89,7 +89,7 @@ export async function getGalleryCollection(id: number): Promise<{
        LEFT JOIN (
          SELECT pic.product_id, SUM(inv.quantity_stock) AS total_stock
          FROM product_internal_codes pic
-         LEFT JOIN inventory inv ON inv.internal_code = pic.internal_code AND inv.stock_location = 'KHOQ9'
+         LEFT JOIN inventory inv ON inv.internal_code = pic.internal_code AND inv.stock_location = 'KHOBC'
          GROUP BY pic.product_id
        ) stk ON stk.product_id = i.product_id
        WHERE i.collection_id = ?

@@ -108,7 +108,7 @@ export type GalleryCollectionItem = {
   created_at: string;
   /** Giá lẻ (m²) — từ sản phẩm liên kết */
   retail_price?: number | null;
-  /** Tồn kho kho Q9 (m²) */
+  /** Tồn kho kho Bình Chánh (m²) */
   total_stock?: number | null;
 };
 

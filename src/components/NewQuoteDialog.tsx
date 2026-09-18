@@ -38,7 +38,8 @@ import {
   unitPriceForProduct,
 } from "@/lib/pricing";
 import { toast } from "sonner";
-import { Check, ChevronDown, ChevronsDownUp, ChevronsUp, ChevronsUpDown, Copy, FileDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUp, ChevronsUpDown, Copy, FileDown, FileText, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { openProductQuickSheet } from "@/lib/product-quick-sheet";
 import { cn } from "@/lib/utils";
 
 /** Thumbnail gọn cho form BG — có ảnh thì hiện; lỗi/không có thì ô xám (không icon vỡ layout). */
@@ -94,6 +95,8 @@ type Line = {
   material: string;
   /** Chuỗi thô đang gõ trong ô SL — giữ được "0", "0." khi nhập thập phân */
   quantity_raw: string;
+  /** Số m² đã parse từ quantity_raw */
+  quantity_m2: number;
   discount_pct: number;
   /** Đơn giá bán / m² — có thể nhập tay */
   unit_price: number;
@@ -644,6 +647,44 @@ export function NewQuoteDialog({
     }
   }
 
+  /**
+   * In nhanh các dòng đang soạn (không cần lưu): ảnh, mã, tên, khu vực, quy
+   * cách, chất liệu/bề mặt, màu, tồn kho, SL/đơn giá/thành tiền của báo giá.
+   */
+  function handleQuickPrint() {
+    const rows = lines.map((l) => {
+      const p = l.product;
+      const quantity = l.quantity_m2 || null;
+      const price = l.unit_price || null;
+      return {
+        code: (l.product_code || p?.code || "").trim(),
+        name: (l.product_name || p?.name || "").trim(),
+        image: p?.image_path || "",
+        area: l.area || "",
+        size: (l.size || p?.size || "").trim(),
+        material: [l.material || p?.material, p?.surface].filter(Boolean).join(" · "),
+        color: p?.color || "",
+        internalCodes: (p?.internal_codes || p?.multi_codes_list || "").trim(),
+        stock: p?.total_stock ?? null,
+        quantity,
+        price,
+        amount: quantity != null && price != null ? Math.round(quantity * price) : null,
+      };
+    });
+    if (
+      !openProductQuickSheet({
+        title: "BÁO GIÁ · DANH SÁCH SẢN PHẨM",
+        subtitle: quoteCode ? `Báo giá ${quoteCode}` : undefined,
+        rows,
+        notes: [
+          "Đơn giá và thành tiền theo báo giá (đ/m²).",
+          "Tồn kho là tổng tồn của các kho.",
+        ],
+      })
+    )
+      toast.error("Trình duyệt đang chặn cửa sổ in nhanh");
+  }
+
   function closeDialog(nextOpen: boolean) {
     if (!nextOpen && (saving || exporting || deleting)) return;
     if (!nextOpen) setQuoteProductKey(null);
@@ -926,6 +967,16 @@ export function NewQuoteDialog({
                   className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-surface-strong hover:text-foreground disabled:opacity-40"
                 >
                   <Copy className="size-3.5" /> Copy mã
+                </button>
+                <button
+                  type="button"
+                  title="In nhanh danh sách sản phẩm đang soạn: ảnh, mã, tên, quy cách, tồn kho, giá (không cần lưu)"
+                  aria-label="In nhanh danh sách sản phẩm đang soạn"
+                  disabled={!lines.some((l) => l.product_code || l.product?.code || l.product_name || l.product?.name)}
+                  onClick={() => void handleQuickPrint()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-surface-strong hover:text-foreground disabled:opacity-40"
+                >
+                  <FileText className="size-3.5" /> In sản phẩm
                 </button>
                 <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
                   <input

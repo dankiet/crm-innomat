@@ -232,7 +232,7 @@ export function ImportExportProductsDialog({
               2. Xuất Báo Cáo Tồn Kho & Mã Nội Bộ (Tách Riêng)
             </div>
             <p className="text-xs text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
-              Tải file tổng hợp liên kết Mã Báo Giá ↔ Mã Nội Bộ ↔ Tồn Kho (Kho VP / Kho Q9) để đối soát kho. (File dành riêng cho bộ phận kho).
+              Tải file tổng hợp liên kết Mã Báo Giá ↔ Mã Nội Bộ ↔ Tồn Kho (Kho VP / Kho Bình Chánh) để đối soát kho. (File dành riêng cho bộ phận kho).
             </p>
             <div className="pt-1">
               <button

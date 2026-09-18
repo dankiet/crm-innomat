@@ -994,7 +994,7 @@ function GalleryPage() {
                         ? "bg-terracotta text-primary-foreground ring-terracotta/30 shadow-sm"
                         : "bg-card text-muted-foreground ring-black/5 hover:bg-surface-strong hover:text-foreground",
                     )}
-                    title="Gom ảnh cùng SP, sắp xếp theo tồn kho Q9 cao → thấp (không đổi thứ tự đã lưu)"
+                    title="Gom ảnh cùng SP, sắp xếp theo tồn kho Bình Chánh cao → thấp (không đổi thứ tự đã lưu)"
                   >
                     Tồn cao → thấp
                   </button>

@@ -57,6 +57,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format";
+import { openProductQuickSheet, type ProductQuickSheetRow } from "@/lib/product-quick-sheet";
 import { unitPriceForProduct } from "@/lib/pricing";
 import type { Customer, DiscountType, Product } from "@/lib/types";
 import {
@@ -658,6 +659,74 @@ export function CustomerMappingDialog({
     }
   }
 
+  /**
+   * In nhanh các dòng đang soạn (không cần lưu): ảnh, mã, tên, khu vực, quy
+   * cách, chất liệu/bề mặt, màu, tồn kho và giá đề xuất.
+   */
+  function handleQuickPrint() {
+    // Tên khu vực nằm ở mô tả nhóm (item.size là ô "Khu vực" tự do của từng dòng).
+    const areaName = new Map<string, string>();
+    for (const item of items) {
+      const key = item.areaGroupKey || "";
+      if (item.description.trim() && !areaName.get(key))
+        areaName.set(key, item.description.trim());
+    }
+    const rows: ProductQuickSheetRow[] = items.flatMap((item) => {
+      const area = areaName.get(item.areaGroupKey || "") || item.size.trim();
+      const overridden = item.priceOverride.trim() !== "";
+      const price = overridden
+        ? Number(item.priceOverride.replace(/\D/g, ""))
+        : autoPriceFor(item, priceBasis);
+      if (item.product) {
+        const p = item.product;
+        return [
+          {
+            code: p.code || "",
+            name: p.name || "",
+            image: p.image_path || "",
+            area,
+            size: p.size || "",
+            material: [p.material, p.surface].filter(Boolean).join(" · "),
+            color: p.color || "",
+            internalCodes: (p.internal_codes || p.multi_codes_list || "").trim(),
+            stock: p.total_stock ?? null,
+            price: price || null,
+          },
+        ];
+      }
+      if (item.customProduct) {
+        const c = item.customProduct;
+        return [
+          {
+            code: c.code || "",
+            name: c.name || "",
+            image: c.imageDataUrl || c.imagePath || "",
+            area,
+            size: c.size || "",
+            material: c.surface || "",
+            price: price || null,
+          },
+        ];
+      }
+      return [];
+    });
+    const subtitle = effectiveMapping?.code
+      ? `Đề xuất vật liệu ${effectiveMapping.code}`
+      : undefined;
+    if (
+      !openProductQuickSheet({
+        title: "ĐỀ XUẤT VẬT LIỆU · DANH SÁCH SẢN PHẨM",
+        subtitle,
+        rows,
+        notes: [
+          "Đơn giá là Giá đề xuất (đ/m², đã bao gồm VAT).",
+          "Tồn kho là tổng tồn của các kho.",
+        ],
+      })
+    )
+      toast.error("Trình duyệt đang chặn cửa sổ in nhanh");
+  }
+
   function closeDialog(nextOpen: boolean) {
     if (!nextOpen && (saving || importing || exporting || deleting)) return;
     onOpenChange(nextOpen);
@@ -683,6 +752,8 @@ export function CustomerMappingDialog({
             busy={saving || importing || exporting || deleting}
             confirmDelete={confirmDelete}
             onExport={() => void handleExport()}
+            onQuickPrint={() => void handleQuickPrint()}
+            quickPrintDisabled={!items.some((item) => item.product || item.customProduct)}
             onDelete={handleDelete}
             onCancelDelete={() => setConfirmDelete(false)}
           />
@@ -1073,6 +1144,8 @@ function EditorHeader({
   busy,
   confirmDelete,
   onExport,
+  onQuickPrint,
+  quickPrintDisabled,
   onDelete,
   onCancelDelete,
 }: {
@@ -1082,6 +1155,8 @@ function EditorHeader({
   busy: boolean;
   confirmDelete: boolean;
   onExport: () => void;
+  onQuickPrint: () => void;
+  quickPrintDisabled: boolean;
   onDelete: () => void;
   onCancelDelete: () => void;
 }) {
@@ -1092,43 +1167,55 @@ function EditorHeader({
           <Image className="size-4 text-terracotta" />
           {mapping ? "Sửa đề xuất vật liệu" : "Tạo đề xuất vật liệu"}
         </DialogTitle>
-        {mapping ? (
-          <div className="relative flex items-center rounded-lg border border-border/70 bg-card p-0.5 shadow-sm">
-            <button
-              type="button"
-              onClick={onExport}
-              disabled={busy || exporting || deleting}
-              className="h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 hover:bg-surface-strong disabled:opacity-50"
-            >
-              {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <FileDown className="size-3.5" />}
-              <span className="hidden sm:inline">Xuất PDF</span>
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={busy || exporting || deleting}
-              aria-label="Xóa đề xuất vật liệu"
-              className={
-                confirmDelete
-                  ? "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                  : "size-8 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-              }
-            >
-              {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-              {confirmDelete ? <span className="hidden sm:inline">Xóa vĩnh viễn</span> : null}
-            </button>
-            {confirmDelete ? (
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onQuickPrint}
+            disabled={busy || exporting || deleting || quickPrintDisabled}
+            className="h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 hover:bg-surface-strong disabled:opacity-50"
+            title="In nhanh danh sách sản phẩm đang soạn: ảnh, mã, tên, quy cách, tồn kho, giá (không cần lưu)"
+          >
+            <FileText className="size-3.5" />
+            <span className="hidden sm:inline">In sản phẩm</span>
+          </button>
+          {mapping ? (
+            <div className="relative flex items-center rounded-lg border border-border/70 bg-card p-0.5 shadow-sm">
               <button
                 type="button"
-                onClick={onCancelDelete}
-                disabled={deleting}
-                className="h-8 px-2.5 rounded-md text-xs font-medium bg-card hover:bg-surface-strong disabled:opacity-50"
+                onClick={onExport}
+                disabled={busy || exporting || deleting}
+                className="h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 hover:bg-surface-strong disabled:opacity-50"
               >
-                Không xóa
+                {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <FileDown className="size-3.5" />}
+                <span className="hidden sm:inline">Xuất PDF</span>
               </button>
-            ) : null}
-          </div>
-        ) : null}
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={busy || exporting || deleting}
+                aria-label="Xóa đề xuất vật liệu"
+                className={
+                  confirmDelete
+                    ? "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                    : "size-8 grid place-items-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                }
+              >
+                {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                {confirmDelete ? <span className="hidden sm:inline">Xóa vĩnh viễn</span> : null}
+              </button>
+              {confirmDelete ? (
+                <button
+                  type="button"
+                  onClick={onCancelDelete}
+                  disabled={deleting}
+                  className="h-8 px-2.5 rounded-md text-xs font-medium bg-card hover:bg-surface-strong disabled:opacity-50"
+                >
+                  Không xóa
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </DialogHeader>
   );

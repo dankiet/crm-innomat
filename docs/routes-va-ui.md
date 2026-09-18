@@ -63,16 +63,16 @@ Nhóm hiện có (`src/lib/product-categories.ts`):
 | `gach-bong`   | Gạch Bông                             |
 | `gach-op-lat` | Gạch Ốp Lát                           |
 
-**3. `/san-pham`: mặc định kho phải là `KHOQ9` trong loader.**
+**3. `/san-pham`: mặc định kho phải là `KHOBC` trong loader.**
 
 ```ts
-// UI defaults the warehouse chip to Kho Q9 when URL has no stockLocation.
-// Must mirror that here — otherwise listProducts sums Q9+VP (no JOIN filter).
+// UI defaults the warehouse chip to Kho Bình Chánh when URL has no stockLocation.
+// Must mirror that here — otherwise listProducts sums Bình Chánh+VP (no JOIN filter).
 const stockLocation =
-  !deps.stockLocation || deps.stockLocation === "ALL" ? "KHOQ9" : deps.stockLocation;
+  !deps.stockLocation || deps.stockLocation === "ALL" ? "KHOBC" : deps.stockLocation;
 ```
 
-Bỏ dòng này thì tồn kho hiện lên là tổng Q9 + VP trong khi chip UI nói "Kho Q9". Xem
+Bỏ dòng này thì tồn kho hiện lên là tổng Bình Chánh + VP trong khi chip UI nói "Kho Bình Chánh". Xem
 [san-pham-ton-kho-import.md](san-pham-ton-kho-import.md).
 
 ## Sidebar

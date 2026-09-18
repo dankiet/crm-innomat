@@ -50,15 +50,15 @@ LEFT JOIN inventory inv ON inv.internal_code = pic.internal_code AND inv.stock_l
 Nhờ vậy sản phẩm không có tồn ở kho đó **vẫn hiện** (với `total_stock` null) thay vì bị lọc mất.
 
 Hệ quả: **không truyền `stockLocation` thì `total_stock` là tổng tất cả kho.** UI mặc định chip kho
-là **Kho Q9**, nên loader của `/san-pham` phải mirror mặc định đó, nếu không con số hiện lên sẽ là
-Q9 + VP:
+là **Kho Bình Chánh**, nên loader của `/san-pham` phải mirror mặc định đó, nếu không con số hiện lên sẽ là
+Bình Chánh + VP:
 
 ```ts
 // src/routes/_app.san-pham.tsx
-// UI defaults the warehouse chip to Kho Q9 when URL has no stockLocation.
-// Must mirror that here — otherwise listProducts sums Q9+VP (no JOIN filter).
+// UI defaults the warehouse chip to Kho Bình Chánh when URL has no stockLocation.
+// Must mirror that here — otherwise listProducts sums Bình Chánh+VP (no JOIN filter).
 const stockLocation =
-  !deps.stockLocation || deps.stockLocation === "ALL" ? "KHOQ9" : deps.stockLocation;
+  !deps.stockLocation || deps.stockLocation === "ALL" ? "KHOBC" : deps.stockLocation;
 ```
 
 Tìm kiếm quét đồng thời `code`, `multi_codes_list`, `name`, `size`, `supplier` — nên gõ mã nội bộ

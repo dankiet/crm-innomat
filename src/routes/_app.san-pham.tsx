@@ -427,11 +427,11 @@ export const Route = createFileRoute("/_app/san-pham")({
   },
   loaderDeps: ({ search }: { search: SanPhamSearch }) => ({ stockLocation: search.stockLocation }),
   loader: async ({ deps }) => {
-    // UI defaults the warehouse chip to Kho Q9 when URL has no stockLocation.
-    // Must mirror that here — otherwise listProducts sums Q9+VP (no JOIN filter).
+    // UI defaults the warehouse chip to Kho Bình Chánh when URL has no stockLocation.
+    // Must mirror that here — otherwise listProducts sums Bình Chánh+VP (no JOIN filter).
     const stockLocation =
       !deps.stockLocation || deps.stockLocation === "ALL"
-        ? "KHOQ9"
+        ? "KHOBC"
         : deps.stockLocation;
     const products = await fetchProducts({ data: { stockLocation } });
     return { products };
@@ -1263,15 +1263,15 @@ function ProductsPage() {
           <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0">
             <button
               type="button"
-              onClick={() => setSearch({ stockLocation: "KHOQ9" })}
+              onClick={() => setSearch({ stockLocation: "KHOBC" })}
               className={cn(
                 "h-8 px-3.5 rounded-full text-xs font-medium transition-all",
-                !stockLocParam || stockLocParam === "KHOQ9"
+                !stockLocParam || stockLocParam === "KHOBC"
                   ? "bg-card text-foreground shadow-sm ring-1 ring-black/5"
                   : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
               )}
             >
-              Kho Q9
+              Kho Bình Chánh
             </button>
             <button
               type="button"

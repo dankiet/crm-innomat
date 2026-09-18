@@ -1664,19 +1664,25 @@ export const importStockUpdateFn = createServerFn({ method: "POST" })
 
     for (const item of data.items ?? []) {
       const internal_code = String(item.internal_code ?? "").trim();
-      const stock_location = String(item.stock_location ?? "").trim();
+      // Kho Q9 đã đổi tên thành KHOBC (Bình Chánh); file MISA chuyển đổi dần
+      // nên vẫn còn nhãn "KHOQ9" — quy về KHOBC để cùng một kho.
+      const rawLocation = String(item.stock_location ?? "").trim();
+      const stock_location = rawLocation === "KHOQ9" ? "KHOBC" : rawLocation;
       if (!internal_code || !stock_location) {
         skipped++;
         continue;
       }
       const rawQuantity = Number(item.quantity);
       const quantity = Number.isFinite(rawQuantity) ? Math.max(0, rawQuantity) : 0;
-      // File MISA có thể chứa trùng mã/kho; giữ dòng cuối cùng như import tuần tự cũ.
-      normalized.set(`${internal_code}|${stock_location}`, {
-        internal_code,
-        stock_location,
-        quantity,
-      });
+      // Cùng mã + cùng kho (kể cả KHOQ9 đã quy về KHOBC) → cộng dồn tồn kho,
+      // khớp với migration gộp KHOQ9 vào KHOBC trong schema-pg.sql.
+      const key = `${internal_code}|${stock_location}`;
+      const prev = normalized.get(key);
+      if (prev) {
+        prev.quantity += quantity;
+      } else {
+        normalized.set(key, { internal_code, stock_location, quantity });
+      }
     }
 
     const rows = [...normalized.values()];
@@ -1710,7 +1716,44 @@ export const importStockUpdateFn = createServerFn({ method: "POST" })
           .run(...valid.flatMap((row) => [row.internal_code, row.stock_location, row.quantity]));
         updated += Number(result.changes) || 0;
       }
+
+      // Cân đối kho: mã có internal (đã từng có stock) nhưng không xuất hiện
+      // trong file với kho mà file bao phủ → hết hàng, đưa tồn kho về 0.
+      // Mã không khớp internal đã bị bỏ qua ở trên (không nằm trong inventory).
+      const covered = new Map<string, string[]>();
+      for (const row of rows) {
+        const list = covered.get(row.stock_location);
+        if (list) list.push(row.internal_code);
+        else covered.set(row.stock_location, [row.internal_code]);
+      }
+      for (const [location, codes] of covered) {
+        const placeholders = codes.map(() => "?").join(", ");
+        const zeroed = await tx
+          .prepare(
+            `UPDATE inventory SET quantity_stock = 0
+             WHERE stock_location = ?
+               AND quantity_stock <> 0
+               AND internal_code NOT IN (${placeholders})`,
+          )
+          .run(location, ...codes);
+        updated += Number(zeroed.changes) || 0;
+
+        // Nhãn KHOQ9 cũ đã được file quy về KHOBC (cộng dồn). Dòng KHOQ9 còn
+        // lại trong DB là dữ liệu đợt trước chưa migrate → phải về 0, nếu không
+        // migration gộp KHOQ9→KHOBC sẽ cộng trùng lên tồn kho mới của KHOBC.
+        if (location === "KHOBC") {
+          const stale = await tx
+            .prepare(
+              `UPDATE inventory SET quantity_stock = 0
+               WHERE stock_location = 'KHOQ9'
+                 AND quantity_stock <> 0`,
+            )
+            .run();
+          updated += Number(stale.changes) || 0;
+        }
+      }
     });
+    await runTx();
     return { updated, skipped };
   });
 
