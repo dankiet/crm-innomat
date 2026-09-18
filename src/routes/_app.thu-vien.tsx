@@ -82,6 +82,7 @@ import {
   type FacetKey,
   type FacetOption,
 } from "@/lib/product-filters";
+import { BLANK_FILTER_VALUE, toneLabel, toneOf } from "@/lib/color-tones";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import type {
   GalleryCollection,
@@ -291,7 +292,7 @@ type CollectionDetail = {
 const FACETS: Array<{ key: FacetKey; label: string }> = [
   { key: "category", label: "Nhóm" },
   { key: "supplier", label: "Nhà cung cấp" },
-  { key: "color", label: "Màu" },
+  { key: "color", label: "Tông màu" },
   { key: "surface", label: "Bề mặt" },
   { key: "size", label: "Kích thước" },
   { key: "shape", label: "Kiểu dáng" },
@@ -322,6 +323,10 @@ function searchTokens(query: string): string[] {
 
 /** Đọc giá trị facet động từ candidate — Field names giống nhau giữa các row sản phẩm. */
 function facetValueOf(row: GalleryImageCandidate, key: FacetKey): string | null {
+  if (key === "color") {
+    const group = toneOf(row.color);
+    return group && group !== BLANK_FILTER_VALUE ? group : null;
+  }
   return (row as unknown as Record<FacetKey, string | undefined>)[key]?.trim() ?? null;
 }
 
@@ -1871,7 +1876,7 @@ function ImagePickerDialog({
   const options = useMemo(() => {
     const result = {} as Record<FacetKey, FacetOption[]>;
     for (const facet of FACETS) {
-      result[facet.key] = buildFacetOptions(
+      const built = buildFacetOptions(
         searchRows,
         facet.key,
         (entry, key) => facetValueOf(entry.row, key),
@@ -1882,6 +1887,10 @@ function ImagePickerDialog({
           uniqueBy: (entry) => entry.row.product_id,
         },
       );
+      result[facet.key] =
+        facet.key === "color"
+          ? built.map((o) => ({ ...o, label: toneLabel(o.value) }))
+          : built;
     }
     return result;
   }, [searchRows, tokens, exactSet, filters]);

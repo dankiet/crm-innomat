@@ -76,6 +76,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  normalizeToneSelection,
+  TONE_GROUPS,
+  toneLabel,
+  toneOf,
+} from "@/lib/color-tones";
 import { NewQuoteDialog } from "@/components/NewQuoteDialog";
 
 /** Mỗi lần cuộn xuống tải thêm */
@@ -667,7 +673,10 @@ function ProductsPage() {
     [indexed],
   );
 
-  const colorSet = useMemo(() => new Set(colorsParam), [colorsParam]);
+  const colorSet = useMemo(
+    () => new Set(colorsParam.map(normalizeToneSelection)),
+    [colorsParam],
+  );
   const surfaceSet = useMemo(() => new Set(surfacesParam), [surfacesParam]);
   const sizeSet = useMemo(() => new Set(sizesParam), [sizesParam]);
   const shapeSet = useMemo(() => new Set(shapesParam), [shapesParam]);
@@ -693,7 +702,7 @@ function ProductsPage() {
         ) || /^\d{3,4}\s*x\s*\d{3,4}/i.test(deferredSearch.trim());
 
       return indexed.filter(({ p, codeHay, nameHay, collectionHay, searchRow }) => {
-        if (exclude !== "color" && !matchesFacet(colorSet, p.color)) return false;
+        if (exclude !== "color" && !matchesFacet(colorSet, toneOf(p.color))) return false;
         if (exclude !== "surface" && !matchesFacet(surfaceSet, p.surface)) return false;
         if (exclude !== "size" && !matchesFacet(sizeSet, p.size)) return false;
         if (exclude !== "shape" && !matchesFacet(shapeSet, p.shape)) return false;
@@ -726,11 +735,22 @@ function ProductsPage() {
   const colorOptions = useMemo(() => {
     const map = new Map<string, number>();
     for (const { p } of matchIndexed("color")) {
-      addFacetCount(map, p.color);
+      addFacetCount(map, toneOf(p.color));
     }
+    const TONE_ORDER = new Map<string, number>(
+      TONE_GROUPS.map((g, i) => [g.id, i]),
+    );
     return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], "vi"))
-      .map(toFacetOption);
+      .map(([value, count]) => ({
+        value,
+        count,
+        label: toneLabel(value),
+      }))
+      .sort(
+        (a, b) =>
+          (TONE_ORDER.get(a.value) ?? Number.MAX_SAFE_INTEGER) -
+          (TONE_ORDER.get(b.value) ?? Number.MAX_SAFE_INTEGER),
+      );
   }, [matchIndexed]);
 
   const surfaceOptions = useMemo(() => {
@@ -1301,9 +1321,9 @@ function ProductsPage() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Desktop: facets */}
           <div className="hidden md:contents">
-            <FilterChip label="Màu" count={colorsParam.length}>
+            <FilterChip label="Tông màu" count={colorsParam.length}>
               <MultiSelectFilter
-                title="Chọn màu"
+                title="Chọn tông màu"
                 options={colorOptions}
                 selected={colorsParam}
                 onChange={(next) =>
@@ -1398,9 +1418,9 @@ function ProductsPage() {
               <DialogTitle>Bộ lọc sản phẩm</DialogTitle>
             </DialogHeader>
             <div className="space-y-2 py-1">
-              <FilterSection title="Màu" count={filtersDraft?.colors.length ?? colorsParam.length}>
+              <FilterSection title="Tông màu" count={filtersDraft?.colors.length ?? colorsParam.length}>
                 <MultiSelectFilter
-                  title="Chọn màu"
+                  title="Chọn tông màu"
                   options={colorOptions}
                   selected={filtersDraft?.colors ?? colorsParam}
                   onChange={(next) => patchFiltersDraft({ colors: next })}
@@ -1487,7 +1507,7 @@ function ProductsPage() {
                   })
                 }
               >
-                {c}
+                {toneLabel(normalizeToneSelection(c))}
               </ActiveTag>
             ))}
             {surfacesParam.map((s: string) => (
