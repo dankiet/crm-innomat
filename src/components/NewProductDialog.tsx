@@ -414,7 +414,7 @@ export function NewProductDialog({
                   onDeleteOption={(option) => void handleDeleteOption("shape", option)}
                 />
               </Field>
-              <Field label="Hiệu ứng vân (Texture)">
+              <Field label="Hiệu ứng vân">
                 <ProductSuggestionField
                   value={form.texture}
                   onChange={(v) => setForm((f) => ({ ...f, texture: v }))}

@@ -57,7 +57,7 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
-import { PRODUCT_COLORS } from "@/lib/types";
+import { PRODUCT_COLORS, PRODUCT_TEXTURES } from "@/lib/types";
 export const Route = createFileRoute("/_app/luu-tru")({
   errorComponent: ({ error }) => (
     <div className="p-8 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300">
@@ -538,10 +538,12 @@ function MediaStoragePage() {
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSurfaces, setSelectedSurfaces] = useState<string[]>([]);
   const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
+  const [selectedTextures, setSelectedTextures] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [colorOptions, setColorOptions] = useState<{ value: string; label: string }[]>([]);
   const [surfaceOptions, setSurfaceOptions] = useState<{ value: string; label: string }[]>([]);
   const [shapeOptions, setShapeOptions] = useState<{ value: string; label: string }[]>([]);
+  const [textureOptions, setTextureOptions] = useState<{ value: string; label: string }[]>([]);
   const [collectionOptions, setCollectionOptions] = useState<{ value: string; label: string }[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -557,12 +559,15 @@ function MediaStoragePage() {
       fetchProductFieldValues({ data: { field: "surface", category: catParam } }).catch(() => [] as string[]),
       fetchProductFieldValues({ data: { field: "shape", category: catParam } }).catch(() => [] as string[]),
       fetchProductFieldValues({ data: { field: "collections", category: catParam } }).catch(() => [] as string[]),
-    ]).then(([colors, surfaces, shapes, collections]) => {
+      fetchProductFieldValues({ data: { field: "texture", category: catParam } }).catch(() => [] as string[]),
+    ]).then(([colors, surfaces, shapes, collections, textures]) => {
       if (cancelled) return;
       const allColors = Array.from(new Set([...(catParam ? [] : PRODUCT_COLORS), ...colors])).filter(Boolean);
+      const allTextures = Array.from(new Set([...(catParam ? [] : PRODUCT_TEXTURES), ...textures])).filter(Boolean);
       setColorOptions(allColors.map((c) => ({ value: c, label: c })));
       setSurfaceOptions(surfaces.filter(Boolean).map((s) => ({ value: s, label: s })));
       setShapeOptions(shapes.filter(Boolean).map((s) => ({ value: s, label: s })));
+      setTextureOptions(allTextures.map((t) => ({ value: t, label: t })));
       setCollectionOptions(collections.filter(Boolean).map((c) => ({ value: c, label: c })));
     });
     return () => {
@@ -575,6 +580,7 @@ function MediaStoragePage() {
     setSelectedColors([]);
     setSelectedSurfaces([]);
     setSelectedShapes([]);
+    setSelectedTextures([]);
     setSelectedCollections([]);
   }, [category]);
   useEffect(() => {
@@ -664,6 +670,7 @@ function MediaStoragePage() {
         colors: selectedColors.length ? selectedColors : undefined,
         surfaces: selectedSurfaces.length ? selectedSurfaces : undefined,
         shapes: selectedShapes.length ? selectedShapes : undefined,
+        textures: selectedTextures.length ? selectedTextures : undefined,
         collections: selectedCollections.length ? selectedCollections : undefined,
         sort,
         page: targetPage,
@@ -695,6 +702,7 @@ function MediaStoragePage() {
         colors: selectedColors.length ? selectedColors : undefined,
         surfaces: selectedSurfaces.length ? selectedSurfaces : undefined,
         shapes: selectedShapes.length ? selectedShapes : undefined,
+        textures: selectedTextures.length ? selectedTextures : undefined,
         collections: selectedCollections.length ? selectedCollections : undefined,
         sort,
         pageSize: 1,
@@ -713,7 +721,7 @@ function MediaStoragePage() {
     setPage(1);
     loadData(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, category, roomSlug, publicFilter, selectedColors, selectedSurfaces, selectedShapes, selectedCollections, sort, debouncedSearch, pageSize]);
+  }, [tab, category, roomSlug, publicFilter, selectedColors, selectedSurfaces, selectedShapes, selectedTextures, selectedCollections, sort, debouncedSearch, pageSize]);
 
   function handlePageChange(newPage: number) {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
@@ -1063,6 +1071,15 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
+          <FilterChip label="Hiệu ứng vân" count={selectedTextures.length}>
+            <MultiSelectFilter
+              title="Chọn hiệu ứng vân"
+              options={textureOptions}
+              selected={selectedTextures}
+              onChange={setSelectedTextures}
+              searchable
+            />
+          </FilterChip>
           <FilterChip label="Bộ sưu tập" count={selectedCollections.length}>
             <MultiSelectFilter
               title="Chọn bộ sưu tập"
@@ -1072,13 +1089,14 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          {(selectedColors.length > 0 || selectedSurfaces.length > 0 || selectedShapes.length > 0 || selectedCollections.length > 0) ? (
+          {(selectedColors.length > 0 || selectedSurfaces.length > 0 || selectedShapes.length > 0 || selectedTextures.length > 0 || selectedCollections.length > 0) ? (
             <button
               type="button"
               onClick={() => {
                 setSelectedColors([]);
                 setSelectedSurfaces([]);
                 setSelectedShapes([]);
+                setSelectedTextures([]);
                 setSelectedCollections([]);
               }}
               className="h-8 px-3 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-strong/60 transition-colors cursor-pointer"

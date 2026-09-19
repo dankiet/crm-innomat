@@ -1768,6 +1768,7 @@ export const fetchFlatMediaImagesFn = createServerFn({ method: "GET" })
       colors?: string[];
       surfaces?: string[];
       shapes?: string[];
+      textures?: string[];
       collections?: string[];
       page?: number;
       pageSize?: number;

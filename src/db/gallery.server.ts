@@ -166,7 +166,7 @@ export async function listGalleryImageCandidates(opts?: {
         i.is_primary, i.sort_order, i.kind, p.code, p.name,
         COALESCE(codes.internal_codes, '') AS internal_codes,
         p.category, p.supplier, p.color, p.surface, p.size, p.shape,
-        p.collections, p.material
+        p.texture, p.collections, p.material
        FROM product_images i
        JOIN products p ON p.id = i.product_id
        LEFT JOIN (

@@ -2797,6 +2797,7 @@ export async function listFlatMediaImages(opts?: {
   colors?: string[];
   surfaces?: string[];
   shapes?: string[];
+  textures?: string[];
   collections?: string[];
   page?: number;
   pageSize?: number;
@@ -2855,6 +2856,12 @@ export async function listFlatMediaImages(opts?: {
     const placeholders = opts.shapes.map(() => "?").join(", ");
     baseWhere.push(`p.shape IN (${placeholders})`);
     baseParams.push(...opts.shapes);
+  }
+
+  if (opts?.textures && opts.textures.length > 0) {
+    const placeholders = opts.textures.map(() => "?").join(", ");
+    baseWhere.push(`p.texture IN (${placeholders})`);
+    baseParams.push(...opts.textures);
   }
 
   if (opts?.collections && opts.collections.length > 0) {

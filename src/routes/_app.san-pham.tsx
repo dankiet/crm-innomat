@@ -148,7 +148,7 @@ function parseCsv(v: unknown): string[] {
 }
 
 /** Nhóm facet — dùng khi tính options: loại facet của chính nhóm đó ra khỏi bộ lọc. */
-type FacetKey = "color" | "surface" | "size" | "shape" | "effect" | "collection";
+type FacetKey = "color" | "surface" | "size" | "shape" | "texture" | "effect" | "collection";
 const BLANK_FILTER_VALUE = "__blank__";
 
 function matchesFacet(values: Set<string>, value: string | null | undefined): boolean {
@@ -370,6 +370,8 @@ type SanPhamSearch = {
   sizes?: string[];
   /** Kiểu dáng */
   shapes?: string[];
+  /** Hiệu ứng vân */
+  textures?: string[];
   /** Hiệu ứng vân/mặt gạch */
   collections?: string[];
   /** Bộ sưu tập */
@@ -397,6 +399,9 @@ export const Route = createFileRoute("/_app/san-pham")({
     shapes: Array.isArray(search.shapes)
       ? (search.shapes as string[])
       : parseCsv(search.shapes),
+    textures: Array.isArray(search.textures)
+      ? (search.textures as string[])
+      : parseCsv(search.textures),
     collections: Array.isArray(search.collections)
       ? (search.collections as string[])
       : parseCsv(search.collections),
@@ -541,6 +546,7 @@ function ProductsPage() {
     surfaces: surfacesParam = [],
     sizes: sizesParam = [],
     shapes: shapesParam = [],
+    textures: texturesParam = [],
     collections: effectsParam = [],
     supplier: collectionsParam = [],
     hot: hotParam = false,
@@ -601,6 +607,7 @@ function ProductsPage() {
     colors: string[];
     surfaces: string[];
     shapes: string[];
+    textures: string[];
     collections: string[];
     supplier: string[];
   } | null>(null);
@@ -611,6 +618,7 @@ function ProductsPage() {
       colors: colorsParam,
       surfaces: surfacesParam,
       shapes: shapesParam,
+      textures: texturesParam,
       collections: effectsParam,
       supplier: collectionsParam,
     });
@@ -627,6 +635,7 @@ function ProductsPage() {
       colors: [],
       surfaces: [],
       shapes: [],
+      textures: [],
       collections: [],
       supplier: [],
     });
@@ -643,6 +652,7 @@ function ProductsPage() {
       colors: d.colors.length ? d.colors : undefined,
       surfaces: d.surfaces.length ? d.surfaces : undefined,
       shapes: d.shapes.length ? d.shapes : undefined,
+      textures: d.textures.length ? d.textures : undefined,
       collections: d.collections.length ? d.collections : undefined,
       supplier: d.supplier.length ? d.supplier : undefined,
     });
@@ -680,6 +690,7 @@ function ProductsPage() {
   const surfaceSet = useMemo(() => new Set(surfacesParam), [surfacesParam]);
   const sizeSet = useMemo(() => new Set(sizesParam), [sizesParam]);
   const shapeSet = useMemo(() => new Set(shapesParam), [shapesParam]);
+  const textureSet = useMemo(() => new Set(texturesParam), [texturesParam]);
   const effectSet = useMemo(() => new Set(effectsParam), [effectsParam]);
   const collectionSet = useMemo(
     () => new Set(collectionsParam),
@@ -706,6 +717,7 @@ function ProductsPage() {
         if (exclude !== "surface" && !matchesFacet(surfaceSet, p.surface)) return false;
         if (exclude !== "size" && !matchesFacet(sizeSet, p.size)) return false;
         if (exclude !== "shape" && !matchesFacet(shapeSet, p.shape)) return false;
+        if (exclude !== "texture" && !matchesFacet(textureSet, p.texture)) return false;
         if (exclude !== "effect" && !matchesFacet(effectSet, p.collections)) return false;
         if (exclude !== "collection" && !matchesFacet(collectionSet, p.supplier)) return false;
         if (hotParam && !p.is_hot) return false;
@@ -725,6 +737,7 @@ function ProductsPage() {
       surfaceSet,
       sizeSet,
       shapeSet,
+      textureSet,
       effectSet,
       collectionSet,
       hotParam,
@@ -771,6 +784,16 @@ function ProductsPage() {
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0], "vi"))
+      .map(toFacetOption);
+  }, [matchIndexed]);
+
+  const textureOptions = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const { p } of matchIndexed("texture")) {
+      addFacetCount(map, p.texture);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
       .map(toFacetOption);
   }, [matchIndexed]);
 
@@ -934,6 +957,7 @@ function ProductsPage() {
     surfacesParam.length +
     sizesParam.length +
     shapesParam.length +
+    texturesParam.length +
     effectsParam.length +
     collectionsParam.length +
     (hotParam ? 1 : 0) +
@@ -945,6 +969,7 @@ function ProductsPage() {
   /** Facet đếm cho mobile sheet (desktop đã show hết chip) */
   const secondaryFilterCount =
     shapesParam.length +
+    texturesParam.length +
     effectsParam.length +
     collectionsParam.length;
   const primaryFilterCount =
@@ -959,6 +984,7 @@ function ProductsPage() {
       filtersDraft.surfaces.length +
       filtersDraft.sizes.length +
       filtersDraft.shapes.length +
+      filtersDraft.textures.length +
       filtersDraft.collections.length +
       filtersDraft.supplier.length
     : 0;
@@ -976,6 +1002,7 @@ function ProductsPage() {
           delete next.surfaces;
         if (!next.sizes || next.sizes.length === 0) delete next.sizes;
         if (!next.shapes || next.shapes.length === 0) delete next.shapes;
+        if (!next.textures || next.textures.length === 0) delete next.textures;
         if (!next.collections || next.collections.length === 0) delete next.collections;
         if (!next.supplier || next.supplier.length === 0)
           delete next.supplier;
@@ -1007,6 +1034,7 @@ function ProductsPage() {
       surfaces: undefined,
       sizes: undefined,
       shapes: undefined,
+      textures: undefined,
       collections: undefined,
       supplier: undefined,
       hot: undefined,
@@ -1354,6 +1382,17 @@ function ProductsPage() {
                 searchable
               />
             </FilterChip>
+            <FilterChip label="Hiệu ứng vân" count={texturesParam.length}>
+              <MultiSelectFilter
+                title="Chọn hiệu ứng vân"
+                options={textureOptions}
+                selected={texturesParam}
+                onChange={(next) =>
+                  setSearch({ textures: next.length ? next : undefined })
+                }
+                searchable
+              />
+            </FilterChip>
             <FilterChip label={"B\u1ed9 s\u01b0u t\u1eadp"} count={effectsParam.length}>
               <MultiSelectFilter
                 title={"Ch\u1ecdn b\u1ed9 s\u01b0u t\u1eadp"}
@@ -1445,6 +1484,15 @@ function ProductsPage() {
                   searchable
                 />
               </FilterSection>
+              <FilterSection title="Hiệu ứng vân" count={filtersDraft?.textures.length ?? texturesParam.length}>
+                <MultiSelectFilter
+                  title="Chọn hiệu ứng vân"
+                  options={textureOptions}
+                  selected={filtersDraft?.textures ?? texturesParam}
+                  onChange={(next) => patchFiltersDraft({ textures: next })}
+                  searchable
+                />
+              </FilterSection>
               <FilterSection title={"B\u1ed9 s\u01b0u t\u1eadp"} count={filtersDraft?.collections.length ?? effectsParam.length}>
                 <MultiSelectFilter
                   title={"Ch\u1ecdn b\u1ed9 s\u01b0u t\u1eadp"}
@@ -1532,6 +1580,18 @@ function ProductsPage() {
                 }
               >
                 Kiểu dáng: {s}
+              </ActiveTag>
+            ))}
+            {texturesParam.map((t: string) => (
+              <ActiveTag
+                key={`texture-${t}`}
+                onClear={() =>
+                  setSearch({
+                    textures: texturesParam.filter((x: string) => x !== t),
+                  })
+                }
+              >
+                Hiệu ứng vân: {t}
               </ActiveTag>
             ))}
             {effectsParam.map((e: string) => (

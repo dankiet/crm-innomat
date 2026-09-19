@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 
 type Option = {
   value: string;
-  count: number;
+  /** Số lượng; bỏ trống khi caller không tính count (ẩn trên UI) */
+  count?: number;
   /** Hiển thị; mặc định = value (dùng khi value là key, label là tiếng Việt) */
   label?: string;
 };

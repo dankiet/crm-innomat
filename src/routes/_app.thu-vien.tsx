@@ -282,7 +282,15 @@ type CollectionDetail = {
 };
 
 type FacetKey =
-  "category" | "supplier" | "color" | "surface" | "size" | "shape" | "collections" | "material";
+  | "category"
+  | "supplier"
+  | "color"
+  | "surface"
+  | "size"
+  | "shape"
+  | "texture"
+  | "collections"
+  | "material";
 
 const FACETS: Array<{ key: FacetKey; label: string }> = [
   { key: "category", label: "Nhóm" },
@@ -291,6 +299,7 @@ const FACETS: Array<{ key: FacetKey; label: string }> = [
   { key: "surface", label: "Bề mặt" },
   { key: "size", label: "Kích thước" },
   { key: "shape", label: "Kiểu dáng" },
+  { key: "texture", label: "Hiệu ứng vân" },
   { key: "collections", label: "B\u1ed9 s\u01b0u t\u1eadp" },
   { key: "material", label: "Chất liệu" },
 ];

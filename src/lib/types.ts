@@ -129,6 +129,7 @@ export type GalleryImageCandidate = {
   surface: string;
   size: string;
   shape: string;
+  texture: string;
   collections: string;
   material: string;
   /** Bộ sưu tập đang gắn ảnh này (từ join) */
