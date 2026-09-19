@@ -272,7 +272,7 @@ Không có gì để dọn.
 Sau khi commit `f0c2fc5`, tôi rà lại từng khẳng định trong báo cáo và **tự kiểm chứng** các
 điểm còn nghi ngờ. Bốn việc phát sinh, hai trong số đó là **lỗi thật do chính đợt cleanup gây ra**:
 
-### B15. `vite.config.ts` — lưới import-protection vô hiệu (⚠️ sửa lỗi thật)
+### B15. `vite.config.ts` — lưới import-protection bị hạ cấp thành vô hiệu (⚠️ sửa lỗi thật)
 
 `importProtection.client.files` được khai là `["**/server/**"]`. Nhưng:
 
@@ -282,19 +282,27 @@ Sau khi commit `f0c2fc5`, tôi rà lại từng khẳng định trong báo cáo 
   là `files: ["**/*.server.*"]`, và config người dùng **ghi đè** chứ không merge:
   `pick(user, fallback) = user ? [...user] : [...fallback]` (`plugin.js:785`).
 
-→ Lưới **vô hiệu hoàn toàn**: client lỡ import `@/lib/storage.server` sẽ kéo `node:fs`/`pg`
-vào bundle mà build vẫn xanh. Đây là rủi ro thật, không phải chuyện đặt tên.
+→ Bản cũ là một bước **hạ cấp** so với mặc định, khiến lưới **vô hiệu hoàn toàn**: client lỡ
+import `@/lib/storage.server` sẽ kéo `node:fs`/`pg` vào bundle mà build vẫn xanh. Đây là rủi ro
+thật, không phải chuyện đặt tên.
 
-**Sửa:** thêm `**/*.server.ts` vào `client.files`.
+**Sửa:** trả `client.files` về đúng mặc định `["**/*.server.*"]` (phủ `.ts`/`.js`/`.mjs`) thay vì
+tự thu hẹp thành `*.server.ts`.
 
-**Kiểm chứng bằng test âm** (không chỉ "build vẫn xanh"):
+> Ghi chú: `specifiers` thì **được merge** với mặc định
+> (`dedupePatterns([...defaults.client.specifiers, ...user…])`), nên các marker
+> `@tanstack/react-start/server-only` chưa bao giờ mất. Chỉ `files` và `excludeFiles` bị ghi đè.
 
-1. Thêm `import { readImageBytes } from "@/lib/storage.server"` vào `src/routes/_app.ghi-chu.tsx`
-   và **dùng thật** giá trị (`${typeof readImageBytes}` trong JSX) — lần thử đầu không dùng
-   nên bị tree-shake, test **không kết luận được gì**.
-2. `npm run build` → **FAIL** với `[plugin tanstack-start-core:import-protection]` /
-   `[import-protection] Import denied in client environment` ✓
-3. Gỡ import → build xanh lại ✓ (`git diff` trên file đó rỗng, đã hoàn nguyên sạch).
+**Kiểm chứng HAI CHIỀU** (không chỉ "build vẫn xanh"):
+
+| Chiều | Cách làm | Kết quả |
+|---|---|---|
+| **Có chặn** (không false negative) | Thêm `import { readImageBytes } from "@/lib/storage.server"` vào `src/routes/_app.ghi-chu.tsx` và **dùng thật** giá trị (`${typeof readImageBytes}` trong JSX) | **FAIL, `exit=1`**<br>`[import-protection] Import denied in client environment`<br>`Denied by file pattern: **/*.server.*`<br>`Importer: src/routes/_app.ghi-chu.tsx`<br>`Resolved: src/lib/storage.server.ts` |
+| **Không chặn nhầm** (không false positive) | Gỡ import, build lại toàn repo | `✓ built` ×3 — xanh; `git diff` trên file test rỗng |
+
+⚠️ **Bẫy khi test:** lần thử đầu tôi chỉ thêm import mà **không dùng** → esbuild elide nó trước
+khi plugin kịp thấy → build xanh và **test không kết luận được gì**. Phải tham chiếu giá trị
+thật thì mới là test hợp lệ.
 
 ### B16. `useShortlistStorage` — prune API chết (⚠️ lỗ hổng của phương pháp)
 

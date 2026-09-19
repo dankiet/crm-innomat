@@ -38,11 +38,17 @@ export default defineConfig(async (env): Promise<UserConfig> => {
       importProtection: {
         behavior: "error",
         client: {
-          // `**/server/**` là thư mục `server/` (repo không có); `**/*.server.ts` mới là
-          // quy ước thật của repo (db/*.server.ts, lib/*.server.ts). Không có dòng thứ hai
-          // thì lưới này vô hiệu: client lỡ import `@/lib/storage.server` sẽ kéo
-          // node:fs/pg vào bundle mà build vẫn xanh.
-          files: ["**/server/**", "**/*.server.ts"],
+          // PHẢI khớp mặc định của framework: `@tanstack/start-plugin-core`
+          // (import-protection/defaults.js) dùng `files: ["**/*.server.*"]`.
+          // Khai `client.files` sẽ GHI ĐÈ mặc định đó chứ không merge
+          // (`pick(user, fallback) = user ? [...user] : [...fallback]`, plugin.js:785),
+          // nên bản cũ `["**/server/**"]` là một bước HẠ CẤP: repo không có thư mục
+          // `server/` nào → lưới vô hiệu, client lỡ import `@/lib/storage.server` sẽ kéo
+          // node:fs/pg vào bundle mà build vẫn xanh. Giữ đúng `**/*.server.*` (phủ cả
+          // .ts/.js/.mjs) thay vì tự thu hẹp thành `*.server.ts`.
+          files: ["**/*.server.*"],
+          // `specifiers` thì được MERGE với mặc định, nên các marker
+          // `@tanstack/react-start/server-only` vẫn còn hiệu lực.
           specifiers: ["server-only"],
         },
       },

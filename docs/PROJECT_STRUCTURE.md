@@ -159,25 +159,33 @@ seapen/
 
 ## 4. Ranh giới client / server
 
-Cơ chế bảo vệ (`vite.config.ts:38-47`):
+Cơ chế bảo vệ (`vite.config.ts:38-54`):
 
 ```ts
 importProtection: {
   behavior: "error",
-  client: { files: ["**/server/**", "**/*.server.ts"], specifiers: ["server-only"] },
+  client: { files: ["**/*.server.*"], specifiers: ["server-only"] },
 }
 ```
 
 ✅ Lưới này **đang cưỡng chế** quy ước `*.server.ts`: client import một module `.server.ts`
-là **lỗi build** (`[import-protection] Import denied in client environment`).
+là **lỗi build** (`exit 1`), không phải cảnh báo.
 
-> **Lịch sử (đã sửa trong cleanup 2026-09-19):** trước đó `client.files` chỉ có
+> **Lịch sử (đã sửa trong cleanup 2026-09-19):** trước đó `client.files` là
 > `["**/server/**"]`. Repo **không có thư mục `server/`** nào, và framework mặc định
-> (`@tanstack/start-plugin-core` → `defaults.js`: `files: ["**/*.server.*"]`) bị **ghi đè**
-> chứ không merge (`pick(user, fallback) = user ? [...user] : [...fallback]`). Hệ quả: lưới
-> **vô hiệu hoàn toàn** — client lỡ import `@/lib/storage.server` sẽ kéo `node:fs`/`pg` vào
-> bundle mà build vẫn xanh. Đã kiểm chứng bằng **test âm**: thêm một import `.server.ts` có
-> dùng thật vào một route → build FAIL đúng như mong đợi.
+> (`@tanstack/start-plugin-core` → `import-protection/defaults.js`: `files: ["**/*.server.*"]`)
+> bị **ghi đè** chứ không merge — `pick(user, fallback) = user ? [...user] : [...fallback]`
+> (`plugin.js:785`). Nên bản cũ là một bước **hạ cấp**: lưới **vô hiệu hoàn toàn**, client lỡ
+> import `@/lib/storage.server` sẽ kéo `node:fs`/`pg` vào bundle mà build vẫn xanh.
+> (`specifiers` thì ngược lại — được **merge** với mặc định, nên các marker
+> `@tanstack/react-start/server-only` chưa bao giờ mất.)
+
+**Đã kiểm chứng cả hai chiều**, không chỉ "build vẫn xanh":
+
+| Chiều | Cách làm | Kết quả |
+|---|---|---|
+| **Có chặn** (không false negative) | Thêm `import { readImageBytes } from "@/lib/storage.server"` vào `src/routes/_app.ghi-chu.tsx` và **dùng thật** giá trị trong JSX (import không dùng sẽ bị elide trước khi plugin thấy) | **FAIL, `exit=1`**: `Denied by file pattern: **/*.server.*` / `Importer: src/routes/_app.ghi-chu.tsx` / `Resolved: src/lib/storage.server.ts` |
+| **Không chặn nhầm** (không false positive) | Gỡ import, build lại trên toàn repo | `✓ built` ×3, xanh; `git diff` trên file test rỗng |
 
 | Module | Hậu tố `.server` | Chạm `node:fs`/`node:crypto`/secret | Ghi chú |
 |---|---|---|---|
@@ -188,7 +196,8 @@ là **lỗi build** (`[import-protection] Import denied in client environment`).
 
 **Ngoại lệ hợp lệ:** route/component được phép `import type` từ module `.server.ts`
 (2 chỗ: `_app.luu-tru.tsx:46,51`). `import type` bị xoá hoàn toàn khi build nên không
-tạo import runtime — lưới chỉ chặn import **có giá trị**.
+tạo import runtime — lưới chỉ chặn import **có giá trị**. Build xanh hiện tại là bằng chứng
+cho điều này.
 
 ---
 
