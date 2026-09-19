@@ -2215,7 +2215,7 @@ function ImagePickerDialog({
               </button>
             ) : null}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-9">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-9">
             {FACETS.map((facet) => (
               <select
                 key={facet.key}
