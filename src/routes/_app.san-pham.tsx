@@ -148,7 +148,7 @@ function parseCsv(v: unknown): string[] {
 }
 
 /** Nhóm facet — dùng khi tính options: loại facet của chính nhóm đó ra khỏi bộ lọc. */
-type FacetKey = "color" | "surface" | "size" | "shape" | "texture" | "effect" | "collection";
+type FacetKey = "color" | "surface" | "size" | "shape" | "texture" | "collection" | "supplier";
 const BLANK_FILTER_VALUE = "__blank__";
 
 function matchesFacet(values: Set<string>, value: string | null | undefined): boolean {
@@ -548,8 +548,8 @@ function ProductsPage() {
     sizes: sizesParam = [],
     shapes: shapesParam = [],
     textures: texturesParam = [],
-    collections: effectsParam = [],
-    supplier: collectionsParam = [],
+    collections: collectionsParam = [],
+    supplier: supplierParam = [],
     hot: hotParam = false,
     web: webParam,
     view: viewParam = "grid",
@@ -620,8 +620,8 @@ function ProductsPage() {
       surfaces: surfacesParam,
       shapes: shapesParam,
       textures: texturesParam,
-      collections: effectsParam,
-      supplier: collectionsParam,
+      collections: collectionsParam,
+      supplier: supplierParam,
     });
     setMoreFiltersOpen(true);
   }
@@ -692,10 +692,10 @@ function ProductsPage() {
   const sizeSet = useMemo(() => new Set(sizesParam), [sizesParam]);
   const shapeSet = useMemo(() => new Set(shapesParam), [shapesParam]);
   const textureSet = useMemo(() => new Set(texturesParam), [texturesParam]);
-  const effectSet = useMemo(() => new Set(effectsParam), [effectsParam]);
-  const collectionSet = useMemo(
-    () => new Set(collectionsParam),
-    [collectionsParam],
+  const collectionSet = useMemo(() => new Set(collectionsParam), [collectionsParam]);
+  const supplierSet = useMemo(
+    () => new Set(supplierParam),
+    [supplierParam],
   );
 
   /**
@@ -719,8 +719,8 @@ function ProductsPage() {
         if (exclude !== "size" && !matchesFacet(sizeSet, p.size)) return false;
         if (exclude !== "shape" && !matchesFacet(shapeSet, p.shape)) return false;
         if (exclude !== "texture" && !matchesFacet(textureSet, p.texture)) return false;
-        if (exclude !== "effect" && !matchesFacet(effectSet, p.collections)) return false;
-        if (exclude !== "collection" && !matchesFacet(collectionSet, p.supplier)) return false;
+        if (exclude !== "collection" && !matchesFacet(collectionSet, p.collections)) return false;
+        if (exclude !== "supplier" && !matchesFacet(supplierSet, p.supplier)) return false;
         if (hotParam && !p.is_hot) return false;
         if (webParam === "public" && p.is_public !== 1) return false;
         if (webParam === "hidden" && p.is_public === 1) return false;
@@ -739,8 +739,8 @@ function ProductsPage() {
       sizeSet,
       shapeSet,
       textureSet,
-      effectSet,
       collectionSet,
+      supplierSet,
       hotParam,
       webParam,
     ],
@@ -798,23 +798,13 @@ function ProductsPage() {
       .map(toFacetOption);
   }, [matchIndexed]);
 
-  const effectOptions = useMemo(() => {
+  const collectionOptions = useMemo(() => {
     const map = new Map<string, number>();
-    for (const { p } of matchIndexed("effect")) {
+    for (const { p } of matchIndexed("collection")) {
       addFacetCount(map, p.collections);
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(toFacetOption);
-  }, [matchIndexed]);
-
-  const collectionOptions = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { p } of matchIndexed("collection")) {
-      addFacetCount(map, p.supplier);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], "vi"))
       .map(toFacetOption);
   }, [matchIndexed]);
 
@@ -894,8 +884,8 @@ function ProductsPage() {
         surfacesParam.join(","),
         sizesParam.join(","),
         shapesParam.join(","),
-        effectsParam.join(","),
         collectionsParam.join(","),
+        supplierParam.join(","),
         hotParam ? "1" : "0",
         webParam ?? "all",
         stockLocParam,
@@ -908,8 +898,8 @@ function ProductsPage() {
       surfacesParam,
       sizesParam,
       shapesParam,
-      effectsParam,
       collectionsParam,
+      supplierParam,
       hotParam,
       webParam,
       stockLocParam,
@@ -959,8 +949,8 @@ function ProductsPage() {
     sizesParam.length +
     shapesParam.length +
     texturesParam.length +
-    effectsParam.length +
     collectionsParam.length +
+    supplierParam.length +
     (hotParam ? 1 : 0) +
     (webParam ? 1 : 0) +
     (stockLocParam === "KHOVP" ? 1 : 0);
@@ -971,8 +961,8 @@ function ProductsPage() {
   const secondaryFilterCount =
     shapesParam.length +
     texturesParam.length +
-    effectsParam.length +
-    collectionsParam.length;
+    collectionsParam.length +
+    supplierParam.length;
   const primaryFilterCount =
     colorsParam.length +
     surfacesParam.length +
@@ -1394,11 +1384,11 @@ function ProductsPage() {
                 searchable
               />
             </FilterChip>
-            <FilterChip label={"B\u1ed9 s\u01b0u t\u1eadp"} count={effectsParam.length}>
+            <FilterChip label={"B\u1ed9 s\u01b0u t\u1eadp"} count={collectionsParam.length}>
               <MultiSelectFilter
                 title={"Ch\u1ecdn b\u1ed9 s\u01b0u t\u1eadp"}
-                options={effectOptions}
-                selected={effectsParam}
+                options={collectionOptions}
+                selected={collectionsParam}
                 onChange={(next) =>
                   setSearch({ collections: next.length ? next : undefined })
                 }
@@ -1494,11 +1484,11 @@ function ProductsPage() {
                   searchable
                 />
               </FilterSection>
-              <FilterSection title={"B\u1ed9 s\u01b0u t\u1eadp"} count={filtersDraft?.collections.length ?? effectsParam.length}>
+              <FilterSection title={"B\u1ed9 s\u01b0u t\u1eadp"} count={filtersDraft?.collections.length ?? collectionsParam.length}>
                 <MultiSelectFilter
                   title={"Ch\u1ecdn b\u1ed9 s\u01b0u t\u1eadp"}
-                  options={effectOptions}
-                  selected={filtersDraft?.collections ?? effectsParam}
+                  options={collectionOptions}
+                  selected={filtersDraft?.collections ?? collectionsParam}
                   onChange={(next) => patchFiltersDraft({ collections: next })}
                    searchable
                  />
@@ -1595,12 +1585,12 @@ function ProductsPage() {
                 Hiệu ứng vân: {t}
               </ActiveTag>
             ))}
-            {effectsParam.map((e: string) => (
+            {collectionsParam.map((e: string) => (
               <ActiveTag
                 key={`effect-${e}`}
                 onClear={() =>
                   setSearch({
-                    collections: effectsParam.filter((x: string) => x !== e),
+                    collections: collectionsParam.filter((x: string) => x !== e),
                   })
                 }
               >

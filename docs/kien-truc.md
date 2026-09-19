@@ -90,7 +90,7 @@ dev server port **8080** với `host: true`.
 
 ## Kích thước để định hướng
 
-`src/` khoảng **40.000 dòng** TS/TSX trên 104 file (số liệu 2026-09-19 — xem
+`src/` khoảng **39.900 dòng** TS/TSX trên 102 file (số liệu 2026-09-19 — xem
 [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §16 để có bảng đầy đủ và cập nhật). Sáu file lớn
 nhất đáng biết:
 
@@ -99,7 +99,7 @@ nhất đáng biết:
 | `src/db/crm.server.ts`                     | 3.250 | Lớp nghiệp vụ chính (khách hàng, báo giá, đơn, sản phẩm) |
 | `src/routes/_app.thu-vien.tsx`             | 2.699 | Thư viện: trang + 5 dialog con                           |
 | `src/routes/_app.luu-tru.tsx`              | 2.386 | Lưu trữ ảnh: trang + popover + dialog                    |
-| `src/routes/_app.san-pham.tsx`             | 2.290 | Catalog sản phẩm: trang + 6 dialog con                   |
+| `src/routes/_app.san-pham.tsx`             | 2.280 | Catalog sản phẩm: trang + 6 dialog con                   |
 | `src/components/CustomerMappingDialog.tsx` | 2.040 | Đề xuất vật liệu (DXVL)                                  |
 | `src/api/functions.ts`                     | 1.853 | Toàn bộ RPC (86 endpoint)                                |
 
