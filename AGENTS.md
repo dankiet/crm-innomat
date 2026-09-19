@@ -89,6 +89,18 @@ reintroduce the old patterns.
 Tài liệu nằm ở `docs/`. Điểm vào là **`docs/tong-quan-tinh-nang.md`** — bản đồ tính năng
 → route/RPC/bảng. Docs chỉ ghi thứ **suy ra được từ code**; không lặp lại luật trong file này.
 
+## `CLAUDE.md` chỉ là con trỏ
+
+`AGENTS.md` là **nguồn luật duy nhất**. `CLAUDE.md` không chứa luật nào — chỉ trỏ về đây.
+
+Lý do vẫn tồn tại 2 file: `gitnexus analyze` **tự tạo lại `CLAUDE.md`** và chèn block GitNexus
+vào nó (`ai-context.js` — tạo vô điều kiện, không có option tắt riêng; `--skip-agents-md` tắt
+cả `AGENTS.md`). Nên xoá `CLAUDE.md` là vô ích — lần `analyze` sau nó quay lại.
+
+→ Giữ `CLAUDE.md` làm con trỏ. **Đừng chép luật vào đó** — chép là có 2 bản luật trôi lệch nhau.
+`gitnexus analyze` chỉ upsert block giữa 2 marker `<!-- gitnexus:start/end -->`, phần còn lại
+của file được giữ nguyên.
+
 ## Mỗi tài liệu sở hữu một mảng
 
 | Thay đổi gì                                  | Phải sửa                                                            |

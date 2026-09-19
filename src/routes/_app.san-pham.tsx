@@ -363,18 +363,19 @@ function priceOf(p: Product): number {
 type SanPhamSearch = {
   nhom?: string;
   q?: string;
+  /** Tông màu (cột products.color) */
   colors?: string[];
-  /** Bề mặt */
+  /** Bề mặt (products.surface) */
   surfaces?: string[];
-  /** Kích thước */
+  /** Kích thước (products.size) */
   sizes?: string[];
-  /** Kiểu dáng */
+  /** Kiểu dáng (products.shape) */
   shapes?: string[];
-  /** Hiệu ứng vân */
+  /** Hiệu ứng vân (products.texture) */
   textures?: string[];
-  /** Hiệu ứng vân/mặt gạch */
+  /** Bộ sưu tập (products.collections) */
   collections?: string[];
-  /** Bộ sưu tập */
+  /** Nhà cung cấp (products.supplier) */
   supplier?: string[];
   hot?: boolean;
   stockLocation?: string;

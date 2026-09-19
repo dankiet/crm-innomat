@@ -25,16 +25,17 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
 | 14  | Quản trị   | Người dùng (**admin**)                             | `/nguoi-dung`                | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
 | 15  | Quản trị   | Nhật ký thao tác (**admin**)                       | `/nhat-ky`                   | [co-so-du-lieu](co-so-du-lieu.md)                                        |
 
-Vùng `/lp/*` là **công khai** (không qua cổng auth). Mọi route còn lại nằm sau `_app.tsx`.
+Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 4 route **công
+khai**: `/lp/$slug` (landing cho khách vãng lai), `/login`, `/auth/callback`, và `/` (chỉ redirect).
 
 ## 2. Nền tảng
 
 ### Đăng nhập & phân quyền
 
 - `scrypt` hash mật khẩu, session lưu ở bảng `sessions`, cookie `HttpOnly`.
-- **Hai vai**: `admin` và `staff`. Route admin có `beforeLoad` chặn ở client, nhưng đó chỉ là UX —
-  endpoint tương ứng vẫn tự gọi `requireAdmin()`.
-- **Owner-scoping**: `staff` chỉ thấy khách hàng mình phụ trách (`assertCanAccessCustomer`).
+- **Hai vai**: `admin` và `user` (`role CHECK (role IN ('admin','user'))`). Route admin có
+  `beforeLoad` chặn ở client, nhưng đó chỉ là UX — endpoint tương ứng vẫn tự gọi `requireAdmin()`.
+- **Owner-scoping**: vai `user` chỉ thấy khách hàng mình phụ trách (`assertCanAccessCustomer`).
 - **CSRF**: `csrfMiddleware` chỉ áp cho `serverFn` (`src/start.ts`), không áp cho request tài liệu.
 
 ### Dashboard `/tong-quan`

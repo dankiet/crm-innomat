@@ -15,17 +15,24 @@ Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:mi
 | `product_images`         | Ảnh của sản phẩm                                     | `UNIQUE(product_id, path)` + partial unique cho `path LIKE '/products/imported/%'`     |
 | `product_image_room_tags`| Thẻ phòng gán cho ảnh (`room_slug`), kèm `source`, `confidence`, `review_status` | PK ghép `(product_image_id, room_slug)`; dùng bởi tab thẻ phòng ở `/luu-tru` |
 
-Cột `products` dễ nhầm — **ý nghĩa nghiệp vụ không khớp tên cột** (di sản migration):
+Cột `products` gắn với nhãn UI như sau:
 
-| Cột           | Nhãn UI                     |
-| ------------- | --------------------------- |
-| `supplier`    | **Bộ sưu tập**              |
-| `collections` | **Hiệu ứng vân / mặt gạch** |
-| `shape`       | Kiểu dáng                   |
-| `surface`     | Bề mặt                      |
+| Cột           | Nhãn UI      |
+| ------------- | ------------ |
+| `supplier`    | Nhà cung cấp |
+| `collections` | Bộ sưu tập   |
+| `texture`     | Hiệu ứng vân |
+| `shape`       | Kiểu dáng    |
+| `surface`     | Bề mặt       |
+| `color`       | Tông màu     |
 
-Schema có một block `DO $$` đổi tên `collections`→`supplier` và `finish_effect`→`collections`
-cho DB cũ. Đã migrate rồi thì block này không làm gì.
+> **Đã từng đảo nghĩa — đừng đọc nhầm theo ký ức cũ.** DB rất cũ có `collections` chứa *nhà
+> cung cấp* và `finish_effect` chứa *bộ sưu tập*. Block `DO $$` ở `schema-pg.sql:33-40` đổi tên
+> `collections`→`supplier` và `finish_effect`→`collections` để tên khớp nghĩa.
+>
+> Trên DB hiện tại tên **khớp** nghĩa, kiểm chứng bằng dữ liệu thật:
+> `products.collections` = "Bộ Đá Tự Nhiên & Xi Măng 600x600", "Bộ Marble Mây & Neutral";
+> `products.supplier` = "Innomat", "Hiệp Thủy", "Á Châu"; `products.texture` = "Vân đá", "Marble".
 
 Giá: `retail_price` (giá lẻ), `trade_price` (cột A – CTYXD/TKE), `b2b_price` (cột C – cân đối),
 kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [nghiep-vu.md](nghiep-vu.md).
