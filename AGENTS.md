@@ -125,5 +125,10 @@ gitignore**: gitnexus cứ sinh ở máy, nhưng nó không bao giờ vào repo.
 
 ```bash
 npm run build          # Vercel deploy bằng vite build — không typecheck
-npx tsc --noEmit       # 29 lỗi tồn đọng (xem docs/audit-2026-09-19.md §E1); không thêm lỗi mới
+npx tsc --noEmit       # phải là 0 lỗi. Baseline cũ 29 lỗi đã được xoá hẳn (2026-09-19)
 ```
+
+`tsc` là **bất biến**: 0 lỗi, và phải giữ ở 0. Trước đây repo có 29 lỗi tồn đọng khiến type
+checking gần như tắt ở `_app.luu-tru.tsx` (2.358 dòng) — xem
+[docs/audit-2026-09-19.md §E1](docs/audit-2026-09-19.md) để biết chúng là gì.
+Thêm lỗi mới = hỏng.

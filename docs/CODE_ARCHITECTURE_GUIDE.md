@@ -81,8 +81,19 @@ lib  ◄── dùng bởi TẤT CẢ (lá, không trỏ lên)
 
 **Trạng thái hiện tại: 0 vi phạm, 0 chu trình.** Kiểm bằng script quét `from "…"` + `await import("…")`.
 
+**Ranh giới `db` — đã kiểm chứng chính xác (2026-09-19):**
+
+- **Mọi** `await import("@/db/*.server")` từ ngoài `src/db/` đều nằm **trong `createServerFn`
+  handler** (170 chỗ ở `api/functions.ts` + `api/lp.ts`, đã kiểm từng chỗ).
+- Ngoài handler, chỉ có **`import type`** chạm tới `src/db/` — 3 chỗ, tất cả đều bị xoá khi build:
+  `api/functions.ts:16`, `_app.luu-tru.tsx:44,56`.
+- **Không có** static value import nào từ `routes/` hay `components/` tới `src/db/`.
+
+Đây là ranh giới thật sự quan trọng — không phải "component gọi `api`", vì `api` **chính là**
+ranh giới client↔server được thiết kế (`kien-truc.md`: "Client chỉ gọi các hàm ở đây").
+
 **`import type` là ngoại lệ hợp lệ**: bị xoá hoàn toàn khi build nên không tạo phụ thuộc runtime.
-Ví dụ: `_app.luu-tru.tsx:46,51` import type từ `db/*.server.ts`.
+Ví dụ: `_app.luu-tru.tsx:44,56` import type từ `db/*.server.ts`.
 
 ---
 
