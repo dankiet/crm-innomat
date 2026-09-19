@@ -44,7 +44,8 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
 nên xoá.
 
 Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 4 route **công
-khai**: `/lp/$slug` (landing cho khách vãng lai), `/login`, `/auth/callback`, và `/` (chỉ redirect).
+khai**: `/` (trang chủ landing — cũng render `ArchitectLanding`, xem §1 cột Trạng thái),
+`/lp/$slug` (biến thể landing theo slug), `/login`, `/auth/callback`.
 
 ## 2. Nền tảng
 

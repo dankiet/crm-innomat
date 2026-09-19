@@ -73,7 +73,7 @@ seapen/
 │   │   ├── product-search.ts     ← token hoá + khớp mã sản phẩm
 │   │   ├── product-categories.ts ← PRODUCT_GROUPS, slug ↔ category
 │   │   ├── color-palette.ts / color-tones.ts / material-taxonomy.ts ← taxonomy facet
-│   │   ├── storage.ts            ← Supabase + fs (server-only, chỉ server import)
+│   │   ├── storage.server.ts     ← Supabase + fs (chỉ server import)
 │   │   ├── image-upload.ts / *.server.ts ← canvas (client) và sharp (server)
 │   │   ├── auth-types.ts / history-layer.ts / product-quick-sheet.ts / …
 │   │
@@ -159,24 +159,36 @@ seapen/
 
 ## 4. Ranh giới client / server
 
-Cơ chế bảo vệ (`vite.config.ts:38-44`):
+Cơ chế bảo vệ (`vite.config.ts:38-47`):
 
 ```ts
 importProtection: {
   behavior: "error",
-  client: { files: ["**/server/**"], specifiers: ["server-only"] },
+  client: { files: ["**/server/**", "**/*.server.ts"], specifiers: ["server-only"] },
 }
 ```
 
-⚠️ Lưới này khớp **thư mục** `server/` và specifier `server-only`, **không** khớp hậu tố
-`*.server.ts`. Quy ước `*.server.ts` là do con người giữ, không được máy cưỡng chế.
+✅ Lưới này **đang cưỡng chế** quy ước `*.server.ts`: client import một module `.server.ts`
+là **lỗi build** (`[import-protection] Import denied in client environment`).
+
+> **Lịch sử (đã sửa trong cleanup 2026-09-19):** trước đó `client.files` chỉ có
+> `["**/server/**"]`. Repo **không có thư mục `server/`** nào, và framework mặc định
+> (`@tanstack/start-plugin-core` → `defaults.js`: `files: ["**/*.server.*"]`) bị **ghi đè**
+> chứ không merge (`pick(user, fallback) = user ? [...user] : [...fallback]`). Hệ quả: lưới
+> **vô hiệu hoàn toàn** — client lỡ import `@/lib/storage.server` sẽ kéo `node:fs`/`pg` vào
+> bundle mà build vẫn xanh. Đã kiểm chứng bằng **test âm**: thêm một import `.server.ts` có
+> dùng thật vào một route → build FAIL đúng như mong đợi.
 
 | Module | Hậu tố `.server` | Chạm `node:fs`/`node:crypto`/secret | Ghi chú |
 |---|---|---|---|
-| `db/*.server.ts` (13) | ✔ | ✔ | Đúng quy ước |
-| `lib/image-upload.server.ts`, `lib/image-export.server.ts`, `lib/brand-assets.server.ts` | ✔ | ✔ | Đúng quy ước |
-| `lib/storage.ts` | ✖ | ✔ | **Phá quy ước** — chỉ server import, nhưng không có gì cưỡng chế (PROJECT_AUDIT §10 R7) |
+| `db/*.server.ts` (13) | ✔ | ✔ | Đúng quy ước — bị chặn ở client |
+| `lib/image-upload.server.ts`, `lib/image-export.server.ts`, `lib/brand-assets.server.ts` | ✔ | ✔ | Đúng quy ước — bị chặn ở client |
+| `lib/storage.server.ts` | ✔ | ✔ | Đúng quy ước (đổi tên trong cleanup — xem CLEANUP_REPORT §Files Moved) |
 | `lib/*.ts` còn lại | ✖ | ✖ | Isomorphic, đúng |
+
+**Ngoại lệ hợp lệ:** route/component được phép `import type` từ module `.server.ts`
+(2 chỗ: `_app.luu-tru.tsx:46,51`). `import type` bị xoá hoàn toàn khi build nên không
+tạo import runtime — lưới chỉ chặn import **có giá trị**.
 
 ---
 

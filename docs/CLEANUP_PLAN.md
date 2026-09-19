@@ -196,6 +196,24 @@ Module này import `node:fs`, `node:crypto`, ghi `public/images` nhưng **không
 - B14 — xoá chuỗi chết bậc hai: `addMaterials` trong `useShortlistStorage` (consumer duy nhất
   là `addMultipleToShortlist` vừa chết).
 
+**Đợt 2b — rà soát lại sau commit (4 việc, 2 là lỗi thật):**
+
+- B15 — ⚠️ **`vite.config.ts`: lưới import-protection vô hiệu.** `client.files` bị ghi đè
+  thành `["**/server/**"]` (repo không có thư mục `server/`), thay vì để mặc định
+  `["**/*.server.*"]` của framework. Đã thêm `**/*.server.ts` và **kiểm chứng bằng test âm**
+  (build FAIL đúng như mong đợi). Đây là thứ làm cho việc đổi tên B11 mới thật sự có nghĩa.
+- B16 — ⚠️ **`useShortlistStorage`: prune `setShortlistIds` + `isHydrated`** (0 tham chiếu
+  ngoài hook, consumer duy nhất chỉ dùng 3/5 thành viên). Đây là lỗ hổng của phương pháp:
+  `tsc --noUnusedLocals` **không** thấy thuộc tính thừa trong object literal được `return`.
+- B17 — sửa 5 chỗ tài liệu mâu thuẫn với code (2 trong `PROJECT_STRUCTURE.md` do chính đợt này
+  gây ra, 1 ở `tong-quan-tinh-nang.md`, 1 bảng đảo ngược ở `san-pham-ton-kho-import.md`,
+  3 dòng ở `audit-2026-09-19.md`).
+- B18 — sửa một khẳng định **sai** của chính báo cáo: catch chuỗi SQLite bị thổi lên mức CAO;
+  thực tế **không tới được** (xem CLEANUP_REPORT §B18).
+- B19 — kiểm chứng lại `vision-batch-runner.mjs`: 8 cột = 8 giá trị, `'accepted'` đã sạch.
+- B20 — ghi nhận `nowLocal` trả giờ UTC dù tên là "local" (không sửa — đổi hành vi).
+- B21 — **không kiểm được** trạng thái deploy Vercel từ môi trường này (CLI không có credentials).
+
 **Kết quả kiểm chứng:** `tsc` 29 lỗi (đúng baseline, không tăng), 0 phát hiện unused,
 `npm run build` PASS, 13/13 route render không lỗi, 2 dialog sản phẩm + dialog đề xuất vật liệu
 mở đúng, 3 route landing trả đúng 200/301/404. Chi tiết: [CLEANUP_REPORT](CLEANUP_REPORT.md).

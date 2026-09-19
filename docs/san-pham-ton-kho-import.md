@@ -24,12 +24,17 @@ Tên cột DB **không khớp** nhãn nghiệp vụ (di sản đổi tên trong 
 | Cột DB                       | Nhãn UI                        |
 | ---------------------------- | ------------------------------ |
 | `code`                       | Mã báo giá                     |
-| `supplier`                   | **Bộ sưu tập**                 |
-| `collections`                | **Hiệu ứng vân / mặt gạch**    |
-| `shape`                      | Kiểu dáng                      |
+| `color`                      | Tông màu                       |
 | `surface`                    | Bề mặt                         |
-| `material`                    | Chất liệu                      |
+| `shape`                      | Kiểu dáng                      |
+| `texture`                    | Hiệu ứng vân                   |
+| `collections`                | **Bộ sưu tập**                 |
+| `supplier`                   | **Nhà cung cấp**               |
+| `material`                   | Chất liệu                      |
 | `area_per_tile_m2`            | Diện tích 1 viên/vỉ (m²)       |
+
+Nhãn trên lấy trực tiếp từ các chip lọc ở `/san-pham` (`FilterChip label=…` trong
+`src/routes/_app.san-pham.tsx`), mỗi chip đọc đúng cột cùng tên.
 
 Hai field ảo trên type `Product` (không có trong bảng, do query tính ra):
 

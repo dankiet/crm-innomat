@@ -3,20 +3,17 @@ import { useEffect, useState, useCallback } from "react";
 const SHORTLIST_STORAGE_KEY = "ebg_architect_shortlist_ids_v1";
 
 /**
- * Hook lưu trữ Shortlist vật liệu an toàn tuyệt đối cho SSR (TanStack Start / Next.js / Vite).
+ * Hook lưu trữ Shortlist vật liệu an toàn cho SSR (TanStack Start / Vite).
  * - Khởi tạo state ban đầu là mảng rỗng [] trên server để chống mismatch hydration.
  * - Chỉ đọc và đồng bộ hóa với localStorage bên trong useEffect (client-mount).
- * - Cung cấp đầy đủ hàm toggle, set toàn bộ và clear.
+ * - Cung cấp hàm toggle và clear.
  */
 export function useShortlistStorage(initialIds: string[] = []): {
   shortlistIds: string[];
   toggleMaterial: (id: string) => void;
-  setShortlistIds: (ids: string[]) => void;
   clearShortlist: () => void;
-  isHydrated: boolean;
 } {
   const [shortlistIds, setShortlistIdsState] = useState<string[]>(initialIds);
-  const [isHydrated, setIsHydrated] = useState(false);
 
   // 1. Client-mount: Đọc dữ liệu từ localStorage
   useEffect(() => {
@@ -30,8 +27,6 @@ export function useShortlistStorage(initialIds: string[] = []): {
       }
     } catch {
       // localStorage không khả dụng hoặc lỗi parse JSON — giữ giá trị khởi tạo
-    } finally {
-      setIsHydrated(true);
     }
   }, []);
 
@@ -57,16 +52,7 @@ export function useShortlistStorage(initialIds: string[] = []): {
     [persistToStorage]
   );
 
-  // 5. Cập nhật đè toàn bộ danh sách
-  const setShortlistIds = useCallback(
-    (ids: string[]) => {
-      setShortlistIdsState(ids);
-      persistToStorage(ids);
-    },
-    [persistToStorage]
-  );
-
-  // 6. Xóa sạch danh sách
+  // 4. Xóa sạch danh sách
   const clearShortlist = useCallback(() => {
     setShortlistIdsState([]);
     persistToStorage([]);
@@ -75,8 +61,6 @@ export function useShortlistStorage(initialIds: string[] = []): {
   return {
     shortlistIds,
     toggleMaterial,
-    setShortlistIds,
     clearShortlist,
-    isHydrated,
   };
 }

@@ -38,7 +38,11 @@ export default defineConfig(async (env): Promise<UserConfig> => {
       importProtection: {
         behavior: "error",
         client: {
-          files: ["**/server/**"],
+          // `**/server/**` là thư mục `server/` (repo không có); `**/*.server.ts` mới là
+          // quy ước thật của repo (db/*.server.ts, lib/*.server.ts). Không có dòng thứ hai
+          // thì lưới này vô hiệu: client lỡ import `@/lib/storage.server` sẽ kéo
+          // node:fs/pg vào bundle mà build vẫn xanh.
+          files: ["**/server/**", "**/*.server.ts"],
           specifiers: ["server-only"],
         },
       },

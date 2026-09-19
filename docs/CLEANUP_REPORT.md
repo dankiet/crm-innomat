@@ -25,7 +25,8 @@
 | Component tách dùng chung | **2** (`FormSection`/`Field`, và 2 route landing) |
 | Dependency xoá | **0** (không có dependency nào chết) |
 | Cấu hình cũ dọn | **3** (`.vinxi` ở eslint/gitignore/prettierignore) |
-| Tài liệu sửa kèm | **5** |
+| Cấu hình sửa lỗi | **1** (`vite.config.ts` — import-protection vô hiệu, xem §B15) |
+| Tài liệu sửa kèm | **9** |
 
 ---
 
@@ -266,6 +267,119 @@ Không có gì để dọn.
 
 ---
 
+## Bổ sung sau khi rà soát lại (đợt 2b)
+
+Sau khi commit `f0c2fc5`, tôi rà lại từng khẳng định trong báo cáo và **tự kiểm chứng** các
+điểm còn nghi ngờ. Bốn việc phát sinh, hai trong số đó là **lỗi thật do chính đợt cleanup gây ra**:
+
+### B15. `vite.config.ts` — lưới import-protection vô hiệu (⚠️ sửa lỗi thật)
+
+`importProtection.client.files` được khai là `["**/server/**"]`. Nhưng:
+
+- Repo **không có thư mục `server/`** nào (`find -type d -name server` → chỉ có trong `node_modules`).
+- Không file nào import specifier `server-only`.
+- Framework mặc định (`@tanstack/start-plugin-core/dist/esm/import-protection/defaults.js`)
+  là `files: ["**/*.server.*"]`, và config người dùng **ghi đè** chứ không merge:
+  `pick(user, fallback) = user ? [...user] : [...fallback]` (`plugin.js:785`).
+
+→ Lưới **vô hiệu hoàn toàn**: client lỡ import `@/lib/storage.server` sẽ kéo `node:fs`/`pg`
+vào bundle mà build vẫn xanh. Đây là rủi ro thật, không phải chuyện đặt tên.
+
+**Sửa:** thêm `**/*.server.ts` vào `client.files`.
+
+**Kiểm chứng bằng test âm** (không chỉ "build vẫn xanh"):
+
+1. Thêm `import { readImageBytes } from "@/lib/storage.server"` vào `src/routes/_app.ghi-chu.tsx`
+   và **dùng thật** giá trị (`${typeof readImageBytes}` trong JSX) — lần thử đầu không dùng
+   nên bị tree-shake, test **không kết luận được gì**.
+2. `npm run build` → **FAIL** với `[plugin tanstack-start-core:import-protection]` /
+   `[import-protection] Import denied in client environment` ✓
+3. Gỡ import → build xanh lại ✓ (`git diff` trên file đó rỗng, đã hoàn nguyên sạch).
+
+### B16. `useShortlistStorage` — prune API chết (⚠️ lỗ hổng của phương pháp)
+
+Hook có **đúng 1 consumer** (`ArchitectLanding.tsx:46`) và consumer đó chỉ destructure 3 thành
+viên. `setShortlistIds` và `isHydrated` có **0 tham chiếu** ngoài file hook.
+
+Đã prune cả hai (type + implementation + return). `persistToStorage` vẫn sống qua
+`toggleMaterial` và `clearShortlist`.
+
+> **Lỗ hổng phương pháp — ghi lại để không lặp lại:** tầng SAFE của đợt này dựa vào
+> `tsc --noUnusedLocals`, mà compiler **không** báo thuộc tính thừa trong object literal được
+> `return`. Quét export của tôi cũng bỏ qua chúng vì loại trừ file định nghĩa. Nghĩa là:
+> **tầng SAFE không bao giờ nhìn thấy dead code nằm trong object trả về.** Hai thành viên này
+> chỉ lộ ra khi kiểm bằng tay. Vì vậy báo cáo **không** claim "đã quét sạch mọi dead code" —
+> chỉ claim chính xác những gì compiler và grep xác nhận.
+
+### B17. Sửa 5 chỗ tài liệu mâu thuẫn với code
+
+| File | Vấn đề | Sửa |
+|---|---|---|
+| `docs/PROJECT_STRUCTURE.md:76` | Cây thư mục còn ghi `storage.ts` | → `storage.server.ts` |
+| `docs/PROJECT_STRUCTURE.md:178` | Bảng quy ước ghi `lib/storage.ts` = "**Phá quy ước**" — tự mâu thuẫn với chính đợt cleanup vừa sửa nó | → ✔ "Đúng quy ước" |
+| `docs/tong-quan-tinh-nang.md:47` | Ghi `/` là "(chỉ redirect)" — sai: `/` render `ArchitectLanding` (`index.tsx:58`) | → mô tả đúng |
+| `docs/san-pham-ton-kho-import.md:26-27` | Bảng "Cột `products` dễ nhầm" **đảo ngược**: ghi `supplier` = "Bộ sưu tập", `collections` = "Hiệu ứng vân / mặt gạch" | → sửa theo code: `supplier` = **Nhà cung cấp**, `collections` = **Bộ sưu tập**, `texture` = Hiệu ứng vân |
+| `docs/audit-2026-09-19.md:25,295,333` | Ba dòng còn nói param `supplier` "không có đường vào từ UI"; dòng 333 trỏ sai sang §G4 (là mục comment/nhãn, không nhắc chip) | → đánh dấu đã xử lý, trỏ đúng §E2c + CLEANUP_REPORT |
+
+Bảng `supplier`/`collections` được xác minh trực tiếp từ code: `collectionOptions` đọc
+`matchIndexed("collection")` → `p.collections`, chip nhãn `"Bộ sưu tập"`; `supplierOptions`
+đọc `matchIndexed("supplier")` → `p.supplier`, chip nhãn `"Nhà cung cấp"`
+(`_app.san-pham.tsx:1288-1343`).
+
+### B18. Sửa một khẳng định SAI trong chính báo cáo này
+
+Mục **R1** của [PROJECT_AUDIT](PROJECT_AUDIT.md) (và bản đầu của báo cáo này) mô tả catch chuỗi
+SQLite là **"lỗi thật, mức CAO"**, cho rằng "1 `product_code` sai làm hỏng cả lần import".
+**Sai.** Đã đọc lại câu lệnh:
+
+```sql
+INSERT OR IGNORE INTO product_internal_codes (product_id, internal_code)
+SELECT id, ? FROM products WHERE code = ?
+```
+
+`product_code` sai → `SELECT` trả **0 dòng** → chèn 0 dòng, **không sinh lỗi FK**.
+`product_id` lấy từ `products.id` nên FK `product_id → products(id)` luôn thoả.
+`INSERT OR IGNORE` nuốt luôn vi phạm UNIQUE. Vậy nhánh `catch` là **code không tới được**.
+
+→ Đã hạ mức xuống **Thấp** và mô tả đúng: đây là **mùi bắt sai dialect**, rủi ro thật là nếu
+câu lệnh đổi dạng thì `catch` sẽ **nuốt nhầm lỗi khác**. Không sửa code (sửa là đổi hành vi).
+
+### B19. Kiểm chứng lại `scripts/vision-batch-runner.mjs`
+
+Nghi ngờ: `'accepted'` còn sót trong `SELECT` → 8 cột vs 9 giá trị → lỗi runtime
+"INSERT has more expressions than target columns". **Đã kiểm: không có vấn đề.**
+
+- Cột (`:587`): `product_image_id, room_slug, source, confidence, model, model_version, created_at, updated_at` = **8**
+- Giá trị (`:588-596`): `u.image_id, u.room_slug, 'vision', u.confidence, u.model, u.model_version, NOW()::text, NOW()::text` = **8**
+- `DO UPDATE SET` (`:598-605`) không còn `review_status`; `'accepted'` không xuất hiện ở đâu
+  trong file (`grep accepted` → 0).
+
+### B20. Ghi nhận: `nowLocal` là tên gây nhầm (KHÔNG sửa)
+
+Cả 7 bản sao (nay còn 1) trả `new Date().toISOString().slice(0,19).replace("T"," ")` —
+tức là **giờ UTC**, không phải giờ địa phương, dù tên là `nowLocal`.
+
+Hệ quả tiềm ẩn: chuỗi này được render thẳng ở ~15 chỗ UI (coi như giờ tường) và được parse lại
+bằng `new Date(x.replace(" ", "T"))` (cũng hiểu là giờ địa phương) ở
+`export-quote.server.ts:169` và `export-mapping.server.ts:287`. Với deployment VN (UTC+7) thì
+ba cách hiểu đó không thể cùng đúng.
+
+**Không sửa** trong đợt này: đổi ngữ nghĩa thời gian là **thay đổi hành vi** và có thể lệch
+dữ liệu hiển thị. Đã ghi vào NEEDS REVIEW. Việc gộp 7 bản sao về 1 helper là **trung tính về
+hành vi** — docblock của helper ghi rõ `(UTC)` để không lặp lại cái tên gây nhầm.
+
+### B21. Trạng thái deploy Vercel — KHÔNG kiểm được từ môi trường này
+
+`npx vercel ls` trả `Error: No existing credentials found`. Repo cũng không còn
+`.vercel/project.json` (thư mục `.vercel/` chỉ có `output/`, và `.vercel/` bị gitignore).
+Vậy **không thể xác nhận từ đây** rằng build production đã xanh.
+
+Cần bạn kiểm trên dashboard Vercel cho commit `f0c2fc5`. Đây là điểm chưa đóng của báo cáo —
+push này nhằm vá lỗi production (xem §Validation), nên trạng thái build production là thông tin
+quan trọng.
+
+---
+
 ## Remaining Suspicious Files
 
 | File / vị trí | Vấn đề | Vì sao chưa xử lý |
@@ -334,6 +448,18 @@ Không có gì để dọn.
     Reason: AGENTS.md cấm chép số liệu tay; đã sửa các chỗ phát hiện được
             (README, cai-dat-va-moi-truong, kien-truc, tong-quan §16) và trỏ
             về tong-quan-tinh-nang.md §16 làm nguồn duy nhất.
+
+15. nowLocal() — tên nói "local" nhưng trả GIỜ UTC
+    Reason: chuỗi `YYYY-MM-DD HH:mm:ss` được render thẳng ở ~15 chỗ UI (hiểu là giờ tường)
+            và parse lại bằng `new Date(x.replace(" ","T"))` (hiểu là giờ địa phương) ở
+            export-quote.server.ts:169 + export-mapping.server.ts:287. Với VN (UTC+7) ba
+            cách hiểu này không thể cùng đúng. Sửa = đổi hành vi + có thể lệch dữ liệu hiển thị.
+    Đã gộp 7 bản sao về 1 helper (trung tính hành vi) và ghi rõ "(UTC)" trong docblock.
+
+16. vite.config.ts import-protection — đã bật lại, nhưng cần biết là nó CHƯA từng chạy
+    Reason: từ nay client import `*.server.ts` là lỗi build. Nếu có ai đó (hoặc một agent)
+    đang dựa vào việc import type từ `*.server.ts` mà không dùng `import type`, build sẽ đỏ.
+    Đây là chủ ý, nhưng là thay đổi hành vi build cần biết.
 ```
 
 ---
@@ -375,6 +501,10 @@ Build:             PASS (vite build + nitro vercel preset + postbuild)
 - Sau cleanup: **29** lỗi, **cùng danh sách** (`_app.luu-tru.tsx` 23, `crm.server.ts` 4,
   `AppSidebar.tsx` 2). Đã đối chiếu từng dòng — không có lỗi mới, không mất lỗi cũ.
 - `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` → 44 phát hiện trước, **0** sau.
+
+**Import-protection (đợt 2b)** — kiểm chứng bằng **test âm**, không chỉ bằng build xanh:
+thêm một import `.server.ts` **có dùng thật** vào một route → `npm run build` **FAIL** với
+`[import-protection] Import denied in client environment`; gỡ ra → xanh lại. Chi tiết §B15.
 
 **Lint** — `npm run lint` → 44.386 lỗi, nhưng:
 - **44.370 lỗi là `Delete ␍` (CRLF)** do Prettier cấu hình LF còn file trên Windows dùng CRLF.
