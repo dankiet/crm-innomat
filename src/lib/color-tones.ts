@@ -21,8 +21,8 @@ export interface ToneGroup {
 export const TONE_GROUPS: ToneGroup[] = [
   { id: "trang_kem", label: "Trắng / Kem" },
   { id: "xam", label: "Xám" },
-  { id: "xanh_la", label: "Xanh lá" },
-  { id: "xanh_duong", label: "Xanh dương" },
+  { id: "xanh_la", label: "Xanh Lá" },
+  { id: "xanh_duong", label: "Xanh Dương" },
   { id: "nau", label: "Nâu" },
   { id: "den", label: "Đen" },
   { id: "cam_terracotta", label: "Cam / Terracotta" },

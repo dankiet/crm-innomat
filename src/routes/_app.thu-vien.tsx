@@ -76,14 +76,6 @@ import {
   matchSearchTokens,
   splitSearchTokens,
 } from "@/lib/product-search";
-import {
-  buildFacetOptions,
-  matchesFacets,
-  type FacetKey,
-  type FacetOption,
-} from "@/lib/product-filters";
-import { BLANK_FILTER_VALUE, toneLabel, toneOf } from "@/lib/color-tones";
-import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import type {
   GalleryCollection,
   GalleryCollectionItem,
@@ -289,14 +281,17 @@ type CollectionDetail = {
   items: GalleryCollectionItem[];
 };
 
+type FacetKey =
+  "category" | "supplier" | "color" | "surface" | "size" | "shape" | "collections" | "material";
+
 const FACETS: Array<{ key: FacetKey; label: string }> = [
   { key: "category", label: "Nhóm" },
-  { key: "supplier", label: "Nhà cung cấp" },
-  { key: "color", label: "Tông màu" },
+  { key: "supplier", label: "Nh\u00e0 cung c\u1ea5p" },
+  { key: "color", label: "Màu" },
   { key: "surface", label: "Bề mặt" },
   { key: "size", label: "Kích thước" },
   { key: "shape", label: "Kiểu dáng" },
-  { key: "collections", label: "Bộ sưu tập" },
+  { key: "collections", label: "B\u1ed9 s\u01b0u t\u1eadp" },
   { key: "material", label: "Chất liệu" },
 ];
 
@@ -319,15 +314,6 @@ function normalizeSearchText(value: string): string {
 
 function searchTokens(query: string): string[] {
   return splitSearchTokens(query, normalizeSearchText);
-}
-
-/** Đọc giá trị facet động từ candidate — Field names giống nhau giữa các row sản phẩm. */
-function facetValueOf(row: GalleryImageCandidate, key: FacetKey): string | null {
-  if (key === "color") {
-    const group = toneOf(row.color);
-    return group && group !== BLANK_FILTER_VALUE ? group : null;
-  }
-  return (row as unknown as Record<FacetKey, string | undefined>)[key]?.trim() ?? null;
 }
 
 async function copyProductCodes(codes: string[], successMessage: string): Promise<void> {
@@ -1773,7 +1759,7 @@ function ImagePickerDialog({
   onCandidatesChanged: () => Promise<unknown>;
 }) {
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<Partial<Record<FacetKey, string[]>>>({});
+  const [filters, setFilters] = useState<Partial<Record<FacetKey, string>>>({});
   /** Membership set: ảnh đang được giữ trong BST (đã có + mới tick). */
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -1874,23 +1860,25 @@ function ImagePickerDialog({
   );
   const tokens = useMemo(() => searchTokens(deferredQuery), [deferredQuery]);
   const options = useMemo(() => {
-    const result = {} as Record<FacetKey, FacetOption[]>;
+    const result = {} as Record<FacetKey, Array<{ value: string; count: number }>>;
     for (const facet of FACETS) {
-      const built = buildFacetOptions(
-        searchRows,
-        facet.key,
-        (entry, key) => facetValueOf(entry.row, key),
-        filters,
-        {
-          preFilter: ({ index, searchable }) =>
-            matchSearchTokens(index, tokens, searchable, exactSet),
-          uniqueBy: (entry) => entry.row.product_id,
-        },
-      );
-      result[facet.key] =
-        facet.key === "color"
-          ? built.map((o) => ({ ...o, label: toneLabel(o.value) }))
-          : built;
+      const productsByValue = new Map<string, Set<number>>();
+      for (const { row, index, searchable } of searchRows) {
+        if (!matchSearchTokens(index, tokens, searchable, exactSet)) continue;
+        if (
+          FACETS.some(({ key }) => key !== facet.key && filters[key] && row[key] !== filters[key])
+        ) {
+          continue;
+        }
+        const value = row[facet.key]?.trim();
+        if (!value) continue;
+        const productIds = productsByValue.get(value) ?? new Set<number>();
+        productIds.add(row.product_id);
+        productsByValue.set(value, productIds);
+      }
+      result[facet.key] = [...productsByValue.entries()]
+        .map(([value, productIds]) => ({ value, count: productIds.size }))
+        .sort((a, b) => a.value.localeCompare(b.value, "vi"));
     }
     return result;
   }, [searchRows, tokens, exactSet, filters]);
@@ -1902,7 +1890,7 @@ function ImagePickerDialog({
     const matches = searchRows
       .filter(({ row, index, searchable }) => {
         if (!matchSearchTokens(index, tokens, searchable, exactSet)) return false;
-        return matchesFacets((key) => facetValueOf(row, key), filters);
+        return FACETS.every(({ key }) => !filters[key] || row[key] === filters[key]);
       })
       .map(
         ({ row, alreadyInCollection, blockedElsewhere }): PickerImage => ({
@@ -1919,11 +1907,11 @@ function ImagePickerDialog({
   }, [searchRows, tokens, exactSet, filters]);
   /** Only when user is searching — show SP locked in other collections. */
   const blockedFiltered = useMemo(() => {
-    if (!tokens.length && !FACETS.some(({ key }) => filters[key]?.length)) return [] as PickerImage[];
+    if (!tokens.length && !FACETS.some(({ key }) => filters[key])) return [] as PickerImage[];
     const matches = blockedSearchRows
       .filter(({ row, index, searchable }) => {
         if (!matchSearchTokens(index, tokens, searchable, exactSet)) return false;
-        return matchesFacets((key) => facetValueOf(row, key), filters);
+        return FACETS.every(({ key }) => !filters[key] || row[key] === filters[key]);
       })
       .map(
         ({ row, alreadyInCollection, blockedElsewhere }): PickerImage => ({
@@ -2218,41 +2206,36 @@ function ImagePickerDialog({
               </button>
             ) : null}
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
             {FACETS.map((facet) => (
-              <MultiSelectFilter
+              <select
                 key={facet.key}
-                title={facet.label}
-                options={options[facet.key]}
-                selected={filters[facet.key] ?? []}
-                onChange={(next) =>
-                  setFilters((current) => ({ ...current, [facet.key]: next }))
+                value={filters[facet.key] ?? ""}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, [facet.key]: event.target.value }))
                 }
-                searchable={options[facet.key].length > 6}
-                emptyLabel="Không có"
-              />
+                className="h-10 min-w-0 rounded-lg border border-border bg-background px-2 text-xs"
+              >
+                <option value="">{facet.label}</option>
+                {options[facet.key].map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.value} ({option.count})
+                  </option>
+                ))}
+              </select>
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {FACETS.filter(({ key }) => (filters[key]?.length ?? 0) > 0).map(({ key, label }) => (
+            {FACETS.filter(({ key }) => filters[key]).map(({ key, label }) => (
               <button
                 key={key}
                 type="button"
-                onClick={() => setFilters((current) => ({ ...current, [key]: [] }))}
+                onClick={() => setFilters((current) => ({ ...current, [key]: "" }))}
                 className="inline-flex items-center gap-1 rounded-full bg-terracotta-soft px-2.5 py-1 text-[11px] text-terracotta"
               >
-                {label}: {(filters[key] ?? []).join(", ")} <X className="size-3" />
+                {label}: {filters[key]} <X className="size-3" />
               </button>
             ))}
-            {FACETS.some(({ key }) => (filters[key]?.length ?? 0) > 0) ? (
-              <button
-                type="button"
-                onClick={() => setFilters({})}
-                className="inline-flex items-center gap-1 rounded-full bg-surface-strong px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-surface-strong/70 hover:text-foreground"
-              >
-                <X className="size-3" /> Xóa hết bộ lọc
-              </button>
-            ) : null}
             <span className="text-xs text-muted-foreground">
               {groups.length} sản phẩm · {filtered.length} ảnh
               {alreadyCount > 0 ? ` · ${alreadyCount} đã có` : ""}
