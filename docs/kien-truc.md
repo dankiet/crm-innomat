@@ -99,7 +99,7 @@ nhất đáng biết:
 | `src/db/crm.server.ts`                     | 3.250 | Lớp nghiệp vụ chính (khách hàng, báo giá, đơn, sản phẩm) |
 | `src/routes/_app.thu-vien.tsx`             | 2.699 | Thư viện: trang + 5 dialog con                           |
 | `src/routes/_app.luu-tru.tsx`              | 2.386 | Lưu trữ ảnh: trang + popover + dialog                    |
-| `src/routes/_app.san-pham.tsx`             | 2.289 | Catalog sản phẩm: trang + 6 dialog con                   |
+| `src/routes/_app.san-pham.tsx`             | 2.290 | Catalog sản phẩm: trang + 6 dialog con                   |
 | `src/components/CustomerMappingDialog.tsx` | 2.040 | Đề xuất vật liệu (DXVL)                                  |
 | `src/api/functions.ts`                     | 1.853 | Toàn bộ RPC (86 endpoint)                                |
 

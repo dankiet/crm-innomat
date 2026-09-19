@@ -178,13 +178,16 @@ Tổng **25 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 16. Quy mô code
 
-| Vùng            | File | Dòng   |
-| --------------- | ---: | -----: |
-| `src/routes`    |   21 | 14.495 |
-| `src/components`|   37 | 12.089 |
-| `src/db`        |   13 |  7.756 |
-| `src/lib`       |   24 |  2.410 |
-| `src/api`       |    2 |  2.190 |
-| **Tổng `src/`** |  104 | **40.036** |
+| Vùng             | File | Dòng   |
+| ---------------- | ---: | -----: |
+| `src/routes`     |   21 | 14.496 |
+| `src/components` |   37 | 12.089 |
+| `src/db`         |   13 |  7.756 |
+| `src/lib`        |   24 |  2.410 |
+| `src/api`        |    2 |  2.190 |
+| `src/*.ts` (gốc) |    4 |    666 |
+| `src/data`       |    1 |    367 |
+| `src/hooks`      |    2 |     63 |
+| **Tổng `src/`**  |  104 | **40.037** |
 
 RPC: **86** `createServerFn` trong `src/api/functions.ts` + **19** trong `src/api/lp.ts` = **105**.
