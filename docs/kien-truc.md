@@ -69,8 +69,10 @@ Mọi route `_app.*` đều nằm sau cổng này.
 - **`src/db/*.server.ts`** giữ SQL và nghiệp vụ; **không** được import ở phía client.
 - Mỗi handler `createServerFn` dùng **dynamic `await import()`** để nạp module server. Nhờ vậy
   code server không rơi vào bundle client. Đây là quy ước áp dụng nhất quán cho cả 100 endpoint.
-- Vite bật **import protection**: import `**/server/**` hoặc `server-only` từ client là **lỗi build**
-  (`importProtection: { behavior: "error" }`).
+- Vite bật **import protection**: client import module `*.server.ts` (hoặc specifier
+  `server-only`) là **lỗi build**, không phải cảnh báo —
+  `importProtection: { behavior: "error", client: { files: ["**/*.server.*"] } }`.
+  Đã kiểm chứng hai chiều: xem [PROJECT_STRUCTURE](PROJECT_STRUCTURE.md) §4.
 
 ## Build chain
 

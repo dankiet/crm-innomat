@@ -196,12 +196,15 @@ Module này import `node:fs`, `node:crypto`, ghi `public/images` nhưng **không
 - B14 — xoá chuỗi chết bậc hai: `addMaterials` trong `useShortlistStorage` (consumer duy nhất
   là `addMultipleToShortlist` vừa chết).
 
-**Đợt 2b — rà soát lại sau commit (4 việc, 2 là lỗi thật):**
+**Đợt 2b — rà soát lại sau commit (7 việc, 2 là lỗi thật):**
 
-- B15 — ⚠️ **`vite.config.ts`: lưới import-protection vô hiệu.** `client.files` bị ghi đè
-  thành `["**/server/**"]` (repo không có thư mục `server/`), thay vì để mặc định
-  `["**/*.server.*"]` của framework. Đã thêm `**/*.server.ts` và **kiểm chứng bằng test âm**
-  (build FAIL đúng như mong đợi). Đây là thứ làm cho việc đổi tên B11 mới thật sự có nghĩa.
+- B15 — ⚠️ **`vite.config.ts`: lưới import-protection bị hạ cấp thành vô hiệu.** `client.files`
+  khai `["**/server/**"]` (repo không có thư mục `server/`), trong khi framework mặc định là
+  `["**/*.server.*"]` và config người dùng **ghi đè** chứ không merge. Đã trả về đúng
+  `["**/*.server.*"]` (KHÔNG tự thu hẹp thành `*.server.ts` — làm vậy là lặp lại đúng kiểu lỗi
+  đang sửa) và **kiểm chứng hai chiều**: import `.server.ts` dùng thật → build FAIL `exit=1`
+  (`Denied by file pattern: **/*.server.*`); gỡ ra → xanh. Đây là thứ làm cho việc đổi tên B11
+  mới thật sự có nghĩa.
 - B16 — ⚠️ **`useShortlistStorage`: prune `setShortlistIds` + `isHydrated`** (0 tham chiếu
   ngoài hook, consumer duy nhất chỉ dùng 3/5 thành viên). Đây là lỗ hổng của phương pháp:
   `tsc --noUnusedLocals` **không** thấy thuộc tính thừa trong object literal được `return`.

@@ -57,9 +57,12 @@ Reason:
   Module này import `node:fs`, `node:crypto`, `@supabase/storage-js` và ghi vào
   `public/images`, nhưng KHÔNG có hậu tố `.server.ts` như các sibling
   (`image-upload.server.ts`, `image-export.server.ts`, `brand-assets.server.ts`).
-  Quy ước `*.server.ts` là thứ duy nhất ngăn module server lọt vào bundle client
-  (lưới `importProtection` ở `vite.config.ts:38-44` chỉ khớp thư mục `server/`
-  và specifier `server-only`, không khớp hậu tố).
+
+  Lưu ý quan trọng: ở thời điểm đổi tên, quy ước `*.server.ts` **chưa** được máy cưỡng chế
+  — lưới `importProtection` khi đó khai `["**/server/**"]`, mà repo không có thư mục `server/`
+  nào, nên nó vô hiệu. Việc đổi tên chỉ thật sự có nghĩa SAU KHI sửa luôn lưới đó (xem §B15
+  bên dưới): nay `client.files = ["**/*.server.*"]` và client import module `.server.ts`
+  là lỗi build thật.
 
 Evidence:
   5 consumer, TẤT CẢ đều là module server:
@@ -485,7 +488,6 @@ quan trọng.
 | Mọi dependency trong `package.json` | Tất cả đều đang được dùng (kể cả `@types/*` và `eslint-config-prettier` — dùng ngầm) |
 | `src/routes/_app.cong-no.tsx:636` `inputCls` | Khác thật (`mt-1`, không có `text-foreground`) — không phải bản sao |
 | `Stat` ở `_app.cong-no.tsx:617` và `_app.khach-hang.$customerId.tsx:1221` | Máy dò trùng lặp báo giống nhau 1.00, nhưng **đọc kỹ thì khác**: `rounded-lg ring-1 ring-black/5 p-3 bg-surface-strong/30` vs `rounded-xl bg-card ring-1 ring-black/5 px-3 py-2.5`; prop `accent: string` vs `accent?: boolean`. Gộp sẽ **đổi giao diện** một trong hai trang |
-| `importProtection` của Vite | Không mở rộng để khớp `*.server.ts` — thay đổi hành vi build, cần bàn riêng |
 | `eslint.config.js` rule `@typescript-eslint/no-unused-vars: "off"` | Đây là lý do 49 import chết tồn tại lâu. Bật lại sẽ tạo hàng trăm lỗi lint trên code hiện tại — cần một đợt riêng. Đã dùng `tsc --noUnusedLocals` làm lưới thay thế trong đợt này |
 
 ---

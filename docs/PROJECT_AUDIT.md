@@ -76,7 +76,8 @@ Browser
 
 1. **Server chỉ chạm được qua `createServerFn`.** Không route/component nào import trực tiếp
    `src/db/**` (chỉ có `import type` ở `src/routes/_app.luu-tru.tsx:48,53`). Vite chặn client
-   import module khớp `**/server/**` (`vite.config.ts:38-44`).
+   import module `.server.ts` (`importProtection.client.files = ["**/*.server.*"]`,
+   `vite.config.ts:38-54`) — xem [PROJECT_STRUCTURE](PROJECT_STRUCTURE.md) §4.
 2. **`src/db/*.server.ts` được nạp bằng dynamic import** bên trong handler
    (`src/api/functions.ts:20`). Đây là lý do mọi phân tích import tĩnh phải quét thêm
    `await import(...)`, nếu không sẽ kết luận sai là "file chết".
