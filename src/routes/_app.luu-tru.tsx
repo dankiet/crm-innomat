@@ -61,7 +61,7 @@ import { PRODUCT_COLORS } from "@/lib/types";
 export const Route = createFileRoute("/_app/luu-tru")({
   errorComponent: ({ error }) => (
     <div className="p-8 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300">
-      <h2 className="text-base font-bold">Lỗi tải Kho ảnh</h2>
+      <h2 className="text-base font-bold">Lỗi tải Lưu trữ</h2>
       <pre className="mt-2 text-xs font-mono whitespace-pre-wrap">{error instanceof Error ? error.stack || error.message : String(error)}</pre>
     </div>
   ),
@@ -963,7 +963,7 @@ function MediaStoragePage() {
     <div ref={gridTopRef} className="space-y-5 pb-28">
       <PageHeader
         eyebrow="Landing Page"
-        title="Kho ảnh"
+        title="Lưu trữ"
         description="Quản lý toàn bộ tài nguyên ảnh sản phẩm: phân loại ảnh MAP, Concept, gán thẻ phòng Lookbook, chọn ảnh bìa Hero và 12 vị trí Tuyển chọn trang chủ."
       />
 
@@ -1346,7 +1346,7 @@ function MediaStoragePage() {
       {loading && items.length === 0 ? (
         <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
           <Loader2 className="size-6 animate-spin text-terracotta" />
-          <p className="text-xs">Đang tải kho ảnh…</p>
+          <p className="text-xs">Đang tải Lưu trữ…</p>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center">

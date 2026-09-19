@@ -663,7 +663,7 @@ function ConceptHubPage() {
             );
           })}
         </div>
-        {/* Row 1.5: Nhóm sản phẩm (Category Pills) đồng bộ Kho ảnh */}
+        {/* Row 1.5: Nhóm sản phẩm (Category Pills) đồng bộ Lưu trữ */}
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5 border-t border-border/40 pt-2">
           <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Nhóm
@@ -1045,7 +1045,7 @@ function ConceptHubPage() {
       )}
 
       {/* 6. Phân trang (Pagination bar ở cuối trang) */}
-      {/* 6. Phân trang (Pagination bar ở cuối trang đồng bộ Kho ảnh) */}
+      {/* 6. Phân trang (Pagination bar ở cuối trang đồng bộ Lưu trữ) */}
       {totalPages > 1 ? (
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/70 pt-5 text-xs text-muted-foreground">
           <p>

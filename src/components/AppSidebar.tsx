@@ -48,7 +48,7 @@ const navGroups = [
     items: [
       { to: "/leads", label: "Hộp thư Lead", icon: Inbox },
       { to: "/khong-gian", label: "Lookbook", icon: Layers3 },
-      { to: "/luu-tru", label: "Kho ảnh", icon: Images },
+      { to: "/luu-tru", label: "Lưu trữ", icon: Images },
     ],
   },
 ] as const;
