@@ -135,7 +135,7 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const { pathname, search } = useRouterState({
     select: (state) => ({
       pathname: state.location.pathname,
-      search: state.location.search as { nhom?: string },
+      search: state.location.search as { nhom?: string; sizes?: string[] },
     }),
   });
 

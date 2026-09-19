@@ -12,6 +12,7 @@ import { PageFilterBar, PageSearchInput } from "@/components/PageFilterBar";
 import { CustomerCard } from "@/components/CustomerCard";
 import { NewCustomerDialog } from "@/components/NewCustomerDialog";
 import { NewQuoteDialog } from "@/components/NewQuoteDialog";
+import { ViewModeToggle, type ViewModeOption } from "@/components/ViewModeToggle";
 import { useLocalStorageState } from "@/hooks/useLocalStorageState";
 import {
   fetchCustomerDebts,
@@ -27,6 +28,11 @@ type KhachHangSearch = {
 };
 
 type ViewMode = "grid" | "list";
+
+const VIEW_MODE_OPTIONS = [
+  { value: "grid", icon: LayoutGrid, label: "Lưới", title: "Lưới thẻ" },
+  { value: "list", icon: List, label: "List", title: "Danh sách" },
+] as const satisfies ReadonlyArray<ViewModeOption<ViewMode>>;
 
 const filters: { key: "all" | CustomerStatus; label: string }[] = [
   { key: "all", label: "Tất cả" },
@@ -134,42 +140,7 @@ function CustomersPage() {
         title="Khách hàng"
         description={`Theo dõi tiến độ dự án của ${customers.length} khách hàng. Nhấp để xem hồ sơ (BG, SP đã báo).`}
         actions={
-          <div
-            className="inline-flex p-0.5 rounded-lg ring-1 ring-black/5 bg-surface-strong/50"
-            role="group"
-            aria-label="Kiểu hiển thị"
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={cn(
-                "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5",
-                viewMode === "grid"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-pressed={viewMode === "grid"}
-              title="Lưới thẻ"
-            >
-              <LayoutGrid className="size-3.5" />
-              <span className="hidden sm:inline">Lưới</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5",
-                viewMode === "list"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-pressed={viewMode === "list"}
-              title="Danh sách"
-            >
-              <List className="size-3.5" />
-              <span className="hidden sm:inline">List</span>
-            </button>
-          </div>
+          <ViewModeToggle value={viewMode} onChange={setViewMode} options={VIEW_MODE_OPTIONS} />
         }
       />
 

@@ -633,5 +633,7 @@ function Stat({
   );
 }
 
+// Biến thể riêng của trang này: `mt-1` + KHÔNG có `text-foreground` (khác bản chuẩn ở
+// `@/lib/utils`). Giữ nguyên để không đổi màu chữ của input — xem REFACTOR_ROADMAP "DO NOT REFACTOR".
 const inputCls =
   "mt-1 w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40";

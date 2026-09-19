@@ -7,7 +7,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArchitectLanding } from "@/components/landing/ArchitectLanding";
 import { DEFAULT_LP_SLUG } from "@/lib/lp-content";
-import { loadLpHeroImage, lpHead } from "@/lib/lp-route";
+import { loadLpHeroImage, lpHead } from "./-lp-route";
 
 export const Route = createFileRoute("/")({
   head: () => lpHead(DEFAULT_LP_SLUG),

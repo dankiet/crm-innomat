@@ -197,19 +197,23 @@ Tổng **25 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 16. Quy mô code
 
-> Đo ngày **2026-09-19** (sau đợt dọn dead code — xem [CLEANUP_REPORT](CLEANUP_REPORT.md)).
+> Đo ngày **2026-09-19** (sau đợt dọn dead code + đợt tối ưu kiến trúc —
+> xem [CLEANUP_REPORT](CLEANUP_REPORT.md) và [ARCHITECTURE_FINAL](ARCHITECTURE_FINAL.md)).
 
 | Vùng             | File | Dòng   |
 | ---------------- | ---: | -----: |
-| `src/routes`     |   21 | 14.330 |
-| `src/components` |   36 | 11.790 |
-| `src/db`         |   13 |  7.605 |
-| `src/lib`        |   26 |  2.435 |
-| `src/api`        |    2 |  2.170 |
+| `src/routes`     |   22 | 14.112 |
+| `src/components` |   38 | 11.976 |
+| `src/db`         |   13 |  7.611 |
+| `src/lib`        |   25 |  2.387 |
+| `src/api`        |    2 |  2.171 |
 | `src/*.ts` (gốc) |    4 |    666 |
 | `src/data`       |    1 |    321 |
 | `src/hooks`      |    2 |     63 |
-| **Tổng `src/`**  |  105 | **39.380** |
+| **Tổng `src/`**  |  107 | **39.307** |
 
 RPC: **82** `createServerFn` trong `src/api/functions.ts` + **18** trong `src/api/lp.ts` = **100**
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
+
+`npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
+[audit-2026-09-19](audit-2026-09-19.md) §E1).

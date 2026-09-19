@@ -13,7 +13,7 @@ import type {
   ImageRoomTagSlug,
 } from "@/lib/types";
 import type { Role } from "@/lib/auth-types";
-import type { FlatMediaTab } from "@/db/crm.server";
+import type { FlatMediaSort, FlatMediaTab } from "@/db/crm.server";
 // ─── Auth ───────────────────────────────────────────────────
 
 export const fetchMe = createServerFn({ method: "GET" }).handler(async () => {
@@ -1755,6 +1755,7 @@ export const fetchFlatMediaImagesFn = createServerFn({ method: "GET" })
       shapes?: string[];
       textures?: string[];
       collections?: string[];
+      sort?: FlatMediaSort;
       page?: number;
       pageSize?: number;
     }) => data,

@@ -5,8 +5,6 @@ import {
   ArrowUpAZ,
   Check,
   CheckSquare,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   EyeOff,
   Globe,
@@ -44,7 +42,14 @@ import {
   bulkSetProductsPublicFn,
 } from "@/api/lp";
 import type { FeaturedSlotInfo } from "@/db/lp.server";
-import { IMAGE_ROOM_TAGS } from "@/lib/types";
+import {
+  IMAGE_ROOM_TAGS,
+  PRODUCT_COLORS,
+  PRODUCT_TEXTURES,
+  type ImageRoomTagSlug,
+  type ProductImageKind,
+  type ProductImageRow,
+} from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ProductImage";
@@ -55,8 +60,7 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
-import { PRODUCT_COLORS, PRODUCT_TEXTURES } from "@/lib/types";
-import { getPageNumbers } from "@/lib/pagination";
+import { PaginationBar } from "@/components/PaginationBar";
 export const Route = createFileRoute("/_app/luu-tru")({
   errorComponent: ({ error }) => (
     <div className="p-8 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300">
@@ -593,7 +597,6 @@ function MediaStoragePage() {
   // Pagination state
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(24);
-  const [jumpPageInput, setJumpPageInput] = useState<string>("");
 
   const [items, setItems] = useState<FlatMediaItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -761,7 +764,6 @@ function MediaStoragePage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const pageNumbers = getPageNumbers(page, totalPages);
   function toggleSelect(id: number) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -1688,105 +1690,15 @@ function MediaStoragePage() {
         </div>
       )}
 
-      {/* Pagination Bar */}
-      {totalPages > 1 ? (
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/70 pt-5 text-xs text-muted-foreground">
-          <p>
-            Hiển thị{" "}
-            <span className="font-semibold text-foreground">
-              {total === 0 ? 0 : ((page - 1) * pageSize + 1).toLocaleString("vi-VN")}
-            </span>{" "}
-            –{" "}
-            <span className="font-semibold text-foreground">
-              {Math.min(page * pageSize, total).toLocaleString("vi-VN")}
-            </span>{" "}
-            trên tổng số{" "}
-            <span className="font-semibold text-foreground">{total.toLocaleString("vi-VN")}</span>{" "}
-            ảnh
-          </p>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              disabled={page <= 1 || loading}
-              onClick={() => handlePageChange(page - 1)}
-              className="inline-flex items-center gap-1 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-            >
-              <ChevronLeft className="size-3.5" />
-              <span>Trước</span>
-            </button>
-
-            <div className="flex items-center gap-1">
-              {pageNumbers.map((p, idx) => {
-                if (p === "...") {
-                  return (
-                    <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground">
-                      …
-                    </span>
-                  );
-                }
-                const num = Number(p);
-                const active = num === page;
-                return (
-                  <button
-                    key={num}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handlePageChange(num)}
-                    className={cn(
-                      "size-8 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
-                      active
-                        ? "bg-foreground text-background font-bold shadow-xs"
-                        : "border border-border/70 bg-card text-muted-foreground hover:bg-surface-strong hover:text-foreground",
-                    )}
-                  >
-                    {num}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              disabled={page >= totalPages || loading}
-              onClick={() => handlePageChange(page + 1)}
-              className="inline-flex items-center gap-1 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-            >
-              <span>Sau</span>
-              <ChevronRight className="size-3.5" />
-            </button>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const target = parseInt(jumpPageInput, 10);
-                if (!isNaN(target) && target >= 1 && target <= totalPages) {
-                  handlePageChange(target);
-                  setJumpPageInput("");
-                }
-              }}
-              className="ml-2 flex items-center gap-1"
-            >
-              <span className="text-[11px] text-muted-foreground">Đến:</span>
-              <input
-                type="number"
-                min={1}
-                max={totalPages}
-                value={jumpPageInput}
-                onChange={(e) => setJumpPageInput(e.target.value)}
-                placeholder={`${page}`}
-                className="h-8 w-14 rounded-lg border border-border/80 bg-card px-1.5 text-center text-xs text-foreground outline-none focus:border-terracotta"
-              />
-              <button
-                type="submit"
-                className="h-8 rounded-lg border border-border/80 bg-card px-2 text-xs font-medium text-foreground hover:bg-surface-strong cursor-pointer"
-              >
-                Đi
-              </button>
-            </form>
-          </div>
-        </div>
-      ) : null}
+      <PaginationBar
+        page={page}
+        total={total}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        loading={loading}
+        itemNoun="ảnh"
+        onPageChange={handlePageChange}
+      />
 
       {/* Floating Action Bar (Bulk Selection) */}
       {selectedIds.size > 0 ? (

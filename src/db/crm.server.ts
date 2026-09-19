@@ -171,6 +171,9 @@ const PRODUCT_SUGGEST_FIELDS = [
   "size",
 ] as const;
 
+/** Tên field hợp lệ để gợi ý (datalist) & bulk apply — suy ra từ whitelist ở trên. */
+type ProductSuggestField = (typeof PRODUCT_SUGGEST_FIELDS)[number];
+
 /** Lấy danh sách giá trị distinct đã dùng cho 1 field phân loại — dùng làm gợi ý datalist */
 export async function listProductFieldValues(
   field: ProductSuggestField,
@@ -2750,6 +2753,7 @@ export async function listFlatMediaImages(opts?: {
   shapes?: string[];
   textures?: string[];
   collections?: string[];
+  sort?: FlatMediaSort;
   page?: number;
   pageSize?: number;
 }): Promise<{

@@ -21,8 +21,6 @@ import {
   EyeOff,
   Search,
   X,
-  ChevronLeft,
-  ChevronRight,
   Pencil,
   ArrowDownToDot,
   Loader2,
@@ -52,8 +50,8 @@ import { COLOR_PALETTES } from "@/lib/color-palette";
 import { setImageRoomTagsDirectFn } from "@/api/functions";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { IMAGE_ROOM_TAGS, type ImageRoomTagSlug } from "@/lib/types";
-import { getPageNumbers } from "@/lib/pagination";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PaginationBar } from "@/components/PaginationBar";
 
 const PAGE_LIMIT_OPTIONS = [24, 48, 96] as const;
 
@@ -224,7 +222,6 @@ function ConceptHubPage() {
   const [page, setPage] = useState<number>(initialData?.page ?? 1);
   const [limit, setLimit] = useState<number>(24);
   const [totalPages, setTotalPages] = useState<number>(initialData?.totalPages ?? 1);
-  const [jumpPageInput, setJumpPageInput] = useState<string>("");
   const [stats, setStats] = useState(
     initialData?.stats ?? {
       total: 0,
@@ -376,8 +373,6 @@ function ConceptHubPage() {
       throw err;
     }
   }
-
-  const pageNumbers = getPageNumbers(page, totalPages);
 
   // Bật/Tắt hiển thị công khai trên Landing Page (Cập nhật trực tiếp local state)
   async function handleTogglePublic(item: CrmConceptItem) {
@@ -1019,125 +1014,34 @@ function ConceptHubPage() {
         </div>
       )}
 
-      {/* 6. Phân trang (Pagination bar ở cuối trang) */}
-      {/* 6. Phân trang (Pagination bar ở cuối trang đồng bộ Lưu trữ) */}
-      {totalPages > 1 ? (
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/70 pt-5 text-xs text-muted-foreground">
-          <p>
-            Hiển thị{" "}
-            <span className="font-semibold text-foreground">
-              {total === 0 ? 0 : ((page - 1) * limit + 1).toLocaleString("vi-VN")}
-            </span>{" "}
-            –{" "}
-            <span className="font-semibold text-foreground">
-              {Math.min(page * limit, total).toLocaleString("vi-VN")}
-            </span>{" "}
-            trên tổng số{" "}
-            <span className="font-semibold text-foreground">{total.toLocaleString("vi-VN")}</span>{" "}
-            bối cảnh
-          </p>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* Limit selector */}
-            <div className="flex items-center bg-surface-strong/60 p-0.5 rounded-full border border-border/80 text-xs mr-1">
-              {PAGE_LIMIT_OPTIONS.map((sz) => (
-                <button
-                  key={sz}
-                  type="button"
-                  onClick={() => handleLimitChange(sz)}
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer",
-                    limit === sz
-                      ? "bg-card font-semibold text-foreground shadow-xs ring-1 ring-black/5"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {sz}/tr
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              disabled={page <= 1 || isFetching}
-              onClick={() => void handlePageChange(page - 1)}
-              className="inline-flex items-center gap-1 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-            >
-              <ChevronLeft className="size-3.5" />
-              <span>Trước</span>
-            </button>
-
-            <div className="flex items-center gap-1">
-              {pageNumbers.map((p, idx) => {
-                if (p === "...") {
-                  return (
-                    <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground">
-                      …
-                    </span>
-                  );
-                }
-                const num = Number(p);
-                const active = num === page;
-                return (
-                  <button
-                    key={num}
-                    type="button"
-                    disabled={isFetching}
-                    onClick={() => void handlePageChange(num)}
-                    className={cn(
-                      "size-8 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
-                      active
-                        ? "bg-foreground text-background font-bold shadow-xs"
-                        : "border border-border/70 bg-card text-muted-foreground hover:bg-surface-strong hover:text-foreground",
-                    )}
-                  >
-                    {num}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              disabled={page >= totalPages || isFetching}
-              onClick={() => void handlePageChange(page + 1)}
-              className="inline-flex items-center gap-1 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-            >
-              <span>Sau</span>
-              <ChevronRight className="size-3.5" />
-            </button>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const target = parseInt(jumpPageInput, 10);
-                if (!isNaN(target) && target >= 1 && target <= totalPages) {
-                  void handlePageChange(target);
-                  setJumpPageInput("");
-                }
-              }}
-              className="ml-2 flex items-center gap-1"
-            >
-              <span className="text-[11px] text-muted-foreground">Đến:</span>
-              <input
-                type="number"
-                min={1}
-                max={totalPages}
-                value={jumpPageInput}
-                onChange={(e) => setJumpPageInput(e.target.value)}
-                placeholder={`${page}`}
-                className="h-8 w-14 rounded-lg border border-border/80 bg-card px-1.5 text-center text-xs text-foreground outline-none focus:border-terracotta"
-              />
+      <PaginationBar
+        page={page}
+        total={total}
+        pageSize={limit}
+        totalPages={totalPages}
+        loading={isFetching}
+        itemNoun="bối cảnh"
+        onPageChange={(target) => void handlePageChange(target)}
+        extra={
+          <div className="flex items-center bg-surface-strong/60 p-0.5 rounded-full border border-border/80 text-xs mr-1">
+            {PAGE_LIMIT_OPTIONS.map((sz) => (
               <button
-                type="submit"
-                className="h-8 rounded-lg border border-border/80 bg-card px-2 text-xs font-medium text-foreground hover:bg-surface-strong cursor-pointer"
+                key={sz}
+                type="button"
+                onClick={() => handleLimitChange(sz)}
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer",
+                  limit === sz
+                    ? "bg-card font-semibold text-foreground shadow-xs ring-1 ring-black/5"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
-                Đi
+                {sz}/tr
               </button>
-            </form>
+            ))}
           </div>
-        </div>
-      ) : null}
+        }
+      />
 
       {/* 7. Dialog Quick Edit Description (Chỉnh sửa Lời bình Kiến trúc) */}
       <Dialog

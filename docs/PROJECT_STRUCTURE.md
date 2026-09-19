@@ -39,7 +39,8 @@ seapen/
 │   │   ├── _app.khong-gian.tsx   ← `/khong-gian`  Lookbook concept
 │   │   ├── _app.leads.tsx        ← `/leads`       Hộp thư lead
 │   │   ├── _app.nguoi-dung.tsx   ← `/nguoi-dung`  (admin)
-│   │   └── _app.nhat-ky.tsx      ← `/nhat-ky`     (admin)
+│   │   ├── _app.nhat-ky.tsx      ← `/nhat-ky`     (admin)
+│   │   └── -lp-route.ts          ← hỗ trợ `/` + `/lp/$slug` (tiền tố `-` = router bỏ qua)
 │   │
 │   ├── api/                      ← TRANSPORT: createServerFn (inputValidator + handler)
 │   │   ├── functions.ts          ← 66 endpoint CRM + auth
@@ -60,10 +61,11 @@ seapen/
 │   │   ├── users.server.ts / audit.server.ts
 │   │
 │   ├── components/               ← 38 file
-│   │   ├── ui/                   ← primitive bọc Radix: dialog, popover, sonner
-│   │   ├── product-filter/       ← FilterChip, MultiSelectFilter (dùng cả CRM + landing)
-│   │   ├── landing/              ← 11 file giao diện landing công khai
-│   │   └── *.tsx                 ← 24 file: PageHeader/PageFilterBar + dialog nghiệp vụ
+│   │   ├── ui/                   ← primitive bọc Radix: dialog, popover, sonner (3)
+│   │   ├── product-filter/       ← FilterChip, MultiSelectFilter (dùng cả CRM + landing) (2)
+│   │   ├── landing/              ← 11 file giao diện landing công khai (11)
+│   │   └── *.tsx                 ← 22 file: PageHeader/PageFilterBar/PaginationBar/
+│   │                               ViewModeToggle + dialog nghiệp vụ
 │   │
 │   ├── lib/                      ← LỚP DÙNG CHUNG isomorphic (client + server)
 │   │   ├── types.ts              ← domain model (Product, Customer, Quote…)

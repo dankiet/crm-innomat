@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageFilterBar, PageSearchInput } from "@/components/PageFilterBar";
 import { NewCustomerDialog } from "@/components/NewCustomerDialog";
 import { NewQuoteDialog } from "@/components/NewQuoteDialog";
+import { ViewModeToggle, type ViewModeOption } from "@/components/ViewModeToggle";
 import { useLocalStorageState } from "@/hooks/useLocalStorageState";
 import { fetchCustomers, setCustomerStatus } from "@/api/functions";
 import { pipelineStages, statusMeta, type Customer, type CustomerStatus } from "@/lib/types";
@@ -44,6 +45,11 @@ export const Route = createFileRoute("/_app/co-hoi")({
 });
 
 type ViewMode = "board" | "list";
+
+const VIEW_MODE_OPTIONS = [
+  { value: "board", icon: Columns3, label: "Board", title: "Kanban" },
+  { value: "list", icon: List, label: "List", title: "Danh sách" },
+] as const satisfies ReadonlyArray<ViewModeOption<ViewMode>>;
 type PipelineStage = (typeof pipelineStages)[number];
 
 /** Grid cols tĩnh cho Tailwind (class phải là literal để JIT nhận diện) — map theo số cột đang hiện. */
@@ -360,42 +366,7 @@ function PipelinePage() {
         title="Pipeline cơ hội"
         description="Tư vấn → Báo giá → Đã chốt · Bỏ lỡ. Kéo thẻ (biểu tượng ⋮⋮) để đổi giai đoạn."
         actions={
-          <div
-            className="inline-flex p-0.5 rounded-lg ring-1 ring-black/5 bg-surface-strong/50"
-            role="group"
-            aria-label="Kiểu hiển thị"
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode("board")}
-              className={cn(
-                "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5",
-                viewMode === "board"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-pressed={viewMode === "board"}
-              title="Kanban"
-            >
-              <Columns3 className="size-3.5" />
-              <span className="hidden sm:inline">Board</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5",
-                viewMode === "list"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-pressed={viewMode === "list"}
-              title="Danh sách"
-            >
-              <List className="size-3.5" />
-              <span className="hidden sm:inline">List</span>
-            </button>
-          </div>
+          <ViewModeToggle value={viewMode} onChange={setViewMode} options={VIEW_MODE_OPTIONS} />
         }
       />
 

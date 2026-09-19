@@ -32,6 +32,7 @@ import { NewProductDialog } from "@/components/NewProductDialog";
 import { BulkEditFieldDialog } from "@/components/BulkEditFieldDialog";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
+import { ViewModeToggle, type ViewModeOption } from "@/components/ViewModeToggle";
 import {
   SortMenu,
   type SortDir,
@@ -133,6 +134,11 @@ function ProductCheck({
 }
 
 type ViewMode = "grid" | "list";
+
+const VIEW_MODE_OPTIONS = [
+  { value: "grid", icon: LayoutGrid, label: "Lưới", title: "Lưới" },
+  { value: "list", icon: List, label: "List", title: "Danh sách" },
+] as const satisfies ReadonlyArray<ViewModeOption<ViewMode>>;
 
 function parseCsv(v: unknown): string[] {
   if (typeof v !== "string" || !v.trim()) return [];
@@ -1635,40 +1641,7 @@ function ProductsPage() {
                   : "Chọn đang hiện"}
               </button>
             ) : null}
-            <div
-              className="inline-flex p-0.5 rounded-lg ring-1 ring-black/5 bg-surface-strong/50"
-              role="group"
-              aria-label="Kiểu hiển thị"
-            >
-              <button
-                type="button"
-                onClick={() => setViewMode("grid")}
-                className={
-                  viewMode === "grid"
-                    ? "h-8 px-2.5 rounded-md text-xs font-medium bg-card shadow-sm text-foreground inline-flex items-center gap-1.5"
-                    : "h-8 px-2.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
-                }
-                aria-pressed={viewMode === "grid"}
-                title="Lưới"
-              >
-                <LayoutGrid className="size-3.5" />
-                <span className="hidden sm:inline">Lưới</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("list")}
-                className={
-                  viewMode === "list"
-                    ? "h-8 px-2.5 rounded-md text-xs font-medium bg-card shadow-sm text-foreground inline-flex items-center gap-1.5"
-                    : "h-8 px-2.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
-                }
-                aria-pressed={viewMode === "list"}
-                title="Danh sách"
-              >
-                <List className="size-3.5" />
-                <span className="hidden sm:inline">List</span>
-              </button>
-            </div>
+            <ViewModeToggle value={viewMode} onChange={setViewMode} options={VIEW_MODE_OPTIONS} />
           </div>
         </div>
       </div>

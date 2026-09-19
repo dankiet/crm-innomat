@@ -26,7 +26,7 @@ Ký hiệu: `SF` = `createServerFn`; `DB` = module `src/db/*.server.ts` được
 | `/ghi-chu` | `_app` | `NotesPage` | — | `PageHeader`, `NewNoteDialog` | — | `fetchNotes` | `crm.server` |
 | `/san-pham` | `_app` | `ProductsPage` | `ImportExportProductsDialog`, `ImportStockDialog`, `EditProductDialog`, `EditProductImagesDialog`, `NewProductDialog`, `BulkEditFieldDialog`, `NewQuoteDialog`, `ProductCheck`, `FilterSection`, `ActiveTag` | `PageHeader`, `ProductImage`, `SortMenu`, `FilterChip`, `MultiSelectFilter`, `ui/popover`, `ui/dialog` | — | 6 SF | `crm.server`, `product-import-export.server` |
 | `/luu-tru` | `_app` | `MediaStoragePage` | `QuickRoomTagPopover`, `QuickFeaturedRankPopover`, `BulkRoomTagPopover`, `ProductGalleryDialog` | `PageHeader`, `ProductImage`, `ImageRoomTagPicker`, `FilterChip`, `MultiSelectFilter`, `ui/dialog`, `ui/popover` | — | 15 SF | `crm.server`, `gallery.server`, `lp.server` |
-| `/thu-vien` | `_app` | `GalleryPage` | `Sortable*` (DnD), `CollectionCard`, `CollectionPicker` | `PageHeader`, `ProductImage`, `SortMenu`, `ui/dialog` | — | 14 SF | `gallery.server`, `crm.server` |
+| `/thu-vien` | `_app` | `GalleryPage` | `SortableGalleryCard` (DnD), `GalleryViewerDialog`, `CollectionFormDialog`, `ImagePickerDialog`, `QuickSelect`, `EmptyCollection` | `PageHeader`, `ProductImage`, `SortMenu`, `ui/dialog` | — | 14 SF | `gallery.server`, `crm.server` |
 | `/khong-gian` | `_app` | `ConceptHubPage` | `QuickConceptRoomTagPopover` | `PageHeader`, `ui/dialog`, `ui/popover` | — | 5 SF | `space-collections.server`, `crm.server` |
 | `/leads` | `_app` | `LeadsPage` | `STATUS_TABS`, hai bước xoá inline | `PageHeader` | — | 4 SF | `lp.server` |
 | `/nguoi-dung` | `_app` | `UsersPage` | `Field` (local) | `PageHeader` | `useQuery` (react-query) | 4 SF | `users.server`, `audit.server` |
@@ -262,7 +262,7 @@ thêm trong cleanup này dùng đúng khuôn đó.
 ```text
 /luu-tru (_app.luu-tru.tsx:61)                          2.4k dòng
 │
-├── Không validateSearch — toàn bộ filter là state local (:533-…)
+├── Không validateSearch — toàn bộ filter là state local (:507-…)
 ├── errorComponent tuỳ biến (:62)
 ├── Page: MediaStoragePage
 │
