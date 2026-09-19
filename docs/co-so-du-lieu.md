@@ -1,9 +1,13 @@
 # Cơ sở dữ liệu
 
 Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:migrate`
-(idempotent — mọi lệnh đều `IF NOT EXISTS`, chạy lại an toàn).
+(idempotent — mọi lệnh đều `IF NOT EXISTS` / `IF EXISTS`, chạy lại an toàn).
 
 ## 25 bảng
+
+Số dòng thật của từng bảng (đo 2026-09-19 trên DB production): xem
+[audit-2026-09-19](audit-2026-09-19.md) §G0b — **không chép lại ở đây** để tránh hai bản số liệu
+trôi lệch nhau. §G cũng ghi rõ `public` có đúng 25 bảng, **0 bảng mồ côi**.
 
 ### Catalog sản phẩm
 
@@ -13,7 +17,7 @@ Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:mi
 | `product_internal_codes` | Mã nội bộ (MISA) → sản phẩm, **1 sản phẩm nhiều mã** | `UNIQUE(internal_code)` toàn cục                                                       |
 | `inventory`              | Tồn kho theo từng mã nội bộ × kho                    | `UNIQUE(internal_code, stock_location)`; FK về `product_internal_codes(internal_code)` |
 | `product_images`         | Ảnh của sản phẩm                                     | `UNIQUE(product_id, path)` + partial unique cho `path LIKE '/products/imported/%'`     |
-| `product_image_room_tags`| Thẻ phòng gán cho ảnh (`room_slug`), kèm `source`, `confidence`, `review_status` | PK ghép `(product_image_id, room_slug)`; dùng bởi tab thẻ phòng ở `/luu-tru` |
+| `product_image_room_tags`| Thẻ phòng gán cho ảnh (`room_slug`), kèm `source`, `confidence`, `model`, `model_version` | PK ghép `(product_image_id, room_slug)`; dùng bởi tab thẻ phòng ở `/luu-tru`. **Bộ review đã bỏ** — `review_status`/`reviewed_by`/`reviewed_at` chưa từng được dùng (1435/1435 dòng = `'accepted'`, 0 dòng có `reviewed_by`/`reviewed_at`), xem [audit](audit-2026-09-19.md) §G2 |
 
 Cột `products` gắn với nhãn UI như sau:
 
@@ -61,8 +65,8 @@ kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [n
 | Bảng                           | Ghi chú                                                                                                                                    |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `customer_mappings`            | `UNIQUE(code)`, `status`, `version` (mặc định `'01'`)                                                                                      |
-| `customer_mapping_items`       | Dòng đề xuất: trỏ `product_id` **hoặc** dùng bộ `custom_product_*` cho hàng ngoài catalog; nhóm theo `area_group_key` / `area_description` |
-| `customer_mapping_quote_links` | Liên kết N–N mapping ↔ quote. **PK ghép, không có cột `id`**                                                                               |
+| `customer_mapping_items`       | Dòng đề xuất: trỏ `product_id` **hoặc** dùng bộ `custom_product_*` cho hàng ngoài catalog; nhóm theo `area_group_key` (`area_description` còn khai báo nhưng 0 code dùng, 0/151 dòng có giá trị — xem [audit](audit-2026-09-19.md) §G1) |
+| `customer_mapping_quote_links` | Liên kết N–N mapping ↔ quote. **PK ghép, không có cột `id`**. Hiện **0 dòng** — tính năng đã viết xong code (ghi ở `crm.server.ts`, đọc ở `crm.server.ts` + `api/functions.ts`) nhưng chưa từng chạy ở production; **không** phải bảng chết |
 
 ### Thư viện hình
 

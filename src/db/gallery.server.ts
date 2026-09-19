@@ -1,15 +1,12 @@
 import { getDb, type AsyncDb, type SqlValue } from "./driver";
 import { isPublicImagePathReferenced } from "./crm.server";
 import { saveBase64Image } from "@/lib/image-upload.server";
-import { deleteImageRef, isManagedImageRef } from "@/lib/storage";
+import { deleteImageRef, isManagedImageRef } from "@/lib/storage.server";
 import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate, ProductImageKind } from "@/lib/types";
+import { nowLocal } from "@/lib/format";
 
 const MAX_BULK_IMAGE_IDS = 5_000;
 const BULK_CHUNK_SIZE = 400;
-
-function nowLocal(): string {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
 
 function cleanName(value: string): string {
   const name = value.trim();

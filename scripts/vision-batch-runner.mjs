@@ -584,7 +584,7 @@ export async function syncMasterToDb() {
     if (insertImageIds.length > 0) {
       await client.query(`
         INSERT INTO product_image_room_tags
-          (product_image_id, room_slug, source, confidence, model, model_version, review_status, created_at, updated_at)
+          (product_image_id, room_slug, source, confidence, model, model_version, created_at, updated_at)
         SELECT
           u.image_id,
           u.room_slug,
@@ -592,7 +592,6 @@ export async function syncMasterToDb() {
           u.confidence,
           u.model,
           u.model_version,
-          'accepted',
           NOW()::text,
           NOW()::text
         FROM UNNEST($1::bigint[], $2::text[], $3::double precision[], $4::text[], $5::text[])
@@ -602,7 +601,6 @@ export async function syncMasterToDb() {
           confidence = EXCLUDED.confidence,
           model = EXCLUDED.model,
           model_version = EXCLUDED.model_version,
-          review_status = EXCLUDED.review_status,
           updated_at = EXCLUDED.updated_at
         WHERE product_image_room_tags.source <> 'manual'
       `, [insertImageIds, insertRoomSlugs, insertConfidences, insertModels, insertModelVersions]);

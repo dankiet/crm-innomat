@@ -1,7 +1,8 @@
 # Bề mặt RPC (`createServerFn`)
 
-Tất cả nằm trong **`src/api/functions.ts`** (1.853 dòng, **86** endpoint) và
-**`src/api/lp.ts`** (19 endpoint công khai cho landing). Đây là ranh giới
+Tất cả nằm trong **`src/api/functions.ts`** (1.838 dòng, **82** endpoint) và
+**`src/api/lp.ts`** (332 dòng, **18** endpoint công khai cho landing, cộng 2 hàm auth
+re-export từ `functions.ts`). Đây là ranh giới
 client ↔ server: client **chỉ** gọi các hàm export từ file này.
 
 Docblock đầu file là hợp đồng:

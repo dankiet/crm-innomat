@@ -4,7 +4,7 @@ import { bulkUpdateProductFieldFn, clearProductFieldValueFn, fetchProductFieldVa
 import { PRODUCT_COLORS } from "@/lib/types";
 import { ProductSuggestionField } from "@/components/ProductSuggestionField";
 import { toast } from "sonner";
-import { Tags, Check, Sparkles, Loader2 } from "lucide-react";
+import { Tags, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type BulkField = "color" | "supplier" | "category" | "surface" | "collections" | "shape" | "material" | "size";

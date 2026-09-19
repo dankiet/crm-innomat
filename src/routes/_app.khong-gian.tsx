@@ -13,7 +13,7 @@
  *   - Cập nhật state trực tiếp không giật màn hình (no router.invalidate).
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Sparkles,
   Layers3,
@@ -26,12 +26,8 @@ import {
   Pencil,
   ArrowDownToDot,
   Loader2,
-  Check,
   Maximize2,
-  SlidersHorizontal,
   Compass,
-  Building2,
-  CheckCircle2,
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -56,30 +52,10 @@ import { COLOR_PALETTES } from "@/lib/color-palette";
 import { setImageRoomTagsDirectFn } from "@/api/functions";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { IMAGE_ROOM_TAGS, type ImageRoomTagSlug } from "@/lib/types";
+import { getPageNumbers } from "@/lib/pagination";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const PAGE_LIMIT_OPTIONS = [24, 48, 96] as const;
-
-function getPageNumbers(currentPage: number, totalPages: number): (number | "...")[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-  const pages: (number | "...")[] = [];
-  pages.push(1);
-  if (currentPage > 3) {
-    pages.push("...");
-  }
-  const start = Math.max(2, currentPage - 1);
-  const end = Math.min(totalPages - 1, currentPage + 1);
-  for (let i = start; i <= end; i++) {
-    pages.push(i);
-  }
-  if (currentPage < totalPages - 2) {
-    pages.push("...");
-  }
-  pages.push(totalPages);
-  return pages;
-}
 
 function QuickConceptRoomTagPopover({
   item,
@@ -387,7 +363,6 @@ function ConceptHubPage() {
         room_slug: s,
         confidence: null,
         source: "manual",
-        review_status: "accepted",
       }));
       setItems((prev) =>
         prev.map((it) => (it.image_id === item.image_id ? { ...it, room_tags: updatedTags } : it)),

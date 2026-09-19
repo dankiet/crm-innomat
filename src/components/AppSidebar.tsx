@@ -1,6 +1,5 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard,
   Users,
   Target,
   FileText,
@@ -19,7 +18,6 @@ import {
   ChevronRight,
   Inbox,
   Layers3,
-  Sparkles,
 } from "lucide-react";
 import { ALL_PRODUCTS_SLUG, PRODUCT_GROUPS } from "@/lib/product-categories";
 import { Fragment, useEffect, useState } from "react";

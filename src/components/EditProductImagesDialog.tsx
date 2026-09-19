@@ -18,6 +18,7 @@ import {
   uploadProductImageFn,
 } from "@/api/functions";
 import type { Product, ProductImageRow, ProductImageKind, ImageRoomTagSlug } from "@/lib/types";
+import { inputCls } from "@/lib/utils";
 import { PRODUCT_IMAGE_KINDS, PRODUCT_IMAGE_KIND_LABELS } from "@/lib/types";
 import { toast } from "sonner";
 import { ImagePlus, Loader2, Star, Trash2, Upload, Link2 } from "lucide-react";
@@ -423,6 +424,3 @@ export function EditProductImagesDialog({
     </Dialog>
   );
 }
-
-const inputCls =
-  "w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground";

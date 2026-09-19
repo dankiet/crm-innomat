@@ -1,7 +1,12 @@
-import type { DiscountType, Product } from "@/lib/types";
+import type { DiscountType, MappingPriceBasis, Product } from "@/lib/types";
 
 /** Thuế suất VAT dùng chung (export báo giá + ước tính lợi nhuận). */
 export const VAT_RATE = 0.08;
+
+/** Quy căn cứ giá của đề xuất vật liệu về nhóm chiết khấu tương ứng. */
+export function basisToDiscountType(basis: MappingPriceBasis): DiscountType {
+  return basis === "tp" ? "tp" : basis === "b2b" ? "b2b" : "none";
+}
 
 /** Quy đơn giá bán về trục gồm VAT — để so sánh đúng với trade_price (đã gồm VAT). */
 function salePriceInclVat(

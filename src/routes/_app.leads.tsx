@@ -12,7 +12,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { fetchLpLeadsFn, setLpLeadStatusFn, convertLpLeadFn, deleteLpLeadFn } from "@/api/lp";
-import { LP_LEAD_STATUS_LABEL, type LpLead, type LpLeadStatus } from "@/lib/lp-types";
+import { LP_FORM_KIND_LABEL, LP_LEAD_STATUS_LABEL, type LpLead, type LpLeadStatus } from "@/lib/lp-types";
 
 type LeadsSearch = { status?: LpLeadStatus | "all"; q?: string };
 
@@ -186,7 +186,7 @@ function LeadsPage() {
                       : "rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-500/20"
                   }
                 >
-                  {lead.form_kind === "library-gate" ? "Mở thư viện" : "Brief KTS"}
+                  {LP_FORM_KIND_LABEL[lead.form_kind]}
                 </span>
                 {(lead.dup_count ?? 1) > 1 ? (
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground ring-1 ring-black/5">

@@ -1,4 +1,4 @@
-import { putImageBuffer } from "@/lib/storage";
+import { putImageBuffer } from "@/lib/storage.server";
 
 const IMAGE_MAX_SIDE = 1600;
 const IMAGE_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;

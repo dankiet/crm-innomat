@@ -98,12 +98,7 @@ export const toggleProductPublicFn = createServerFn({ method: "POST" })
     return { ok: true as const, isPublic: data.isPublic };
   });
 
-export {
-  authGoogleStart,
-  authGoogleCallback,
-  fetchPublicMeFn,
-  logoutPublicFn,
-} from "./functions";
+export { authGoogleStart, fetchPublicMeFn } from "./functions";
 
 export const submitLpLeadFn = createServerFn({ method: "POST" })
   .inputValidator((data: LpLeadInput) => data)

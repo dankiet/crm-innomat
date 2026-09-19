@@ -7,7 +7,6 @@ import {
   Layers,
   Sparkles,
   ArrowUpRight,
-  SlidersHorizontal,
   LockKeyhole,
 } from "lucide-react";
 import {
@@ -302,7 +301,7 @@ export function SpaceLookbookSection({
       )}
 
       <div className="space-gallery-grid">
-        {displayedItems.map((item, index) => {
+        {displayedItems.map((item) => {
           const isShortlisted = shortlistIds.includes(item.product.id);
 
           return (

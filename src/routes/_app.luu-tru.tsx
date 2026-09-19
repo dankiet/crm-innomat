@@ -8,13 +8,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Eye,
   EyeOff,
   Globe,
   Grid,
   Image as ImageIcon,
   Images,
-  Layers,
   Loader2,
   Maximize2,
   RefreshCw,
@@ -58,6 +56,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import { PRODUCT_COLORS, PRODUCT_TEXTURES } from "@/lib/types";
+import { getPageNumbers } from "@/lib/pagination";
 export const Route = createFileRoute("/_app/luu-tru")({
   errorComponent: ({ error }) => (
     <div className="p-8 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300">
@@ -84,27 +83,6 @@ const SORT_OPTIONS: Array<{ key: FlatMediaSort; label: string; icon: typeof Cloc
 ];
 
 const PAGE_SIZE_OPTIONS = [24, 48, 96] as const;
-
-function getPageNumbers(currentPage: number, totalPages: number): (number | "...")[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-  const pages: (number | "...")[] = [];
-  pages.push(1);
-  if (currentPage > 3) {
-    pages.push("...");
-  }
-  const start = Math.max(2, currentPage - 1);
-  const end = Math.min(totalPages - 1, currentPage + 1);
-  for (let i = start; i <= end; i++) {
-    pages.push(i);
-  }
-  if (currentPage < totalPages - 2) {
-    pages.push("...");
-  }
-  pages.push(totalPages);
-  return pages;
-}
 
 function QuickRoomTagPopover({
   item,
@@ -234,12 +212,10 @@ function QuickFeaturedRankPopover({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [occupiedSlots, setOccupiedSlots] = useState<Record<number, FeaturedSlotInfo>>({});
-  const [loadingSlots, setLoadingSlots] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setLoadingSlots(true);
     void fetchFeaturedSlotsFn()
       .then((slots) => {
         if (!cancelled) {
@@ -250,10 +226,7 @@ function QuickFeaturedRankPopover({
           setOccupiedSlots(map);
         }
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoadingSlots(false);
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -1378,7 +1351,6 @@ function MediaStoragePage() {
             const isSelected = selectedIds.has(img.id);
             const isMap = img.kind === "map";
             const isConcept = img.kind === "concept";
-            const hasTag = isMap || isConcept;
             const isConfirmingDelete = confirmDeleteId === img.id;
             const isDeletingThis = deletingId === img.id;
 

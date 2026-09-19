@@ -4,9 +4,6 @@ import {
   Search,
   SlidersHorizontal,
   Sparkles,
-  Download,
-  Box,
-  FileText,
   Layers3,
   Check,
   Plus,
@@ -14,7 +11,6 @@ import {
   LockKeyhole,
   ArrowRight,
   ShieldCheck,
-  X,
 } from "lucide-react";
 import { BrandMark } from "./BrandMark";
 import {
@@ -22,7 +18,7 @@ import {
   authGoogleStart,
   fetchPublicMeFn,
 } from "@/api/lp";
-import type { CatalogFacets, CatalogFacetOption } from "@/lib/lp-types";
+import type { CatalogFacets } from "@/lib/lp-types";
 import { COLOR_PALETTES } from "@/lib/color-palette";
 import { SURFACE_FINISHES, FORMAT_FAMILIES } from "@/lib/material-taxonomy";
 import { cn } from "@/lib/utils";
@@ -39,8 +35,6 @@ type MaterialLibraryPageProps = {
   onGoToHome: () => void;
   onOpenMoodboard: () => void;
 };
-
-const UNLOCKED_STORAGE_KEY = "ebg_library_unlocked";
 
 export function MaterialLibraryPage({
   shortlistIds,
@@ -74,7 +68,6 @@ export function MaterialLibraryPage({
   const [gateSuccessToast, setGateSuccessToast] = useState(false);
 
   const [liveMaterials, setLiveMaterials] = useState<Material[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Debounce search query
   useEffect(() => {
@@ -136,7 +129,6 @@ export function MaterialLibraryPage({
   // Fetch catalog & facets from PostgreSQL
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetchPublicCatalogFn({
       data: {
         category: categoryName,
@@ -170,10 +162,7 @@ export function MaterialLibraryPage({
           }
         }
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

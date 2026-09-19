@@ -2,7 +2,7 @@
 
 ## Lưu trữ hai chế độ
 
-`src/lib/storage.ts` (~156 dòng) là lớp lưu trữ dùng chung. Tên file **content-addressed theo
+`src/lib/storage.server.ts` (~156 dòng) là lớp lưu trữ dùng chung. Tên file **content-addressed theo
 SHA-256** nên tự chống trùng: cùng một tấm ảnh upload nhiều lần chỉ tốn một file.
 
 | Chế độ               | Điều kiện                                               | Ref trả về                                                                                       |

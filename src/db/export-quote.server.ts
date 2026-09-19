@@ -1,6 +1,6 @@
 import { getDb } from "./index.server";
 import { VAT_RATE } from "@/lib/pricing";
-import { readImageBytes } from "@/lib/storage";
+import { readImageBytes } from "@/lib/storage.server";
 import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";
 import { mapLimit } from "@/lib/image-export.server";
 

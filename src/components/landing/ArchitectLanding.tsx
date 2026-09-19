@@ -23,14 +23,12 @@ import { MaterialLibraryPage } from "./MaterialLibraryPage";
 import { useShortlistStorage } from "./useShortlistStorage";
 import { trackEvent } from "@/lib/lp-tracking";
 import {
-  curatedMaterials,
   tileLines,
   deliverables,
   heroImage,
   fnbCollectionImage,
   type Material,
   type TileLine,
-  type LineId,
 } from "@/data/mockData";
 import { fetchLpMaterialsFn } from "@/api/lp";
 
@@ -44,7 +42,6 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
   const {
     shortlistIds: selectedIds,
     toggleMaterial: toggleStorageMaterial,
-    addMaterials: addStorageMaterials,
     clearShortlist,
   } = useShortlistStorage([]);
 
@@ -106,11 +103,6 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
     if (isAdding) {
       trackEvent("AddToCart", { material_id: id });
     }
-  };
-
-  const addMultipleToShortlist = (ids: string[]) => {
-    addStorageMaterials(ids);
-    trackEvent("AddToCart", { collection_ids: ids });
   };
 
   // Shortlisted material objects
@@ -454,7 +446,6 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                   <span>BRIEF — 01</span>
                 </div>
                 <ProjectBriefForm
-                  shortlistCount={selectedIds.length}
                   intent="new-project"
                   shortlistMaterialIds={selectedIds}
                   onRemoveShortlistId={toggleMaterial}

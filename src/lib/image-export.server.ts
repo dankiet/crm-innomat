@@ -1,4 +1,4 @@
-import { readImageBytes } from "@/lib/storage";
+import { readImageBytes } from "@/lib/storage.server";
 import { stampDataUrl } from "@/lib/brand-assets.server";
 
 /**
@@ -15,9 +15,9 @@ import { stampDataUrl } from "@/lib/brand-assets.server";
  */
 export const EXPORT_AREA_MAX_SIDE = 1000;
 export const EXPORT_THUMB_MAX_SIDE = 260;
-export const EXPORT_JPEG_QUALITY = 78;
+const EXPORT_JPEG_QUALITY = 78;
 /** Con dấu render ở 135px, giữ 2× cho màn hình retina và bản in. */
-export const EXPORT_STAMP_MAX_SIDE = 270;
+const EXPORT_STAMP_MAX_SIDE = 270;
 
 /** Chạy fn trên từng phần tử với giới hạn concurrency. */
 export async function mapLimit<T, R>(
@@ -47,7 +47,7 @@ function mimeFromRef(ref: string): string {
  * Resize + nén về JPEG. Trả `null` khi sharp không xử lý được để caller
  * fallback về buffer gốc — một ảnh lỗi không được làm hỏng cả file xuất.
  */
-export async function resizeForExport(
+async function resizeForExport(
   input: Buffer,
   maxSide: number,
 ): Promise<Buffer | null> {
@@ -72,7 +72,7 @@ export async function resizeForExport(
   }
 }
 
-export type ExportImagePool = {
+type ExportImagePool = {
   /** Data URI đã nén cho `ref`; "" nếu thiếu ref hoặc đọc không được. */
   load: (ref: string, maxSide: number) => Promise<string>;
 };

@@ -6,12 +6,11 @@ const SHORTLIST_STORAGE_KEY = "ebg_architect_shortlist_ids_v1";
  * Hook lưu trữ Shortlist vật liệu an toàn tuyệt đối cho SSR (TanStack Start / Next.js / Vite).
  * - Khởi tạo state ban đầu là mảng rỗng [] trên server để chống mismatch hydration.
  * - Chỉ đọc và đồng bộ hóa với localStorage bên trong useEffect (client-mount).
- * - Cung cấp đầy đủ hàm toggle, add nhiều mã, set toàn bộ và clear.
+ * - Cung cấp đầy đủ hàm toggle, set toàn bộ và clear.
  */
 export function useShortlistStorage(initialIds: string[] = []): {
   shortlistIds: string[];
   toggleMaterial: (id: string) => void;
-  addMaterials: (ids: string[]) => void;
   setShortlistIds: (ids: string[]) => void;
   clearShortlist: () => void;
   isHydrated: boolean;
@@ -58,18 +57,6 @@ export function useShortlistStorage(initialIds: string[] = []): {
     [persistToStorage]
   );
 
-  // 4. Thêm danh sách mã gạch (gộp không trùng lặp)
-  const addMaterials = useCallback(
-    (ids: string[]) => {
-      setShortlistIdsState((current) => {
-        const next = Array.from(new Set([...current, ...ids]));
-        persistToStorage(next);
-        return next;
-      });
-    },
-    [persistToStorage]
-  );
-
   // 5. Cập nhật đè toàn bộ danh sách
   const setShortlistIds = useCallback(
     (ids: string[]) => {
@@ -88,7 +75,6 @@ export function useShortlistStorage(initialIds: string[] = []): {
   return {
     shortlistIds,
     toggleMaterial,
-    addMaterials,
     setShortlistIds,
     clearShortlist,
     isHydrated,

@@ -3,12 +3,10 @@ import {
   X,
   Trash2,
   ArrowRight,
-  Download,
   BookOpen,
   Sparkles,
   Check,
   Copy,
-  FileText,
 } from "lucide-react";
 import type { Material } from "@/data/mockData";
 

@@ -37,8 +37,7 @@ import {
   type SortDir,
   type SortFieldOption,
 } from "@/components/SortMenu";
-import { deleteProductFn, fetchProducts, updateProductFn } from "@/api/functions";
-import { bulkSetProductsPublicFn } from "@/api/lp";
+import { deleteProductFn, fetchProducts } from "@/api/functions";
 import type { Product } from "@/lib/types";
 import { formatVND } from "@/lib/format";
 import {
@@ -58,13 +57,9 @@ import {
   Copy,
   FilePlus2,
   Flame,
-  Globe,
-  Eye,
-  EyeOff,
   Images,
   LayoutGrid,
   List,
-  Loader2,
   Pencil,
   Plus,
   Search,
@@ -808,6 +803,16 @@ function ProductsPage() {
       .map(toFacetOption);
   }, [matchIndexed]);
 
+  const supplierOptions = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const { p } of matchIndexed("supplier")) {
+      addFacetCount(map, p.supplier);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(toFacetOption);
+  }, [matchIndexed]);
+
   const hotInScope = useMemo(
     () => indexed.filter(({ p }) => p.is_hot).length,
     [indexed],
@@ -1099,66 +1104,6 @@ function ProductsPage() {
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
-  const onTogglePublic = useCallback(
-    async (product: Product) => {
-      const next = product.is_public === 1 ? 0 : 1;
-      try {
-        await updateProductFn({
-          data: {
-            id: product.id,
-            is_public: next,
-          },
-        });
-        toast.success(
-          next === 1
-            ? `Đã hiện mã ${product.code} trên Thư viện web`
-            : `Đã ẩn mã ${product.code} khỏi Thư viện web`,
-        );
-        await router.invalidate();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
-      }
-    },
-    [router],
-  );
-
-  async function bulkPublish() {
-    if (!selectedProducts.length || bulkBusy) return;
-    setBulkBusy(true);
-    try {
-      await bulkSetProductsPublicFn({
-        data: {
-          productIds: selectedProducts.map((p) => p.id),
-          is_public: 1,
-        },
-      });
-      toast.success(`Đã xuất bản ${selectedProducts.length} sản phẩm lên Thư viện web`);
-      await router.invalidate();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
-    } finally {
-      setBulkBusy(false);
-    }
-  }
-
-  async function bulkUnpublish() {
-    if (!selectedProducts.length || bulkBusy) return;
-    setBulkBusy(true);
-    try {
-      await bulkSetProductsPublicFn({
-        data: {
-          productIds: selectedProducts.map((p) => p.id),
-          is_public: 0,
-        },
-      });
-      toast.success(`Đã ẩn ${selectedProducts.length} sản phẩm khỏi Thư viện web`);
-      await router.invalidate();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật");
-    } finally {
-      setBulkBusy(false);
-    }
-  }
   async function bulkCopyCodes() {
     if (!selectedProducts.length) return;
     const text = [...new Set(selectedProducts.map((product) => product.code.trim()).filter(Boolean))].join(" ");
@@ -1395,6 +1340,17 @@ function ProductsPage() {
                 searchable
               />
             </FilterChip>
+            <FilterChip label="Nhà cung cấp" count={supplierParam.length}>
+              <MultiSelectFilter
+                title="Chọn nhà cung cấp"
+                options={supplierOptions}
+                selected={supplierParam}
+                onChange={(next) =>
+                  setSearch({ supplier: next.length ? next : undefined })
+                }
+                searchable
+              />
+            </FilterChip>
           </div>
 
           {/* Mobile: 1 nút mở sheet full facets */}
@@ -1493,6 +1449,15 @@ function ProductsPage() {
                    searchable
                  />
                </FilterSection>
+              <FilterSection title="Nhà cung cấp" count={filtersDraft?.supplier.length ?? supplierParam.length}>
+                <MultiSelectFilter
+                  title="Chọn nhà cung cấp"
+                  options={supplierOptions}
+                  selected={filtersDraft?.supplier ?? supplierParam}
+                  onChange={(next) => patchFiltersDraft({ supplier: next })}
+                  searchable
+                />
+              </FilterSection>
              </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <button
@@ -1587,7 +1552,7 @@ function ProductsPage() {
             ))}
             {collectionsParam.map((e: string) => (
               <ActiveTag
-                key={`effect-${e}`}
+                key={`collection-${e}`}
                 onClear={() =>
                   setSearch({
                     collections: collectionsParam.filter((x: string) => x !== e),
@@ -1595,6 +1560,18 @@ function ProductsPage() {
                 }
               >
                 {"B\u1ed9 s\u01b0u t\u1eadp"}: {e}
+              </ActiveTag>
+            ))}
+            {supplierParam.map((e: string) => (
+              <ActiveTag
+                key={`supplier-${e}`}
+                onClear={() =>
+                  setSearch({
+                    supplier: supplierParam.filter((x: string) => x !== e),
+                  })
+                }
+              >
+                Nhà cung cấp: {e}
               </ActiveTag>
             ))}
             {stockLocParam === "KHOVP" && (
@@ -1704,7 +1681,6 @@ function ProductsPage() {
               product={t}
               selected={selectedIds.has(t.id)}
               onToggleSelect={toggleSelect}
-              onTogglePublic={canEditProducts ? onTogglePublic : undefined}
               onEdit={canEditProducts ? onEditProduct : undefined}
               onImages={onImagesProduct}
             />
@@ -1732,7 +1708,6 @@ function ProductsPage() {
               product={t}
               selected={selectedIds.has(t.id)}
               onToggleSelect={toggleSelect}
-              onTogglePublic={canEditProducts ? onTogglePublic : undefined}
               onEdit={canEditProducts ? onEditProduct : undefined}
               onImages={onImagesProduct}
             />
@@ -1977,14 +1952,12 @@ const ProductCard = memo(function ProductCard({
   product: t,
   selected,
   onToggleSelect,
-  onTogglePublic,
   onEdit,
   onImages,
 }: {
   product: Product;
   selected: boolean;
   onToggleSelect: (id: number) => void;
-  onTogglePublic?: (p: Product) => void;
   onEdit?: (p: Product) => void;
   onImages?: (p: Product) => void;
 }) {
@@ -2113,14 +2086,12 @@ const ProductListRow = memo(function ProductListRow({
   product: t,
   selected,
   onToggleSelect,
-  onTogglePublic,
   onEdit,
   onImages,
 }: {
   product: Product;
   selected: boolean;
   onToggleSelect: (id: number) => void;
-  onTogglePublic?: (p: Product) => void;
   onEdit?: (p: Product) => void;
   onImages?: (p: Product) => void;
 }) {

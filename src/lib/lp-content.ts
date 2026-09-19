@@ -7,39 +7,6 @@
  */
 import type { LpVariant } from "./lp-types";
 
-/**
- * Màu chữ tiếng Việt → hex, dùng cho swatch trên material card.
- * Spec yêu cầu card có swatch màu; CRM lưu màu dạng text nên cần map.
- */
-const COLOR_TONE: Record<string, string> = {
-  trắng: "#EFEAE0",
-  đen: "#26292B",
-  xám: "#8E9094",
-  kem: "#E4D9C3",
-  beige: "#D8C7AC",
-  nâu: "#7A5641",
-  vàng: "#D9A94C",
-  cam: "#C9713C",
-  đỏ: "#B94A2E",
-  hồng: "#D9A6A0",
-  xanh: "#4A6870",
-  "xanh mint": "#A9C6BB",
-  "xanh dương": "#3F6080",
-  "xanh lá": "#657151",
-  tím: "#7A6A88",
-  gold: "#C4A268",
-};
-
-/** Tông đại diện cho một mã gạch; fallback về màu đất nung nhạt. */
-export function toneForColor(color: string | undefined | null): string {
-  const key = (color ?? "").trim().toLowerCase();
-  if (!key) return "#C8B7A1";
-  if (COLOR_TONE[key]) return COLOR_TONE[key];
-  // Màu ghép kiểu "Xanh rêu", "Nâu nhạt" — lấy từ đầu tiên khớp.
-  const hit = Object.keys(COLOR_TONE).find((k) => key.startsWith(k));
-  return hit ? COLOR_TONE[hit] : "#C8B7A1";
-}
-
 const SHARED_FAQ: LpVariant["faq"] = [
   {
     q: "Giá bao nhiêu một mét vuông?",

@@ -20,6 +20,7 @@ import type { Customer, CustomerStatus, LeadSource } from "@/lib/types";
 import { LEAD_SOURCES, statusMeta } from "@/lib/types";
 import type { AppUser, SessionUser } from "@/lib/auth-types";
 import { isPhoneMatchable } from "@/lib/phone";
+import { inputClsPlaceholder as inputCls } from "@/lib/utils";
 import { toast } from "sonner";
 import { AlertTriangle, Trash2, UserRoundCog } from "lucide-react";
 
@@ -553,5 +554,3 @@ function Field({
   );
 }
 
-const inputCls =
-  "w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground placeholder:text-muted-foreground/70";

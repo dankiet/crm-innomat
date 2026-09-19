@@ -233,8 +233,9 @@ CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_
 CREATE UNIQUE INDEX IF NOT EXISTS ux_product_images_one_map
   ON product_images (product_id) WHERE kind = 'map';
  
--- Bối cảnh phòng của ảnh concept. room_slug dùng chung vocabulary ở src/lib/types.ts;
--- các slug image-only (office_workspace/other/unknown) không xuất hiện trong space_collections.
+-- Bối cảnh phòng của ảnh concept. room_slug dùng chung vocabulary ở src/lib/types.ts:
+-- SPACE_TYPES là các slug phòng chuẩn, IMAGE_ROOM_TAGS là danh sách đầy đủ (thêm 3 slug
+-- image-only office_workspace/other/unknown chỉ dùng cho ảnh, không có trong SPACE_TYPES).
 CREATE TABLE IF NOT EXISTS product_image_room_tags (
   product_image_id BIGINT NOT NULL REFERENCES product_images(id) ON DELETE CASCADE,
   room_slug TEXT NOT NULL,
@@ -242,13 +243,15 @@ CREATE TABLE IF NOT EXISTS product_image_room_tags (
   confidence DOUBLE PRECISION,
   model TEXT NOT NULL DEFAULT '',
   model_version TEXT NOT NULL DEFAULT '',
-  review_status TEXT NOT NULL DEFAULT 'accepted',
-  reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-  reviewed_at TEXT,
   created_at TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (product_image_id, room_slug)
 );
+-- Bộ review thẻ phòng (review_status/reviewed_by/reviewed_at) chưa từng được xây:
+-- mọi INSERT ghi cứng 'accepted' (1435/1435 dòng), reviewed_by/reviewed_at luôn NULL → bỏ.
+ALTER TABLE product_image_room_tags DROP COLUMN IF EXISTS review_status;
+ALTER TABLE product_image_room_tags DROP COLUMN IF EXISTS reviewed_by;
+ALTER TABLE product_image_room_tags DROP COLUMN IF EXISTS reviewed_at;
 CREATE INDEX IF NOT EXISTS idx_product_image_room_tags_slug
   ON product_image_room_tags(room_slug);
 
@@ -408,6 +411,7 @@ ALTER TABLE lp_leads ADD COLUMN IF NOT EXISTS area TEXT NOT NULL DEFAULT '';
 -- endpoint upload công khai chưa mở (xem docs). Sales chủ động xin lại file.
 ALTER TABLE lp_leads ADD COLUMN IF NOT EXISTS attachment_names TEXT NOT NULL DEFAULT '';
 -- Nguồn form: 'lp' (landing) | 'library-gate' (mở Thư viện mã gạch)
+--           | 'google-unlock' (đăng nhập Google để mở khoá nội dung)
 ALTER TABLE lp_leads ADD COLUMN IF NOT EXISTS form_kind TEXT NOT NULL DEFAULT 'lp';
 -- JSON chi tiết ngữ cảnh shortlist (mã gạch + bối cảnh không gian + vị trí ghim)
 ALTER TABLE lp_leads ADD COLUMN IF NOT EXISTS shortlist_details TEXT NOT NULL DEFAULT '';

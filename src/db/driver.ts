@@ -32,9 +32,9 @@ interface AsyncStmt {
   run(...params: SqlValue[]): Promise<RunResult>;
 }
 
-export type TransactionRunner<T> = (() => Promise<T>) & Promise<T>;
+type TransactionRunner<T> = (() => Promise<T>) & Promise<T>;
 
-export function makeTxCallable<T>(runner: () => Promise<T>): TransactionRunner<T> {
+function makeTxCallable<T>(runner: () => Promise<T>): TransactionRunner<T> {
   let executedPromise: Promise<T> | null = null;
   const getPromise = () => {
     if (!executedPromise) {

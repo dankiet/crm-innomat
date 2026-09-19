@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { authGoogleCallback } from "@/api/functions";
 
 export const Route = createFileRoute("/auth/callback")({

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { fetchCustomers, fetchNotes, saveNote } from "@/api/functions";
 import type { Customer, Note } from "@/lib/types";
+import { inputClsPlaceholder as inputCls } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Props = {
@@ -211,5 +212,3 @@ export function NewNoteDialog({
   );
 }
 
-const inputCls =
-  "w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground placeholder:text-muted-foreground/70";

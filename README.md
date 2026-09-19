@@ -14,9 +14,9 @@ hình ảnh ở **Supabase Storage**, triển khai trên **Vercel** (preset `nit
 | [docs/tong-quan-tinh-nang.md](docs/tong-quan-tinh-nang.md)         | **Điểm vào** — bản đồ 15 khu vực tính năng → route/RPC/bảng |
 | [docs/kien-truc.md](docs/kien-truc.md)                             | Kiến trúc, tech stack, luồng request, build chain        |
 | [docs/cai-dat-va-moi-truong.md](docs/cai-dat-va-moi-truong.md)     | Chạy local, biến môi trường, script                      |
-| [docs/co-so-du-lieu.md](docs/co-so-du-lieu.md)                     | 19 bảng, RLS, và hợp đồng của `db/driver.ts`             |
+| [docs/co-so-du-lieu.md](docs/co-so-du-lieu.md)                     | 25 bảng, RLS, và hợp đồng của `db/driver.ts`             |
 | [docs/xac-thuc-va-phan-quyen.md](docs/xac-thuc-va-phan-quyen.md)   | Session cookie, scrypt, role, owner-scoping, CSRF        |
-| [docs/api-server-functions.md](docs/api-server-functions.md)       | Bề mặt RPC `createServerFn` (~85 endpoint)               |
+| [docs/api-server-functions.md](docs/api-server-functions.md)       | Bề mặt RPC `createServerFn` (100 endpoint)               |
 | [docs/nghiep-vu.md](docs/nghiep-vu.md)                             | Mã chứng từ, pipeline, giá/VAT 8%, xuất HTML             |
 | [docs/san-pham-ton-kho-import.md](docs/san-pham-ton-kho-import.md) | Sản phẩm, mã nội bộ, tồn kho, import/export Excel        |
 | [docs/hinh-anh-va-thu-vien.md](docs/hinh-anh-va-thu-vien.md)       | Lưu hình content-addressed, nén ảnh, thư viện            |

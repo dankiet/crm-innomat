@@ -13,6 +13,45 @@ export type QuoteStatus = "draft" | "sent" | "accepted" | "expired";
 export type OrderStatus = "preparing" | "shipping" | "delivered";
 export type DiscountType = "none" | "tp" | "b2b" | "custom";
 
+/** Căn cứ giá in trên đề xuất vật liệu (dùng chung client + server). */
+export type MappingPriceBasis = "retail" | "tp" | "b2b";
+
+/** Một dòng vật liệu trong đề xuất vật liệu (mapping) gửi khách. */
+export type CustomerMappingItem = {
+  id: number;
+  mapping_id: number;
+  sort_order: number;
+  area_group_key: string;
+  description: string;
+  size: string;
+  product_id: number | null;
+  image_path: string;
+  custom_product_code: string;
+  custom_product_name: string;
+  custom_product_size: string;
+  custom_product_surface: string;
+  custom_product_retail_price: number;
+  custom_product_image_path: string;
+  /** null = tính theo price_basis của đề xuất; số = giá chốt tay (đ/m²) */
+  price_override: number | null;
+};
+
+/** Đề xuất vật liệu (mapping) của một khách hàng. */
+export type CustomerMapping = {
+  id: number;
+  code: string;
+  customer_id: number;
+  status: QuoteStatus;
+  name: string;
+  version: string;
+  note: string;
+  price_basis: MappingPriceBasis;
+  created_at: string;
+  updated_at: string;
+  linked_quotes: Array<{ id: number; code: string; status: QuoteStatus }>;
+  items: CustomerMappingItem[];
+};
+
 export const SPACE_TYPES = [
   { id: "living_room", label: "Phòng khách & Lounge" },
   { id: "kitchen_dining", label: "Bếp & Dining" },
@@ -24,8 +63,7 @@ export const SPACE_TYPES = [
 
 export type SpaceType = (typeof SPACE_TYPES)[number]["id"];
 export type ImageRoomTagSlug = SpaceType | "office_workspace" | "other" | "unknown";
-export type ImageRoomTagSource = "manual" | "vision";
-export type ImageRoomTagReviewStatus = "pending" | "accepted" | "rejected";
+type ImageRoomTagSource = "manual" | "vision";
 
 export const IMAGE_ROOM_TAGS = [
   ...SPACE_TYPES,
@@ -41,7 +79,6 @@ export type ProductImageRoomTag = {
   confidence: number | null;
   model: string;
   model_version: string;
-  review_status: ImageRoomTagReviewStatus;
   created_at: string;
   updated_at: string;
 };

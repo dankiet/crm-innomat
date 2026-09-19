@@ -13,7 +13,7 @@
  * kèm nút in cố định phòng trường hợp trình duyệt chặn print tự động.
  */
 
-import { formatVND } from "@/lib/format";
+import { escapeHtml, formatVND } from "@/lib/format";
 
 export type ProductQuickSheetRow = {
   code: string;
@@ -48,15 +48,6 @@ type ProductQuickSheetOptions = {
   /** Ghi chú in dưới bảng (đơn vị giá, phạm vi tồn kho…). */
   notes?: string[];
 };
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 
 /** Số lượng: tối đa 2 chữ số thập phân, dấu kiểu VN. */
 function formatQty(value: number): string {

@@ -29,33 +29,6 @@ export type TileLine = {
   facets: string[];
 };
 
-export type CatalogItem = {
-  id: string;
-  code: string;
-  title: string;
-  line: LineId;
-  surface: string;
-  size: string;
-  tone: string;
-  image: string;
-  contextImage?: string;
-  pattern?: string;
-  finish: string;
-  description: string;
-};
-
-export type Collection = {
-  id: string;
-  slug: string;
-  title: string;
-  kind: string;
-  image: string;
-  note: string;
-  materialIds: string[];
-  tag: string;
-};
- 
-
 export type SpaceLookbookItem = {
   id: string;
   projectId: string;
@@ -72,21 +45,6 @@ export type SpaceLookbookItem = {
   product: Material; // Đối tượng Material hoàn chỉnh gồm id, code, name, size, finish, tone, image (macro), v.v.
 };
 
-export type SpaceProjectAlbum = {
-  id: string;
-  code: string;
-  title: string;
-  subtitle: string;
-  location: string;
-  coverImage: string;
-  spaceTypes: SpaceType[];
-  photoCount: number;
-  photos: SpaceLookbookItem[];
-  materialList: Material[];
-  conceptStory: string;
-};
-
-
 // Curated Architectural Room Photos for "Xem trong không gian"
 export const heroImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/fe2aef755acdc0f9b7e1911403a8ff4d79eff43cb8862b97e86977dea4e679ad.webp";
 export const courtyardCollectionImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/7db7bb5edb309e5fdf791b0b955ea149eade1ff94b57eb427b2178210ec2f30b.webp";
@@ -99,15 +57,11 @@ export const mineralGreenSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.c
 export const sandMatteSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/73c5fb491bc784aa94e4103476ed1f570e037d2552e657f47ae430b7bea7b777.webp";
 export const oliveTileSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/e4fa6796fca9bf953faeadbb4b83818488e2cc919e153a46c0162cc3edf4163f.webp";
 export const rippleAmberSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/50979bc96ffcb73832cc6f03e116639ee926df46c9f583a6230c1524e3e18c5f.webp";
-export const whiteGlazeSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/5e733843449524d5b37011544919957d121e642d42b8c7d81fc885f993f5c961.webp";
-export const carbonBlackSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/fe2aef755acdc0f9b7e1911403a8ff4d79eff43cb8862b97e86977dea4e679ad.webp";
-export const desertGoldSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/7db7bb5edb309e5fdf791b0b955ea149eade1ff94b57eb427b2178210ec2f30b.webp";
 
 export const inkFingerMosaicSurface = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/f61c2674e05b84326994e5a9f20fc7a0030162ea984a83c48b53878de71e2084.webp";
 export const fishScaleMosaicSurface = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/83ae6ff9cdaedaa6cb986a3784e616c78af35eb23a1499f10a239994bb3dc002.webp";
 export const crackleSquareMosaicSurface = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/175792d92d26d9c6184514dda72770c42f499dfa4f63956a43d085ac225c0975.webp";
 export const hexSandMosaicSurface = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/665b5955061a9b7414173bedf80b53cf12baedf8b0e2e9a0f9875c7996cca657.webp";
-export const emeraldKitkatMosaicSurface = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/228f6cec67dc3a9711b78f36192385148625d3677b9b5cdccd091288ae6a4f23.webp";
 
 export const cementTilePatternSurface = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/175792d92d26d9c6184514dda72770c42f499dfa4f63956a43d085ac225c0975.webp";
 export const limestoneSurfaceImage = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/fe2aef755acdc0f9b7e1911403a8ff4d79eff43cb8862b97e86977dea4e679ad.webp";

@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage";
+import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage.server";
 import { normalizeUploadImageBuffer } from "@/lib/image-upload.server";
 import path from "node:path";
 import { getDb, type SqlValue } from "./index.server";
@@ -21,16 +21,15 @@ import type {
   Quote,
   QuoteItem,
   QuoteStatus,
-  ImageRoomTagReviewStatus,
   ImageRoomTagSlug,
+  MappingPriceBasis,
+  CustomerMapping,
+  CustomerMappingItem,
 } from "@/lib/types";
 import { IMAGE_ROOM_TAGS } from "@/lib/types";
 import { isPhoneMatchable, phonesMatch } from "@/lib/phone";
 import { statusMeta } from "@/lib/types";
-
-function nowLocal() {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
+import { nowLocal } from "@/lib/format";
 
 /** Bỏ dấu tiếng Việt + chỉ giữ [A-Z0-9], viết hoa. VD "Kim Áo" → "KIMAO". */
 function slugifyCode(raw: string): string {
@@ -311,7 +310,7 @@ async function loadProductImageRoomTags(
   const tagRows = await getDb()
     .prepare(
       `SELECT product_image_id, room_slug, source, confidence, model, model_version,
-              review_status, created_at, updated_at
+              created_at, updated_at
        FROM product_image_room_tags
        WHERE product_image_id IN (${placeholders})
        ORDER BY product_image_id ASC, room_slug ASC`,
@@ -344,17 +343,6 @@ function normalizeRoomSlugs(roomSlugs: ImageRoomTagSlug[]): ImageRoomTagSlug[] {
   return unique;
 }
 
-export async function listProductImageRoomTags(
-  imageId: number,
-): Promise<ProductImageRoomTag[]> {
-  const row = (await getDb()
-    .prepare("SELECT * FROM product_images WHERE id = ?")
-    .get<ProductImageRow>(imageId)) as ProductImageRow | undefined;
-  if (!row) return [];
-  const [withTags] = await attachProductImageRoomTags([row]);
-  return withTags?.room_tags ?? [];
-}
-
 export async function setProductImageRoomTags(
   productId: number,
   imageId: number,
@@ -380,8 +368,8 @@ export async function setProductImageRoomTags(
       await tx
         .prepare(
           `INSERT INTO product_image_room_tags
-             (product_image_id, room_slug, source, review_status, created_at, updated_at)
-           VALUES (?, ?, 'manual', 'accepted', ?, ?)`,
+             (product_image_id, room_slug, source, created_at, updated_at)
+           VALUES (?, ?, 'manual', ?, ?)`,
         )
         .run(imageId, roomSlug, now, now);
     }
@@ -1083,47 +1071,10 @@ export async function deleteCustomerProductSample(id: number): Promise<{ ok: tru
 
 // ─── Customer mappings (mapping mẫu gạch theo KH) ──────────────
 
-/** Căn cứ giá in trên đề xuất vật liệu. */
-export type MappingPriceBasis = "retail" | "tp" | "b2b";
-
 /** Chuẩn hóa giá trị basis đọc từ DB / client. */
 export function normalizeMappingPriceBasis(value: unknown): MappingPriceBasis {
   return value === "tp" || value === "b2b" ? value : "retail";
 }
-
-export type CustomerMappingItem = {
-  id: number;
-  mapping_id: number;
-  sort_order: number;
-  area_group_key: string;
-  description: string;
-  size: string;
-  product_id: number | null;
-  image_path: string;
-  custom_product_code: string;
-  custom_product_name: string;
-  custom_product_size: string;
-  custom_product_surface: string;
-  custom_product_retail_price: number;
-  custom_product_image_path: string;
-  /** null = tính theo price_basis của mapping; số = giá chốt tay (đ/m²). */
-  price_override: number | null;
-};
-
-export type CustomerMapping = {
-  id: number;
-  code: string;
-  customer_id: number;
-  status: "draft" | "sent" | "accepted" | "expired";
-  name: string;
-  version: string;
-  note: string;
-  price_basis: MappingPriceBasis;
-  created_at: string;
-  updated_at: string;
-  linked_quotes: Array<{ id: number; code: string; status: QuoteStatus }>;
-  items: CustomerMappingItem[];
-};
 
 export async function listCustomerMappings(customerId: number): Promise<CustomerMapping[]> {
   const db = getDb();
@@ -3163,11 +3114,10 @@ export async function setImageRoomTagsDirect(
       await tx
         .prepare(
           `INSERT INTO product_image_room_tags
-             (product_image_id, room_slug, source, review_status, created_at, updated_at)
-           VALUES (?, ?, 'manual', 'accepted', ?, ?)
+             (product_image_id, room_slug, source, created_at, updated_at)
+           VALUES (?, ?, 'manual', ?, ?)
            ON CONFLICT (product_image_id, room_slug) DO UPDATE SET
              source = 'manual',
-             review_status = 'accepted',
              updated_at = EXCLUDED.updated_at`,
         )
         .run(imageId, roomSlug, now, now);
@@ -3207,8 +3157,8 @@ export async function bulkSetProductImageRoomTags(
           await tx
             .prepare(
               `INSERT INTO product_image_room_tags
-                 (product_image_id, room_slug, source, review_status, created_at, updated_at)
-               VALUES (?, ?, 'manual', 'accepted', ?, ?)
+                 (product_image_id, room_slug, source, created_at, updated_at)
+               VALUES (?, ?, 'manual', ?, ?)
                ON CONFLICT (product_image_id, room_slug) DO NOTHING`,
             )
             .run(imgId, slug, now, now);
@@ -3221,8 +3171,8 @@ export async function bulkSetProductImageRoomTags(
           const res = await tx
             .prepare(
               `INSERT INTO product_image_room_tags
-                 (product_image_id, room_slug, source, review_status, created_at, updated_at)
-               VALUES (?, ?, 'manual', 'accepted', ?, ?)
+                 (product_image_id, room_slug, source, created_at, updated_at)
+               VALUES (?, ?, 'manual', ?, ?)
                ON CONFLICT (product_image_id, room_slug) DO NOTHING`,
             )
             .run(imgId, slug, now, now);

@@ -7,9 +7,9 @@ import {
   exportStampDataUrl,
   mapLimit,
 } from "@/lib/image-export.server";
-import { normalizeMappingPriceBasis, type MappingPriceBasis } from "./crm.server";
-import { unitPriceForProduct } from "@/lib/pricing";
-import type { DiscountType } from "@/lib/types";
+import { normalizeMappingPriceBasis } from "./crm.server";
+import { basisToDiscountType, unitPriceForProduct } from "@/lib/pricing";
+import { escapeHtml } from "@/lib/format";
 
 type MappingExportResult = {
   filename: string;
@@ -24,19 +24,6 @@ type MappingExportResult = {
  * xuất đều in "Giá đề xuất", `price_basis` chỉ dùng để tính con số.
  */
 const PRICE_LABEL = "Giá đề xuất";
-
-function basisToDiscountType(basis: MappingPriceBasis): DiscountType {
-  return basis === "tp" ? "tp" : basis === "b2b" ? "b2b" : "none";
-}
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 
 function formatPrice(value: number | null | undefined): string {
   const amount = Number(value) || 0;

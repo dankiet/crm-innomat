@@ -13,7 +13,7 @@ import type {
   ImageRoomTagSlug,
 } from "@/lib/types";
 import type { Role } from "@/lib/auth-types";
-import type { FlatMediaTab, FlatMediaSort } from "@/db/crm.server";
+import type { FlatMediaTab } from "@/db/crm.server";
 // ─── Auth ───────────────────────────────────────────────────
 
 export const fetchMe = createServerFn({ method: "GET" }).handler(async () => {
@@ -102,12 +102,6 @@ export const authGoogleCallback = createServerFn({ method: "POST" })
 export const fetchPublicMeFn = createServerFn({ method: "GET" }).handler(async () => {
   const { getCurrentPublicUser } = await import("@/db/auth-public.server");
   return await getCurrentPublicUser();
-});
-
-export const logoutPublicFn = createServerFn({ method: "POST" }).handler(async () => {
-  const { logoutPublicSession } = await import("@/db/auth-public.server");
-  await logoutPublicSession();
-  return { ok: true as const };
 });
 
 // ─── Users (admin) ──────────────────────────────────────────
@@ -538,15 +532,6 @@ export const setProductImageKindFn = createServerFn({ method: "POST" })
       summary: `Gán loại ảnh #${data.imageId} → ${data.kind}`,
     });
     return rows;
-  });
-
-export const fetchProductImageRoomTagsFn = createServerFn({ method: "GET" })
-  .inputValidator((data: { imageId: number }) => data)
-  .handler(async ({ data }) => {
-    const { requireUser } = await import("@/db/auth.server");
-    await requireUser();
-    const { listProductImageRoomTags } = await import("@/db/crm.server");
-    return await listProductImageRoomTags(data.imageId);
   });
 
 export const setProductImageRoomTagsFn = createServerFn({ method: "POST" })

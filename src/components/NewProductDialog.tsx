@@ -19,17 +19,13 @@ import { ProductSuggestionField } from "@/components/ProductSuggestionField";
 import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
 import { parseInternalCodesList } from "@/lib/product-internal-codes";
-
-const SUGGEST_FIELDS = [
-  "color",
-  "supplier",
-  "category",
-  "surface",
-  "shape",
-  "texture",
-  "collections",
-] as const;
-type SuggestField = (typeof SUGGEST_FIELDS)[number];
+import { inputCls } from "@/lib/utils";
+import {
+  Field,
+  FormSection,
+  SUGGEST_FIELDS,
+  type SuggestField,
+} from "@/components/ProductFormFields";
 
 type Props = {
   open: boolean;
@@ -625,34 +621,3 @@ export function NewProductDialog({
     </Dialog>
   );
 }
-
-function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl border border-border/70 bg-surface-strong/25 px-3.5 py-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className ?? ""}`}>
-      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-const inputCls =
-  "w-full text-sm px-3 py-2 rounded-md bg-background ring-1 ring-black/10 outline-none focus:ring-terracotta/40 text-foreground";

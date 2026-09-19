@@ -33,8 +33,8 @@ import { NewCustomerDialog } from "@/components/NewCustomerDialog";
 import { NewQuoteDialog } from "@/components/NewQuoteDialog";
 import {
   CustomerMappingDialog,
-  type CustomerMapping,
 } from "@/components/CustomerMappingDialog";
+import type { CustomerMapping } from "@/lib/types";
 import {
   ExportQuoteDialog,
   type QuotePrintOptions,

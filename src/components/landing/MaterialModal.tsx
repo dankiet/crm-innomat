@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   Check,
@@ -48,7 +48,6 @@ export function MaterialModal({
   initialTab = "surface",
 }: MaterialModalProps) {
   const [activeTab, setActiveTab] = useState<"surface" | "context">(initialTab);
-  const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
 
   // Khi đổi mã gạch (qua Next/Prev): giữ nguyên tab đang chọn nếu mã mới có hỗ trợ; ngược lại thì auto-fallback về "surface"
   useEffect(() => {
@@ -115,12 +114,6 @@ export function MaterialModal({
                 className="material-modal-image"
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
-                onLoad={(e) => {
-                  const el = e.currentTarget;
-                  if (el.naturalWidth > 0 && el.naturalHeight > 0) {
-                    setImgNatural({ w: el.naturalWidth, h: el.naturalHeight });
-                  }
-                }}
               />
               <div className="material-modal-tag">
                 <span>EBG / {material.code}</span>

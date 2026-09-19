@@ -16,17 +16,6 @@ export const LP_LEAD_STATUS_LABEL: Record<LpLeadStatus, string> = {
   spam: "Spam",
 };
 
-/** Dòng gạch khách chọn trong form — khớp taxonomy CRM cấp 1. */
-export const LP_NEEDS = [
-  "Gạch thẻ",
-  "Gạch mosaic",
-  "Gạch bông",
-  "Gạch ốp lát",
-  "Chưa rõ, cần tư vấn",
-] as const;
-
-export type LpNeed = (typeof LP_NEEDS)[number];
-
 /** Tham số UTM thu từ query string của LP. */
 export type LpUtm = {
   source?: string;
@@ -36,12 +25,13 @@ export type LpUtm = {
   term?: string;
 };
 
-/** Loại form đã gửi — phân biệt brief landing với gate Thư viện mã gạch. */
-export type LpFormKind = "lp" | "library-gate";
+/** Loại form đã gửi — phân biệt brief landing, gate Thư viện, đăng nhập Google. */
+export type LpFormKind = "lp" | "library-gate" | "google-unlock";
 
 export const LP_FORM_KIND_LABEL: Record<LpFormKind, string> = {
   lp: "Brief landing",
   "library-gate": "Mở thư viện",
+  "google-unlock": "Đăng nhập Google",
 };
 
 /** Loại hình công trình — pill group trong brief. */
@@ -49,7 +39,7 @@ export const LP_PROJECT_TYPES = [
   "Nhà ở / Villa",
   "Hospitality / Resort",
   "F&B / Retail",
-  "Văn phòng / Studio",
+  "Văn phòng Studio",
   "Công trình khác",
 ] as const;
 
@@ -209,7 +199,6 @@ export type CrmConceptTag = {
   room_slug: string;
   confidence: number | null;
   source: string;
-  review_status: string;
 };
 
 /** Concept item đại diện cho một ảnh concept kiến trúc trong CRM Hub */
@@ -231,10 +220,12 @@ export type CrmConceptItem = {
   room_tags: CrmConceptTag[];
 };
 
-/** Bộ lọc tìm kiếm & phân trang cho CRM Concept Hub */
+/** Bộ lọc tìm kiếm & phân trang cho CRM Concept Hub (nguồn chuẩn — server import lại). */
 export type CrmConceptFilter = {
+  category?: string | null;
   room_slug?: string | null;
   is_public?: number | "all" | null;
+  color?: string | null;
   search?: string | null;
   page?: number;
   limit?: number;

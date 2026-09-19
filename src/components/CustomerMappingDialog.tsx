@@ -58,8 +58,8 @@ import {
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format";
 import { openProductQuickSheet, type ProductQuickSheetRow } from "@/lib/product-quick-sheet";
-import { unitPriceForProduct } from "@/lib/pricing";
-import type { Customer, DiscountType, Product } from "@/lib/types";
+import { basisToDiscountType, unitPriceForProduct } from "@/lib/pricing";
+import type { Customer, CustomerMapping, MappingPriceBasis, Product } from "@/lib/types";
 import {
   buildExactCodeSet,
   codeRowFromProduct,
@@ -68,37 +68,11 @@ import {
 } from "@/lib/product-search";
 import { cn } from "@/lib/utils";
 
-export type CustomerMappingItem = {
-  id: number;
-  mapping_id: number;
-  sort_order: number;
-  area_group_key: string;
-  description: string;
-  size: string;
-  product_id: number | null;
-  image_path: string;
-  custom_product_code: string;
-  custom_product_name: string;
-  custom_product_size: string;
-  custom_product_surface: string;
-  custom_product_retail_price: number;
-  custom_product_image_path: string;
-  /** null = tính theo price_basis của đề xuất; số = giá chốt tay (đ/m²) */
-  price_override: number | null;
-};
-
-/** Căn cứ giá in trên đề xuất vật liệu (mirror của server type). */
-export type MappingPriceBasis = "retail" | "tp" | "b2b";
-
 const PRICE_BASIS_OPTIONS: Array<{ value: MappingPriceBasis; label: string }> = [
   { value: "retail", label: "Giá lẻ" },
   { value: "tp", label: "CK TP" },
   { value: "b2b", label: "CK B2B" },
 ];
-
-function basisToDiscountType(basis: MappingPriceBasis): DiscountType {
-  return basis === "tp" ? "tp" : basis === "b2b" ? "b2b" : "none";
-}
 
 function basisLabel(basis: MappingPriceBasis): string {
   return PRICE_BASIS_OPTIONS.find((option) => option.value === basis)?.label ?? "Giá lẻ";
@@ -114,25 +88,6 @@ function autoPriceFor(item: Draft, basis: MappingPriceBasis): number {
   }
   return 0;
 }
-
-export type CustomerMapping = {
-  id: number;
-  code: string;
-  customer_id: number;
-  status: "draft" | "sent" | "accepted" | "expired";
-  name: string;
-  version: string;
-  note: string;
-  price_basis: MappingPriceBasis;
-  created_at: string;
-  updated_at: string;
-  linked_quotes: Array<{
-    id: number;
-    code: string;
-    status: "draft" | "sent" | "accepted" | "expired";
-  }>;
-  items: CustomerMappingItem[];
-};
 
 type Draft = {
   key: string;

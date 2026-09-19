@@ -13,7 +13,7 @@
 npm install
 cp .env.example .env
 # điền các biến ở phần dưới, tối thiểu: DATABASE_URL
-npm run db:migrate        # tạo schema (19 bảng) + bật RLS
+npm run db:migrate        # tạo schema (25 bảng) + bật RLS
 npm run db:seed-admin     # tạo user admin từ CRM_ADMIN_*
 npm run dev               # → http://localhost:8080
 ```

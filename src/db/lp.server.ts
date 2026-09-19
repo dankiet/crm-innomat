@@ -25,9 +25,7 @@ import type {
   LpMaterial,
   ShortlistContextItem,
 } from "@/lib/lp-types";
-function nowLocal() {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
+import { nowLocal } from "@/lib/format";
 
 function clip(raw: string | undefined | null, max: number): string {
   return (raw ?? "").trim().slice(0, max);
@@ -470,7 +468,7 @@ export async function checkRateLimit(bucket: string): Promise<boolean> {
 
 // ─── Lead intake ────────────────────────────────────────────
 
-export type LeadResult = { ok: true; duplicate: boolean } | { ok: false; error: string };
+type LeadResult = { ok: true; duplicate: boolean } | { ok: false; error: string };
 
 /**
  * Ghi lead từ LP kèm chi tiết ngữ cảnh Shortlist.
@@ -783,7 +781,7 @@ ${breakdownText}`;
 
 // ─── Landing Page Settings (Hero Banner & Layout) ─────────────
 
-export async function getLpSetting(key: string, defaultValue = ""): Promise<string> {
+async function getLpSetting(key: string, defaultValue = ""): Promise<string> {
   const db = getDb();
   const row = await db
     .prepare("SELECT value FROM lp_settings WHERE key = ?")
@@ -791,7 +789,7 @@ export async function getLpSetting(key: string, defaultValue = ""): Promise<stri
   return row ? row.value : defaultValue;
 }
 
-export async function setLpSetting(key: string, value: string): Promise<void> {
+async function setLpSetting(key: string, value: string): Promise<void> {
   const db = getDb();
   const ts = nowLocal();
   await db

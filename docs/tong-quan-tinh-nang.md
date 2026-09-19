@@ -7,23 +7,41 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
 
 ## 1. Bản đồ nhanh
 
-| #   | Khu vực    | Tính năng                                          | Route                        | Chi tiết                                                                 |
-| --- | ---------- | -------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------ |
-| 1   | Nền tảng   | Đăng nhập, session, phân quyền 2 vai               | `/login`, `/auth/callback`   | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
-| 2   | Nền tảng   | Dashboard KPI + thanh pipeline                     | `/tong-quan`                 | —                                                                        |
-| 3   | Bán hàng   | Khách hàng — danh sách + hồ sơ                     | `/khach-hang`                | [nghiep-vu](nghiep-vu.md)                                                |
-| 4   | Bán hàng   | Cơ hội — Kanban pipeline (dnd-kit)                 | `/co-hoi`                    | [nghiep-vu](nghiep-vu.md)                                                |
-| 5   | Bán hàng   | Báo giá & đơn hàng                                 | `/bao-gia`                   | [nghiep-vu](nghiep-vu.md)                                                |
-| 6   | Bán hàng   | Công nợ & thanh toán                               | `/cong-no`                   | [nghiep-vu](nghiep-vu.md)                                                |
-| 7   | Bán hàng   | Ghi chú toàn hệ thống                              | `/ghi-chu`                   | —                                                                        |
-| 8   | Catalog    | Sản phẩm + tồn kho + import/export Excel           | `/san-pham`                  | [san-pham-ton-kho-import](san-pham-ton-kho-import.md)                    |
-| 9   | Ảnh        | Lưu trữ ảnh — kho ảnh, thẻ phòng, tuyển chọn       | `/luu-tru`                   | [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)                          |
-| 10  | Ảnh        | Thư viện — bộ sưu tập + picker                     | `/thu-vien`                  | [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)                          |
-| 11  | Landing    | Trang LP công khai (khách vãng lai)                | `/lp/$slug`                  | §9                                                                       |
-| 12  | Landing    | Hộp thư Lead                                       | `/leads`                     | §10                                                                      |
-| 13  | Landing    | Lookbook / Concept                                 | `/khong-gian`                | §11                                                                      |
-| 14  | Quản trị   | Người dùng (**admin**)                             | `/nguoi-dung`                | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
-| 15  | Quản trị   | Nhật ký thao tác (**admin**)                       | `/nhat-ky`                   | [co-so-du-lieu](co-so-du-lieu.md)                                        |
+| #   | Khu vực    | Tính năng                                          | Route                        | Trạng thái    | Chi tiết                                                                 |
+| --- | ---------- | -------------------------------------------------- | ---------------------------- | ------------- | ------------------------------------------------------------------------ |
+| 1   | Nền tảng   | Đăng nhập, session, phân quyền 2 vai               | `/login`, `/auth/callback`   | Đang dùng     | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
+| 2   | Nền tảng   | Dashboard KPI + thanh pipeline                     | `/tong-quan`                 | Đang dùng     | —                                                                        |
+| 3   | Bán hàng   | Khách hàng — danh sách + hồ sơ                     | `/khach-hang`                | Đang dùng     | [nghiep-vu](nghiep-vu.md)                                                |
+| 4   | Bán hàng   | Cơ hội — Kanban pipeline (dnd-kit)                 | `/co-hoi`                    | Đang dùng     | [nghiep-vu](nghiep-vu.md)                                                |
+| 5   | Bán hàng   | Báo giá & đơn hàng                                 | `/bao-gia`                   | Đang dùng     | [nghiep-vu](nghiep-vu.md)                                                |
+| 6   | Bán hàng   | Công nợ & thanh toán                               | `/cong-no`                   | Đang dùng     | [nghiep-vu](nghiep-vu.md)                                                |
+| 7   | Bán hàng   | Ghi chú toàn hệ thống                              | `/ghi-chu`                   | Đang dùng     | —                                                                        |
+| 8   | Catalog    | Sản phẩm + tồn kho + import/export Excel           | `/san-pham`                  | Đang dùng     | [san-pham-ton-kho-import](san-pham-ton-kho-import.md)                    |
+| 9   | Ảnh        | Lưu trữ ảnh — kho ảnh, thẻ phòng, tuyển chọn       | `/luu-tru`                   | Đang dùng     | [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)                          |
+| 10  | Ảnh        | Thư viện — bộ sưu tập + picker                     | `/thu-vien`                  | Đang dùng     | [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)                          |
+| 11  | Landing    | Trang LP công khai (khách vãng lai)                | `/lp/$slug`                  | **Một phần**  | §9                                                                       |
+| 12  | Landing    | Hộp thư Lead                                       | `/leads`                     | Đang dùng     | §10                                                                      |
+| 13  | Landing    | Lookbook / Concept                                 | `/khong-gian`                | Đang dùng     | §11                                                                      |
+| 14  | Quản trị   | Người dùng (**admin**)                             | `/nguoi-dung`                | Đang dùng     | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
+| 15  | Quản trị   | Nhật ký thao tác (**admin**)                       | `/nhat-ky`                   | Đang dùng     | [co-so-du-lieu](co-so-du-lieu.md)                                        |
+
+**Cột "Trạng thái"** suy ra từ dữ liệu thật trong DB, không phải phỏng đoán:
+
+- **Đang dùng** — tính năng có dữ liệu thật (đa số). Bảng số dòng từng bảng:
+  [audit-2026-09-19](audit-2026-09-19.md) §G0b.
+- **Một phần** — chỉ `/lp/$slug`: trang vẫn chạy **song song** mock data
+  (`src/data/mockData.ts`, dùng bởi `src/components/landing/*`) dù catalog thật đã có RPC
+  (`fetchPublicCatalogFn`, `fetchLpMaterialsFn`). Cần chốt mock là fallback có chủ đích hay di sản
+  (audit §E3).
+- **Chưa từng chạy** — liên kết **đề xuất vật liệu ↔ báo giá** (`customer_mapping_quote_links`,
+  nằm trong tính năng Đề xuất vật liệu ở hồ sơ khách hàng, §3): bảng **0 dòng**, nhưng code ghi
+  (`crm.server.ts`) và đọc (`crm.server.ts`, `api/functions.ts`) còn sống → đây là **tính năng
+  chưa từng chạy ở production**, không phải code chết. Xem
+  [audit-2026-09-19](audit-2026-09-19.md) §G3.
+
+**Toàn bộ 25 bảng đều đang dùng** — `public` có đúng 25 bảng, khớp 100% với `schema-pg.sql`,
+**0 bảng mồ côi** (bằng chứng: [audit-2026-09-19](audit-2026-09-19.md) §G0). Không có bảng nào
+nên xoá.
 
 Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 4 route **công
 khai**: `/lp/$slug` (landing cho khách vãng lai), `/login`, `/auth/callback`, và `/` (chỉ redirect).
@@ -178,16 +196,19 @@ Tổng **25 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 16. Quy mô code
 
+> Đo ngày **2026-09-19** (sau đợt dọn dead code — xem [CLEANUP_REPORT](CLEANUP_REPORT.md)).
+
 | Vùng             | File | Dòng   |
 | ---------------- | ---: | -----: |
-| `src/routes`     |   21 | 14.486 |
-| `src/components` |   35 | 11.921 |
-| `src/db`         |   13 |  7.756 |
-| `src/lib`        |   24 |  2.410 |
-| `src/api`        |    2 |  2.190 |
+| `src/routes`     |   21 | 14.330 |
+| `src/components` |   36 | 11.790 |
+| `src/db`         |   13 |  7.605 |
+| `src/lib`        |   26 |  2.435 |
+| `src/api`        |    2 |  2.170 |
 | `src/*.ts` (gốc) |    4 |    666 |
-| `src/data`       |    1 |    367 |
+| `src/data`       |    1 |    321 |
 | `src/hooks`      |    2 |     63 |
-| **Tổng `src/`**  |  102 | **39.859** |
+| **Tổng `src/`**  |  105 | **39.380** |
 
-RPC: **86** `createServerFn` trong `src/api/functions.ts` + **19** trong `src/api/lp.ts` = **105**.
+RPC: **82** `createServerFn` trong `src/api/functions.ts` + **18** trong `src/api/lp.ts` = **100**
+(2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).

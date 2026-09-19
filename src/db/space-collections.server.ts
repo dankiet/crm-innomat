@@ -7,17 +7,18 @@
  */
 import { getDb, type SqlValue } from "./index.server";
 import { COLOR_PALETTES } from "@/lib/color-palette";
-import type { LpMaterial } from "@/lib/lp-types";
-
-function nowLocal(): string {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
+import type {
+  CrmConceptFilter,
+  CrmConceptItem,
+  CrmConceptResponse,
+  CrmConceptTag,
+} from "@/lib/lp-types";
 
 function clip(raw: string | undefined | null, max: number): string {
   return (raw ?? "").trim().slice(0, max);
 }
 
-export type PublicSpaceCollection = {
+type PublicSpaceCollection = {
   id: number;
   slug: string;
   title: string;
@@ -96,7 +97,7 @@ export function getLookbookCycleSeed(date: Date = new Date()): number {
   return Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000));
 }
 
-export type ListPublicSpaceCollectionsOptions = {
+type ListPublicSpaceCollectionsOptions = {
   seed?: number | null;
   limit?: number | null;
 };
@@ -246,55 +247,6 @@ export async function listPublicSpaceCollections(
 
 // ─── Concept Manager (Quản trị Concept / Lookbook Hub) ──────────────────────
 
-export type CrmConceptTag = {
-  room_slug: string;
-  confidence: number | null;
-  source: string;
-  review_status: string;
-};
-
-export type CrmConceptItem = {
-  image_id: number;
-  image_path: string;
-  caption: string;
-  ai_description: string;
-  is_public: number;
-  created_at: string;
-  product_id: number;
-  product_code: string;
-  product_name: string;
-  product_category: string;
-  product_size: string;
-  product_surface: string;
-  product_color: string;
-  map_image: string;
-  room_tags: CrmConceptTag[];
-};
-
-export type CrmConceptFilter = {
-  category?: string | null;
-  room_slug?: string | null;
-  is_public?: number | "all" | null;
-  color?: string | null;
-  search?: string | null;
-  page?: number;
-  limit?: number;
-};
-export type CrmConceptResponse = {
-  items: CrmConceptItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  stats: {
-    total: number;
-    publicCount: number;
-    hiddenCount: number;
-    withDescCount: number;
-  };
-  roomStats: Record<string, number>;
-};
-
 export async function listCrmConceptImages(filter?: CrmConceptFilter): Promise<CrmConceptResponse> {
   const db = getDb();
   const page = Math.max(1, filter?.page ?? 1);
@@ -375,8 +327,7 @@ export async function listCrmConceptImages(filter?: CrmConceptFilter): Promise<C
           json_build_object(
             'room_slug', t.room_slug,
             'confidence', t.confidence,
-            'source', t.source,
-            'review_status', t.review_status
+            'source', t.source
           )
         ) FILTER (WHERE t.room_slug IS NOT NULL),
         '[]'

@@ -7,27 +7,18 @@ import {
   X,
   Sparkles,
   BookOpen,
-  Send,
   Clock,
   ShieldCheck,
 } from "lucide-react";
 import { submitLpLeadFn } from "@/api/lp";
 import { trackEvent } from "@/lib/lp-tracking";
-import { curatedMaterials, type Material } from "@/data/mockData";
+import { LP_PROJECT_STAGES, LP_PROJECT_TYPES } from "@/lib/lp-types";
+import { curatedMaterials } from "@/data/mockData";
 type ProjectBriefFormProps = {
-  shortlistCount: number;
   intent: string;
   shortlistMaterialIds?: string[];
   onRemoveShortlistId?: (id: string) => void;
 };
-
-const projectTypes = ["Nhà ở / Villa", "Hospitality / Resort", "F&B / Retail", "Văn phòng Studio", "Công trình khác"];
-const projectStages = [
-  "Đang lên concept",
-  "Đang thiết kế 3D",
-  "Chuẩn bị thi công",
-  "Cần chốt vật liệu gấp",
-];
 
 type AttachedFile = {
   id: string;
@@ -42,7 +33,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 4;
 
 export function ProjectBriefForm({
-  shortlistCount,
   intent,
   shortlistMaterialIds = [],
   onRemoveShortlistId,
@@ -52,8 +42,8 @@ export function ProjectBriefForm({
   const [studio, setStudio] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [selectedProjectType, setSelectedProjectType] = useState(projectTypes[0]);
-  const [selectedStage, setSelectedStage] = useState(projectStages[0]);
+  const [selectedProjectType, setSelectedProjectType] = useState<string>(LP_PROJECT_TYPES[0]);
+  const [selectedStage, setSelectedStage] = useState<string>(LP_PROJECT_STAGES[0]);
   const [projectName, setProjectName] = useState("");
   const [area, setArea] = useState("");
   const [note, setNote] = useState("");
@@ -339,7 +329,7 @@ export function ProjectBriefForm({
       <div className="form-field">
         <span className="form-label">Loại hình công trình</span>
         <div className="pill-group">
-          {projectTypes.map((type) => (
+          {LP_PROJECT_TYPES.map((type) => (
             <button
               key={type}
               type="button"
@@ -356,7 +346,7 @@ export function ProjectBriefForm({
       <div className="form-field">
         <span className="form-label">Giai đoạn dự án hiện tại</span>
         <div className="pill-group">
-          {projectStages.map((stage) => (
+          {LP_PROJECT_STAGES.map((stage) => (
             <button
               key={stage}
               type="button"

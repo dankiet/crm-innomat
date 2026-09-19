@@ -2,16 +2,12 @@ import { getDb } from "./index.server";
 import {
   deleteSessionsForUser,
   hashPassword,
-  normalizeUsername,
   validatePassword,
   validateRole,
   validateUsername,
 } from "./auth.server";
 import type { AppUser, Role, SessionUser } from "@/lib/auth-types";
-
-function nowLocal() {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
+import { nowLocal } from "@/lib/format";
 
 export async function listUsers(): Promise<AppUser[]> {
   return await getDb()
@@ -191,5 +187,3 @@ export async function assignCustomerOwner(
     previous_owner_id: prev,
   };
 }
-
-export { normalizeUsername };

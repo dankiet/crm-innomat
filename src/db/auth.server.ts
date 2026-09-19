@@ -3,21 +3,12 @@ import { promisify } from "node:util";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb } from "./index.server";
 import type { AppUser, Role, SessionUser } from "@/lib/auth-types";
+import { expiresAt, nowLocal } from "@/lib/format";
 
 const scryptAsync = promisify(scrypt);
 
 const SESSION_COOKIE = "crm_session";
 const SESSION_DAYS = 14;
-
-function nowLocal() {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
-
-function expiresAt(days = SESSION_DAYS): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 19).replace("T", " ");
-}
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
@@ -66,7 +57,7 @@ async function createSession(
   userAgent = "",
 ): Promise<{ sessionId: string; expiresAt: string }> {
   const sessionId = randomBytes(32).toString("hex");
-  const exp = expiresAt();
+  const exp = expiresAt(SESSION_DAYS);
   await getDb()
     .prepare(
       `INSERT INTO sessions (id, user_id, expires_at, created_at, last_seen_at, user_agent)

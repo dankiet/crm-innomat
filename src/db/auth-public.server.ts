@@ -8,11 +8,12 @@
 import { randomBytes } from "node:crypto";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb } from "./index.server";
+import { expiresAt, nowLocal } from "@/lib/format";
 
-export const PUBLIC_SESSION_COOKIE = "public_session";
+const PUBLIC_SESSION_COOKIE = "public_session";
 const PUBLIC_SESSION_DAYS = 30;
 
-export type PublicUser = {
+type PublicUser = {
   id: number;
   supabase_id: string;
   email: string;
@@ -20,25 +21,7 @@ export type PublicUser = {
   last_seen_at: string;
 };
 
-export type PublicSession = {
-  token: string;
-  user_id: number;
-  expires_at: string;
-  created_at: string;
-  user_agent: string;
-};
-
-function nowLocal(): string {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
-
-function expiresAt(days = PUBLIC_SESSION_DAYS): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 19).replace("T", " ");
-}
-
-export function getPublicSessionToken(): string | undefined {
+function getPublicSessionToken(): string | undefined {
   try {
     return getCookie(PUBLIC_SESSION_COOKIE);
   } catch {
@@ -46,7 +29,7 @@ export function getPublicSessionToken(): string | undefined {
   }
 }
 
-export function setPublicSessionCookie(token: string) {
+function setPublicSessionCookie(token: string) {
   try {
     setCookie(PUBLIC_SESSION_COOKIE, token, {
       httpOnly: true,
@@ -60,7 +43,7 @@ export function setPublicSessionCookie(token: string) {
   }
 }
 
-export function clearPublicSessionCookie() {
+function clearPublicSessionCookie() {
   try {
     deleteCookie(PUBLIC_SESSION_COOKIE, { path: "/" });
   } catch {
@@ -105,7 +88,7 @@ export function sanitizeReturnTo(raw: string | null | undefined, allowedOrigin?:
 /**
  * Upsert người dùng public vào bảng public_users.
  */
-export async function upsertPublicUser(
+async function upsertPublicUser(
   supabaseId: string,
   email: string,
   rawMeta?: unknown,
@@ -141,12 +124,12 @@ export async function upsertPublicUser(
 /**
  * Tạo phiên đăng nhập công khai (public_session).
  */
-export async function createPublicSession(
+async function createPublicSession(
   userId: number,
   userAgent = "",
 ): Promise<{ token: string; expiresAt: string }> {
   const token = randomBytes(32).toString("hex");
-  const exp = expiresAt();
+  const exp = expiresAt(PUBLIC_SESSION_DAYS);
   const now = nowLocal();
 
   await getDb()
