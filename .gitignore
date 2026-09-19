@@ -50,3 +50,7 @@ Stock.xlsx
 # Temporary pipeline outputs, logs & dev drafts
 tmp/
 em-ban-gach/
+
+# gitnexus tự sinh lại file này mỗi lần `analyze` (không có option tắt riêng).
+# AGENTS.md là nguồn luật duy nhất — không track CLAUDE.md.
+CLAUDE.md
