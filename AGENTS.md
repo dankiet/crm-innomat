@@ -83,3 +83,37 @@ reintroduce the old patterns.
   `onCreated` callback — never mid-save.
 - Canonical examples: `CustomerMappingDialog.tsx` (no invalidate on save),
   `NewQuoteDialog.tsx` (`handleSubmit` does not invalidate).
+
+# Tài liệu — cập nhật cùng lúc với code
+
+Tài liệu nằm ở `docs/`. Điểm vào là **`docs/tong-quan-tinh-nang.md`** — bản đồ tính năng
+→ route/RPC/bảng. Docs chỉ ghi thứ **suy ra được từ code**; không lặp lại luật trong file này.
+
+## Mỗi tài liệu sở hữu một mảng
+
+| Thay đổi gì                                  | Phải sửa                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| Thêm/sửa/xoá **route** hoặc **search param** | `docs/routes-va-ui.md` **và** `docs/tong-quan-tinh-nang.md`         |
+| Thêm **endpoint** `createServerFn`           | `docs/api-server-functions.md` (đúng nhóm của nó)                   |
+| Thêm/sửa **bảng** hoặc cột                   | `docs/co-so-du-lieu.md` (kèm số bảng ở tiêu đề)                     |
+| Đổi **nghiệp vụ** (trạng thái, mã, giá, VAT) | `docs/nghiep-vu.md`                                                 |
+| Thêm **tính năng mới**                       | `docs/tong-quan-tinh-nang.md` (bản đồ + mục của khu vực đó)         |
+| Đổi **script / biến môi trường**             | `docs/cai-dat-va-moi-truong.md` + bảng script ở `README.md`         |
+| Đổi **quy trình deploy / migrate**           | `docs/trien-khai-va-van-hanh.md`                                    |
+
+## Luật
+
+- **Một tính năng = một PR có docs.** Không tách: docs sửa ở commit sau sẽ không bao giờ được sửa.
+- **Số liệu đếm được thì đừng chép tay.** Dòng code, số bảng, số endpoint trôi rất nhanh —
+  audit 2026-09-19 phát hiện `docs/` đã lệch tới +51% ở con số dòng code. Nếu buộc phải ghi,
+  ghi kèm **ngày đo** và con trỏ tới `docs/tong-quan-tinh-nang.md` §16 (nơi duy nhất giữ bảng quy mô).
+- **Tài liệu sai còn tệ hơn không có.** Khi phát hiện docs nói khác code, sửa docs **trong cùng
+  commit** với thay đổi code, hoặc mở việc riêng — đừng để lại.
+- **Không viết lại luật đã có ở đây.** Docs trỏ về `AGENTS.md`, không sao chép.
+
+## Kiểm tra nhanh trước khi commit
+
+```bash
+npm run build          # Vercel deploy bằng vite build — không typecheck
+npx tsc --noEmit       # 29 lỗi tồn đọng (xem docs/audit-2026-09-19.md §E1); không thêm lỗi mới
+```

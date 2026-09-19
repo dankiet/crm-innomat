@@ -11,6 +11,7 @@ hình ảnh ở **Supabase Storage**, triển khai trên **Vercel** (preset `nit
 
 | Tài liệu                                                           | Nội dung                                                 |
 | ------------------------------------------------------------------ | -------------------------------------------------------- |
+| [docs/tong-quan-tinh-nang.md](docs/tong-quan-tinh-nang.md)         | **Điểm vào** — bản đồ 15 khu vực tính năng → route/RPC/bảng |
 | [docs/kien-truc.md](docs/kien-truc.md)                             | Kiến trúc, tech stack, luồng request, build chain        |
 | [docs/cai-dat-va-moi-truong.md](docs/cai-dat-va-moi-truong.md)     | Chạy local, biến môi trường, script                      |
 | [docs/co-so-du-lieu.md](docs/co-so-du-lieu.md)                     | 19 bảng, RLS, và hợp đồng của `db/driver.ts`             |
@@ -21,6 +22,7 @@ hình ảnh ở **Supabase Storage**, triển khai trên **Vercel** (preset `nit
 | [docs/hinh-anh-va-thu-vien.md](docs/hinh-anh-va-thu-vien.md)       | Lưu hình content-addressed, nén ảnh, thư viện            |
 | [docs/routes-va-ui.md](docs/routes-va-ui.md)                       | Danh sách route, search param, quy ước UI, history layer |
 | [docs/trien-khai-va-van-hanh.md](docs/trien-khai-va-van-hanh.md)   | Deploy Vercel, migrate, backup, vận hành                 |
+| [docs/audit-2026-09-19.md](docs/audit-2026-09-19.md)               | Audit: code chết, trùng lặp, file quá lớn, tài liệu lệch |
 
 Quy ước bắt buộc khi sửa code (delete 2 bước, không `router.invalidate()` khi lưu,
 workflow GitNexus, luật deploy) nằm ở [AGENTS.md](AGENTS.md) — docs không lặp lại.

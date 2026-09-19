@@ -8,6 +8,7 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 | ------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
 | `/`                       | `index.tsx`                                        | Redirect → `/tong-quan` (có session) hoặc `/login`                       |
 | `/login`                  | `login.tsx`                                        | Đăng nhập; đã có session thì redirect vào app                            |
+| `/auth/callback`          | `auth.callback.tsx`                                | Callback sau đăng nhập ngoài (Supabase OAuth); hiện trạng thái rồi về app |
 | `/tong-quan`              | `_app.tong-quan.tsx`                               | KPI + thanh pipeline                                                     |
 | `/khach-hang`             | `_app.khach-hang.tsx` (`<Outlet/>`) + `.index.tsx` | Danh sách khách hàng                                                     |
 | `/khach-hang/$customerId` | `_app.khach-hang.$customerId.tsx`                  | Chi tiết khách: báo giá, đơn, thanh toán, ghi chú, mẫu, đề xuất vật liệu |
@@ -17,6 +18,10 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 | `/ghi-chu`                | `_app.ghi-chu.tsx`                                 | Ghi chú toàn hệ thống                                                    |
 | `/san-pham`               | `_app.san-pham.tsx`                                | Catalog sản phẩm, filter & tồn kho                                       |
 | `/thu-vien`               | `_app.thu-vien.tsx`                                | Thư viện hình                                                            |
+| `/luu-tru`                | `_app.luu-tru.tsx`                                 | **Lưu trữ** — kho ảnh: thẻ phòng, tuyển chọn, hiển thị LP                 |
+| `/leads`                  | `_app.leads.tsx`                                   | **Hộp thư Lead** — lead từ landing, chuyển thành khách hàng               |
+| `/khong-gian`             | `_app.khong-gian.tsx`                              | **Lookbook** — ảnh Concept, bật/tắt công khai trên LP                     |
+| `/lp/$slug`               | `lp.$slug.tsx`                                     | **Công khai** — trang landing cho khách vãng lai (không qua cổng auth)    |
 | `/nguoi-dung`             | `_app.nguoi-dung.tsx`                              | **Admin** — quản lý user                                                 |
 | `/nhat-ky`                | `_app.nhat-ky.tsx`                                 | **Admin** — nhật ký thao tác                                             |
 
@@ -36,7 +41,8 @@ URL là nơi giữ trạng thái lọc — người dùng copy link là bạn th
 | `/co-hoi`     | `q`                                                                                                                                                             |                                               |
 | `/bao-gia`    | `q`, `tab`                                                                                                                                                      | `tab` chỉ nhận `quotes` \| `orders`           |
 | `/thu-vien`   | `sort`, `cat`, `c`, `v`                                                                                                                                         | `c` = collection id, `v` = index viewer       |
-| `/san-pham`   | `nhom`, `q`, `min`, `max`, `priceKind`, `colors`, `surfaces`, `sizes`, `shapes`, `collections`, `supplier`, `materials`, `hot`, `view`, `stockLocation`, `sort` | Các filter nhiều giá trị nhận cả array và CSV |
+| `/san-pham`   | `nhom`, `q`, `colors`, `surfaces`, `sizes`, `shapes`, `textures`, `collections`, `supplier`, `hot`, `web`, `view`, `stockLocation`, `sort` | Các filter nhiều giá trị nhận cả array và CSV |
+| `/leads`      | `status`                                                                                                                                   | `new` \| `contacted` \| `converted` \| `spam` \| `all` |
 
 Mọi route đều có `validateSearch` để chuẩn hoá — giá trị lạ bị bỏ (`undefined`), không throw. Nhờ vậy
 URL người dùng sửa tay không làm vỡ trang.

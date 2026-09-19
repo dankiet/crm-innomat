@@ -3,7 +3,7 @@
 Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:migrate`
 (idempotent — mọi lệnh đều `IF NOT EXISTS`, chạy lại an toàn).
 
-## 19 bảng
+## 25 bảng
 
 ### Catalog sản phẩm
 
@@ -13,6 +13,7 @@ Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:mi
 | `product_internal_codes` | Mã nội bộ (MISA) → sản phẩm, **1 sản phẩm nhiều mã** | `UNIQUE(internal_code)` toàn cục                                                       |
 | `inventory`              | Tồn kho theo từng mã nội bộ × kho                    | `UNIQUE(internal_code, stock_location)`; FK về `product_internal_codes(internal_code)` |
 | `product_images`         | Ảnh của sản phẩm                                     | `UNIQUE(product_id, path)` + partial unique cho `path LIKE '/products/imported/%'`     |
+| `product_image_room_tags`| Thẻ phòng gán cho ảnh (`room_slug`), kèm `source`, `confidence`, `review_status` | PK ghép `(product_image_id, room_slug)`; dùng bởi tab thẻ phòng ở `/luu-tru` |
 
 Cột `products` dễ nhầm — **ý nghĩa nghiệp vụ không khớp tên cột** (di sản migration):
 
@@ -67,6 +68,21 @@ kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [n
 
 `audit_logs` — `user_id ON DELETE SET NULL` nhưng vẫn giữ `username` dạng text để log không mất
 dấu vết khi user bị xoá. Có `action`, `entity_type`, `entity_id`, `summary`, `meta_json`.
+
+### Landing công khai (LP)
+
+Năm bảng phục vụ trang `/lp/$slug` và khách vãng lai — **không** dùng chung `users`/`sessions`
+của CRM:
+
+| Bảng             | Ghi chú                                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| `lp_settings`    | Key/value cấu hình landing (ảnh hero, nội dung khối)                                                        |
+| `lp_leads`       | Lead từ form: `full_name`, `phone` + `phone_norm` (để chống trùng), `need`, `shortlist_codes`, `utm_source`, `status`, `customer_id` (gắn sau khi chuyển đổi) |
+| `lp_rate_limits` | Chống spam form: `bucket`, `hits`, `window_start`                                                           |
+| `public_users`   | Danh tính khách vãng lai (`supabase_id`, `email`, `first_seen_at`, `last_seen_at`) — tách khỏi `users`       |
+| `public_sessions`| Session của `public_users`, song song với `sessions` của CRM                                                |
+
+Nghiệp vụ: [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §9–§11.
 
 ## Quy ước kiểu dữ liệu
 
