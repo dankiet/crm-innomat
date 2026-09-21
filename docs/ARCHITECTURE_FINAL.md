@@ -179,6 +179,49 @@ Tests:     N/A   (repo không có test suite — xem T4)
 Build:     PASS  (vite build + nitro vercel + postbuild)
 ```
 
+---
+
+## Completed Refactors (đợt được duyệt, 2026-09-19)
+
+1. **P1-0** — Lưới test đầu tiên: `node --test` (0 dependency mới, Node 24 type-strips TS).
+   10 file test trong `src/lib/`, script `npm test`. **67 test pass**.
+2. **P1-1** — Rút 4 nhóm hàm thuần khỏi các file khổng lồ:
+   - NewQuoteDialog (1743) → `lib/quote-calc.ts` (Line + 7 hàm toán BG) + 10 test
+   - `/thu-vien` (2699) → `lib/gallery-sort.ts` (codec sort + việt hoá + stock sort) + 7 test
+   - `/san-pham` (2225) → `lib/product-facets.ts` (facet primitives + sort codec) + 7 test
+   - `CustomerMappingDialog` (1995) → `lib/mapping-draft.ts` (Draft + blankDraft + autoPriceFor) + 4 test
+3. **P1-2** — Gộp 4 memo facet cùng khuôn của `/san-pham` vào `countFacet()`.
+   Giữ 2 biến thể có chủ đích (color: tông + thứ tự riêng; shape: sort alphabet).
+4. **P1-3** — Tách tail 711 dòng của `crm.server.ts` (3205 → 2493) ra `db/media.server.ts`
+   (product CRUD + flat media + bulk tag). Rewire 3 importer. 0 chu trình.
+5. **P2-1** — `EmptyState` dùng chung cho 3 trang bare-empty; giữ biến thể icon/CTA.
+6. **P2-2** — luật error-signalling đã ghi vào CODE_ARCHITECTURE_GUIDE §11 (mutation throw;
+   chỉ endpoint dự đoán được mới trả object).
+7. **P2-3** — 2 trình sinh HTML (export-quote 488 + export-mapping 327) chuyển khỏi `src/db/`
+   sang `src/render/`.
+8. **P2-4** — `nowLocal()` → `nowUtc()` (9 file; đổi tên, KHÔNG đổi giá trị — đổi múi giờ là
+   đổi hành vi, để riêng).
+9. **P2-5** — Registry `STORAGE_KEYS` cho 8 key localStorage (giá trị giữ nguyên).
+
+## Architecture Changes (Before → After)
+
+```text
+Before:                              After:
+src/db/crm.server.ts   3.205 dòng   src/db/crm.server.ts   2.493 dòng
+                                     src/db/media.server.ts   722 dòng (mới)
+src/db/export-*.server  815 dòng     src/render/export-*.server  815 dòng (đổi chỗ)
+src/lib (source)         24 file     src/lib (source)         30 file (+5 domain lib)
+                                      (+10 file test — test đầu tiên trong repo)
+0 test                                67 test (node --test)
+nowLocal (tên nói dối UTC)           nowUtc (tên đúng)
+8 localStorage key rải rác           STORAGE_KEYS registry
+```
+
+**Cải thiện cốt lõi:** lần đầu tiên repo có một **lưới kiểm chứng tự động** cho các hàm tính
+toán dễ sai nhất (tiền, m²/viên, trùng SĐT, mã nội bộ, facet count). Ba file UI khổng lồ nhỏ
+đi ~300 dòng tổng và phần logic của chúng giờ test được. Cấu trúc tầng sau cùng:
+`routes → components → api → db/render → driver → Postgres`, `lib` là lá thuần.
+
 **Smoke test sau thay đổi:**
 
 | Kiểm | Kết quả |

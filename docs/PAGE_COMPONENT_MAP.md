@@ -379,7 +379,8 @@ Nhãn `form_kind` lấy từ `LP_FORM_KIND_LABEL` (`src/lib/lp-types.ts`) — g�
 ## 19. Component dùng chung — ai dùng ở đâu
 
 ```text
-PageHeader           ── 13 route (mọi trang _app)
+PageHeader            ── 13 route (mọi trang _app)
+EmptyState            ── /ghi-chu, /leads, /cong-no (tầng text thuần; biến thể icon/CTA không gộp)
 ProductImage         ── /san-pham, /luu-tru, /thu-vien, /khach-hang/$id + 4 dialog
 NewQuoteDialog       ── /bao-gia, /co-hoi, /khach-hang/, /khach-hang/$id, /san-pham, TopBar
 NewCustomerDialog    ── /co-hoi, /khach-hang/, /khach-hang/$id, TopBar

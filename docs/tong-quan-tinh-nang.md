@@ -197,23 +197,25 @@ Tổng **25 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 16. Quy mô code
 
-> Đo ngày **2026-09-19** (sau đợt dọn dead code + đợt tối ưu kiến trúc —
-> xem [CLEANUP_REPORT](CLEANUP_REPORT.md) và [ARCHITECTURE_FINAL](ARCHITECTURE_FINAL.md)).
+> Đo ngày **2026-09-19** (sau đợt dọn dead code + đợt tối ưu kiến trúc + đợt
+> refactor được duyệt — xem [CLEANUP_REPORT](CLEANUP_REPORT.md) và [REFACTOR_REPORT](REFACTOR_REPORT.md)).
 
 | Vùng             | File | Dòng   |
 | ---------------- | ---: | -----: |
-| `src/routes`     |   22 | 14.112 |
-| `src/components` |   38 | 11.976 |
-| `src/db`         |   13 |  7.611 |
-| `src/lib`        |   25 |  2.387 |
+| `src/routes`     |   22 | 13.819 |
+| `src/components` |   39 | 11.849 |
+| `src/db`         |   12 |  6.801 |
+| `src/lib`        |   30 |  3.024 |
 | `src/api`        |    2 |  2.171 |
+| `src/render`     |    2 |    815 |
 | `src/*.ts` (gốc) |    4 |    666 |
 | `src/data`       |    1 |    321 |
 | `src/hooks`      |    2 |     63 |
-| **Tổng `src/`**  |  107 | **39.307** |
+| **Tổng `src/`**  |  114 | **39.529** |
+| `*.test.ts` (node --test) | 10 |  ~516 |
 
 RPC: **82** `createServerFn` trong `src/api/functions.ts` + **18** trong `src/api/lp.ts` = **100**
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
 
 `npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
-[audit-2026-09-19](audit-2026-09-19.md) §E1).
+[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **67 test pass**.

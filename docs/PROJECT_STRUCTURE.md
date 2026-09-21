@@ -43,39 +43,48 @@ seapen/
 │   │   └── -lp-route.ts          ← hỗ trợ `/` + `/lp/$slug` (tiền tố `-` = router bỏ qua)
 │   │
 │   ├── api/                      ← TRANSPORT: createServerFn (inputValidator + handler)
-│   │   ├── functions.ts          ← 66 endpoint CRM + auth
-│   │   └── lp.ts                 ← 18 endpoint landing/lead + 4 re-export auth
+│   │   ├── functions.ts          ← 82 endpoint CRM + auth
+│   │   └── lp.ts                 ← 18 endpoint landing/lead + 2 re-export auth
 │   │
 │   ├── db/                       ← NGHIỆP VỤ + SQL (chỉ nạp bằng dynamic import)
 │   │   ├── driver.ts             ← Pool pg + query/run/tx, tự thêm RETURNING id
 │   │   ├── index.server.ts       ← facade 1 dòng re-export getDb/SqlValue
 │   │   ├── schema-pg.sql         ← NGUỒN SCHEMA DUY NHẤT (25 bảng), áp 1 transaction
-│   │   ├── crm.server.ts         ← nghiệp vụ chính (sản phẩm, khách, quote, order…)
+│   │   ├── crm.server.ts         ← nghiệp vụ chính (Khách/BG/Đơn/Nợ/Map…, 2.493 dòng)
+│   │   ├── media.server.ts       ← product CRUD + flat media + bulk tag (tách khỏi crm)
 │   │   ├── lp.server.ts          ← catalog công khai, lead, hero, featured slot
 │   │   ├── space-collections.server.ts ← lookbook concept
 │   │   ├── gallery.server.ts     ← bộ sưu tập ảnh
 │   │   ├── product-import-export.server.ts ← xlsx + tồn kho
-│   │   ├── export-quote.server.ts / export-mapping.server.ts ← HTML in ấn
 │   │   ├── auth.server.ts        ← session CRM (scrypt)
 │   │   ├── auth-public.server.ts ← session khách + Google OAuth
 │   │   ├── users.server.ts / audit.server.ts
 │   │
-│   ├── components/               ← 38 file
+│   ├── render/                   ← TRÌNH SINH HTML in ấn (không phải tầng dữ liệu)
+│   │   ├── export-quote.server.ts    ← báo giá → HTML
+│   │   └── export-mapping.server.ts  ← đề xuất vật liệu → HTML
+│   │
+│   ├── components/               ← 39 file
 │   │   ├── ui/                   ← primitive bọc Radix: dialog, popover, sonner (3)
 │   │   ├── product-filter/       ← FilterChip, MultiSelectFilter (dùng cả CRM + landing) (2)
 │   │   ├── landing/              ← 11 file giao diện landing công khai (11)
-│   │   └── *.tsx                 ← 22 file: PageHeader/PageFilterBar/PaginationBar/
-│   │                               ViewModeToggle + dialog nghiệp vụ
+│   │   └── *.tsx                 ← 23 file: PageHeader/PageFilterBar/PaginationBar/
+│   │                               ViewModeToggle/EmptyState + dialog nghiệp vụ
 │   │
 │   ├── lib/                      ← LỚP DÙNG CHUNG isomorphic (client + server)
 │   │   ├── types.ts              ← domain model (Product, Customer, Quote…)
 │   │   ├── lp-types.ts           ← type landing/lead (nguồn chuẩn của CrmConcept*)
-│   │   ├── format.ts             ← formatVND + tiện ích thời gian dùng chung
+│   │   ├── format.ts             ← formatVND + nowUtc/expiresAt/escapeHtml
 │   │   ├── pricing.ts            ← VAT, giá theo nhóm, chiết khấu
+│   │   ├── quote-calc.ts         ← toán dòng báo giá (m²/viên/đơn giá) — có test
+│   │   ├── product-facets.ts     ← facet/sort codec của /san-pham — có test
+│   │   ├── gallery-sort.ts       ← sort/codec việt hoá của /thu-vien — có test
+│   │   ├── mapping-draft.ts      ← draft factory + giá tự động (mapping) — có test
 │   │   ├── product-search.ts     ← token hoá + khớp mã sản phẩm
 │   │   ├── product-categories.ts ← PRODUCT_GROUPS, slug ↔ category
 │   │   ├── color-palette.ts / color-tones.ts / material-taxonomy.ts ← taxonomy facet
 │   │   ├── storage.server.ts     ← Supabase + fs (chỉ server import)
+│   │   ├── storage-keys.ts       ← registry localStorage key (8 key)
 │   │   ├── image-upload.ts / *.server.ts ← canvas (client) và sharp (server)
 │   │   ├── auth-types.ts / history-layer.ts / product-quick-sheet.ts / …
 │   │
