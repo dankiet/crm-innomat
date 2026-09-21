@@ -13,7 +13,7 @@
  *   - Cập nhật state trực tiếp không giật màn hình (no router.invalidate).
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Sparkles,
   Layers3,
@@ -52,6 +52,7 @@ import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { IMAGE_ROOM_TAGS, type ImageRoomTagSlug } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PaginationBar } from "@/components/PaginationBar";
+import { parsePositiveInt } from "@/lib/gallery-sort";
 
 const PAGE_LIMIT_OPTIONS = [24, 48, 96] as const;
 
@@ -195,7 +196,45 @@ const ROOM_NAMES: Record<string, string> = {
   unknown: "Chưa xác định",
 };
 
+type ConceptHubSearch = {
+  category?: string;
+  room?: string;
+  status?: "all" | "1" | "0";
+  color?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+};
+
+const ROOM_IDS: string[] = ROOM_TABS.map((t) => t.id);
+const PALETTE_IDS: string[] = COLOR_PALETTES.map((p) => p.id);
+
+function parseConceptRoom(v: unknown): string | undefined {
+  return typeof v === "string" && ROOM_IDS.includes(v) && v !== "all" ? v : undefined;
+}
+function parseConceptStatus(v: unknown): "all" | "1" | "0" | undefined {
+  return v === "1" || v === "0" ? v : undefined;
+}
+function parseConceptColor(v: unknown): string | undefined {
+  return typeof v === "string" && PALETTE_IDS.includes(v) ? v : undefined;
+}
+
 export const Route = createFileRoute("/_app/khong-gian")({
+  validateSearch: (search: Record<string, unknown>): ConceptHubSearch => {
+    const limit = Number(search.limit);
+    return {
+      category:
+        typeof search.category === "string" && search.category !== "all"
+          ? search.category.slice(0, 80)
+          : undefined,
+      room: parseConceptRoom(search.room),
+      status: parseConceptStatus(search.status),
+      color: parseConceptColor(search.color),
+      q: typeof search.q === "string" ? search.q.slice(0, 120) : undefined,
+      page: parsePositiveInt(search.page),
+      limit: (PAGE_LIMIT_OPTIONS as readonly number[]).includes(limit) ? limit : undefined,
+    };
+  },
   head: () => ({
     meta: [{ title: "Lookbook Bối Cảnh — Innomat CRM" }],
   }),
@@ -215,12 +254,12 @@ export const Route = createFileRoute("/_app/khong-gian")({
 
 function ConceptHubPage() {
   const { initialData } = Route.useLoaderData();
+  const searchParams = Route.useSearch();
+  const navigate = Route.useNavigate();
 
   // Dữ liệu chính
   const [items, setItems] = useState<CrmConceptItem[]>(initialData?.items ?? []);
   const [total, setTotal] = useState<number>(initialData?.total ?? 0);
-  const [page, setPage] = useState<number>(initialData?.page ?? 1);
-  const [limit, setLimit] = useState<number>(24);
   const [totalPages, setTotalPages] = useState<number>(initialData?.totalPages ?? 1);
   const [stats, setStats] = useState(
     initialData?.stats ?? {
@@ -232,14 +271,23 @@ function ConceptHubPage() {
   );
   const [roomStats, setRoomStats] = useState<Record<string, number>>(initialData?.roomStats ?? {});
 
-  // Bộ lọc & Tìm kiếm
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [activeRoom, setActiveRoom] = useState<string>("all");
-  const [activeStatus, setActiveStatus] = useState<"all" | "1" | "0">("all");
-  const [activeColor, setActiveColor] = useState<string>("all");
-  const [searchInput, setSearchInput] = useState<string>("");
-  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  // Bộ lọc & phân trang — nguồn URL (validateSearch)
+  const activeCategory = searchParams.category ?? "all";
+  const activeRoom = searchParams.room ?? "all";
+  const activeStatus = searchParams.status ?? "all";
+  const activeColor = searchParams.color ?? "all";
+  const page = searchParams.page ?? 1;
+  const limit = searchParams.limit ?? 24;
+  const [searchInput, setSearchInput] = useState<string>(searchParams.q ?? "");
   const [isFetching, setIsFetching] = useState<boolean>(false);
+
+  /** Đổi filter: ghi URL + reset trang 1 (đúng hành vi cũ: filter đổi → page 1). */
+  function patchFilters(patch: Partial<ConceptHubSearch>) {
+    navigate({ search: (prev) => ({ ...prev, ...patch, page: undefined }) });
+  }
+  function gotoPage(newPage: number) {
+    navigate({ search: (prev) => ({ ...prev, page: newPage === 1 ? undefined : newPage }) });
+  }
 
   // Thao tác inline
   const [busyPublicId, setBusyPublicId] = useState<number | null>(null);
@@ -254,24 +302,26 @@ function ConceptHubPage() {
   // Dialog Image Inspection Preview
   const [previewItem, setPreviewItem] = useState<CrmConceptItem | null>(null);
 
-  // Debounce search input
+  // Giữ ô tìm kiếm đồng bộ URL (Back/Forward/share link)
   useEffect(() => {
+    setSearchInput(searchParams.q ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.q]);
+
+  // Debounce 300ms rồi commit q lên URL — fetch do effect phía dưới kích
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed === (searchParams.q ?? "")) return;
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchInput.trim());
+      patchFilters({ q: trimmed || undefined });
     }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Cờ nhận biết lần render đầu để tránh double-fetch với loader
-  const isFirstRender = useRef(true);
-
-  // Fetch dữ liệu khi thay đổi filter hoặc search
+  // Fetch theo toàn bộ filter/sort/search/page/limit — nguồn URL.
+  // ⚠️ Dep là primitive/giá trị router giữ (identity ổn định) — KHÔNG dùng biến `?? []`.
+  // Chạy cả lần đầu để áp đúng filter từ URL (loader vẫn là nguồn paint đầu).
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-
     let isMounted = true;
     async function loadData() {
       setIsFetching(true);
@@ -282,8 +332,8 @@ function ConceptHubPage() {
             room_slug: activeRoom === "all" ? null : activeRoom,
             is_public: activeStatus === "all" ? "all" : Number(activeStatus),
             color: activeColor === "all" ? null : activeColor,
-            search: debouncedSearch || null,
-            page: 1, // Reset về trang 1 khi đổi bộ lọc
+            search: searchParams.q || null,
+            page, // đọc từ URL (filter đổi → patchFilters reset page = 1)
             limit,
           },
         });
@@ -291,7 +341,6 @@ function ConceptHubPage() {
         setItems(res.items);
         setTotal(res.total);
         setTotalPages(res.totalPages);
-        setPage(res.page);
         setStats(res.stats);
         setRoomStats(res.roomStats);
       } catch (err) {
@@ -308,44 +357,19 @@ function ConceptHubPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeCategory, activeRoom, activeStatus, activeColor, debouncedSearch, limit]);
+  }, [activeCategory, activeRoom, activeStatus, activeColor, searchParams.q, page, limit]);
 
   // Chuyển trang (Pagination)
-  async function handlePageChange(newPage: number) {
+  function handlePageChange(newPage: number) {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
-    setIsFetching(true);
-    try {
-      const res = await fetchCrmConceptImagesFn({
-        data: {
-          category: activeCategory === "all" ? null : activeCategory,
-          room_slug: activeRoom === "all" ? null : activeRoom,
-          is_public: activeStatus === "all" ? "all" : Number(activeStatus),
-          color: activeColor === "all" ? null : activeColor,
-          search: debouncedSearch || null,
-          page: newPage,
-          limit,
-        },
-      });
-      setItems(res.items);
-      setTotal(res.total);
-      setTotalPages(res.totalPages);
-      setPage(res.page);
-      setStats(res.stats);
-      setRoomStats(res.roomStats);
-
-      // Cuộn mượt lên đầu danh sách
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err) {
-      toast.error("Lỗi phân trang: " + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setIsFetching(false);
-    }
+    gotoPage(newPage);
+    // Cuộn mượt lên đầu danh sách
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleLimitChange(newLimit: number) {
     if (newLimit === limit) return;
-    setLimit(newLimit);
-    setPage(1);
+    patchFilters({ limit: newLimit === 24 ? undefined : newLimit });
   }
 
   async function handleQuickSetRoomTags(item: CrmConceptItem, slugs: ImageRoomTagSlug[]) {
@@ -610,7 +634,7 @@ function ConceptHubPage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveRoom(tab.id)}
+                onClick={() => patchFilters({ room: tab.id === "all" ? undefined : tab.id })}
                 className={cn(
                   "inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer",
                   active
@@ -640,7 +664,7 @@ function ConceptHubPage() {
           </span>
           <button
             type="button"
-            onClick={() => setActiveCategory("all")}
+            onClick={() => patchFilters({ category: undefined })}
             className={cn(
               "h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer",
               activeCategory === "all"
@@ -656,7 +680,7 @@ function ConceptHubPage() {
               <button
                 key={g.slug}
                 type="button"
-                onClick={() => setActiveCategory(g.category)}
+                onClick={() => patchFilters({ category: g.category })}
                 className={cn(
                   "h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer",
                   active
@@ -685,7 +709,10 @@ function ConceptHubPage() {
             {searchInput ? (
               <button
                 type="button"
-                onClick={() => setSearchInput("")}
+                onClick={() => {
+                  setSearchInput("");
+                  patchFilters({ q: undefined });
+                }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 size-5 grid place-items-center rounded-full text-muted-foreground hover:text-foreground hover:bg-surface-strong transition-colors"
                 title="Xóa tìm kiếm"
               >
@@ -701,7 +728,7 @@ function ConceptHubPage() {
             </span>
             <select
               value={activeColor}
-              onChange={(e) => setActiveColor(e.target.value)}
+              onChange={(e) => patchFilters({ color: e.target.value === "all" ? undefined : e.target.value })}
               className="h-8 rounded-xl border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-foreground outline-none focus:border-terracotta transition-colors cursor-pointer"
             >
               <option value="all">Tất cả tông màu</option>
@@ -717,7 +744,7 @@ function ConceptHubPage() {
           <div className="inline-flex items-center rounded-xl border border-border/80 bg-surface-strong/60 p-1 text-xs font-medium self-start sm:self-auto">
             <button
               type="button"
-              onClick={() => setActiveStatus("all")}
+              onClick={() => patchFilters({ status: undefined })}
               className={cn(
                 "rounded-lg px-3 py-1.5 transition-all cursor-pointer",
                 activeStatus === "all"
@@ -729,7 +756,7 @@ function ConceptHubPage() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveStatus("1")}
+              onClick={() => patchFilters({ status: "1" })}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all cursor-pointer",
                 activeStatus === "1"
@@ -742,7 +769,7 @@ function ConceptHubPage() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveStatus("0")}
+              onClick={() => patchFilters({ status: "0" })}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all cursor-pointer",
                 activeStatus === "0"
@@ -777,10 +804,8 @@ function ConceptHubPage() {
             <button
               type="button"
               onClick={() => {
-                setActiveRoom("all");
-                setActiveStatus("all");
-                setActiveColor("all");
                 setSearchInput("");
+                patchFilters({ room: undefined, status: undefined, color: undefined });
               }}
             >
               Đặt lại bộ lọc
