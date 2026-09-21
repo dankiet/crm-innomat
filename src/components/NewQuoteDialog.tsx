@@ -35,7 +35,6 @@ import {
 import {
   effectiveDiscountPct,
   estimateLineProfitInfo,
-  unitPriceForProduct,
 } from "@/lib/pricing";
 import { toast } from "sonner";
 import { Check, ChevronDown, ChevronsDownUp, ChevronsUp, ChevronsUpDown, Copy, FileDown, FileText, Loader2, Plus, Search, Trash2 } from "lucide-react";

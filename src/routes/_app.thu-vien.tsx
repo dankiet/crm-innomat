@@ -57,7 +57,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import {
   SortMenu,
-  type SortDir,
   type SortFieldOption,
 } from "@/components/SortMenu";
 import { compareCollectionName, decodeGallerySort, encodeGallerySort, normalizeSearchText, parseGallerySort, parsePositiveInt, parseViewerIndex, searchTokens, sortCollectionItemsByStockDesc, timeMs, type GallerySort, type GallerySortField } from "@/lib/gallery-sort";
@@ -75,7 +74,6 @@ import {
   buildExactCodeSet,
   codeRowFromProduct,
   matchSearchTokens,
-  splitSearchTokens,
 } from "@/lib/product-search";
 import type {
   GalleryCollection,

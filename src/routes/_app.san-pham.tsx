@@ -35,9 +35,9 @@ import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter
 import { ViewModeToggle, type ViewModeOption } from "@/components/ViewModeToggle";
 import {
   SortMenu,
-  type SortDir,
   type SortFieldOption,
 } from "@/components/SortMenu";
+import { addFacetCount, compareProductCode, decodeProductSort, encodeProductSort, matchesFacet, parseCsv, parseSort, priceOf, toFacetOption, type FacetKey, type ProductSort, type ProductSortField } from "@/lib/product-facets";
 import { deleteProductFn, fetchProducts } from "@/api/functions";
 import type { Product } from "@/lib/types";
 import { formatVND } from "@/lib/format";
@@ -140,52 +140,13 @@ const VIEW_MODE_OPTIONS = [
   { value: "list", icon: List, label: "List", title: "Danh sách" },
 ] as const satisfies ReadonlyArray<ViewModeOption<ViewMode>>;
 
-function parseCsv(v: unknown): string[] {
-  if (typeof v !== "string" || !v.trim()) return [];
-  return v
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 /** Nhóm facet — dùng khi tính options: loại facet của chính nhóm đó ra khỏi bộ lọc. */
-type FacetKey = "color" | "surface" | "size" | "shape" | "texture" | "collection" | "supplier";
-const BLANK_FILTER_VALUE = "__blank__";
 
-function matchesFacet(values: Set<string>, value: string | null | undefined): boolean {
-  if (!values.size) return true;
-  const normalized = (value || "").trim();
-  return normalized ? values.has(normalized) : values.has(BLANK_FILTER_VALUE);
-}
 
-function addFacetCount(map: Map<string, number>, value: string | null | undefined): void {
-  const key = (value || "").trim() || BLANK_FILTER_VALUE;
-  map.set(key, (map.get(key) ?? 0) + 1);
-}
 
-function toFacetOption([value, count]: [string, number]) {
-  return { value, count, label: value === BLANK_FILTER_VALUE ? "Blank" : value };
-}
 
-type ProductSort =
-  | "default"
-  | "code_asc"
-  | "code_desc"
-  | "name_asc"
-  | "name_desc"
-  | "price_asc"
-  | "price_desc"
-  | "stock_desc"
-  | "stock_asc"
-  | "hot_first";
 
-type ProductSortField =
-  | "default"
-  | "code"
-  | "name"
-  | "price"
-  | "stock"
-  | "hot";
 
 const PRODUCT_SORT_FIELDS: SortFieldOption<ProductSortField>[] = [
   {
@@ -236,59 +197,8 @@ const PRODUCT_SORT_FIELDS: SortFieldOption<ProductSortField>[] = [
   },
 ];
 
-function decodeProductSort(value: ProductSort): {
-  field: ProductSortField;
-  dir?: SortDir;
-} {
-  switch (value) {
-    case "code_asc":
-      return { field: "code", dir: "asc" };
-    case "code_desc":
-      return { field: "code", dir: "desc" };
-    case "name_asc":
-      return { field: "name", dir: "asc" };
-    case "name_desc":
-      return { field: "name", dir: "desc" };
-    case "price_asc":
-      return { field: "price", dir: "asc" };
-    case "price_desc":
-      return { field: "price", dir: "desc" };
-    case "stock_asc":
-      return { field: "stock", dir: "asc" };
-    case "stock_desc":
-      return { field: "stock", dir: "desc" };
-    case "hot_first":
-      return { field: "hot", dir: "desc" };
-    default:
-      return { field: "default", dir: "asc" };
-  }
-}
 
-function encodeProductSort(field: ProductSortField, dir: SortDir): ProductSort {
-  switch (field) {
-    case "code":
-      return dir === "desc" ? "code_desc" : "code_asc";
-    case "name":
-      return dir === "desc" ? "name_desc" : "name_asc";
-    case "price":
-      return dir === "desc" ? "price_desc" : "price_asc";
-    case "stock":
-      return dir === "desc" ? "stock_desc" : "stock_asc";
-    case "hot":
-      return "hot_first";
-    default:
-      return "default";
-  }
-}
 
-function compareProductCode(a: Product, b: Product): number {
-  const byCode = (a.code || "").localeCompare(b.code || "", "vi", {
-    numeric: true,
-    sensitivity: "base",
-  });
-  if (byCode !== 0) return byCode;
-  return a.id - b.id;
-}
 
 /** Section filter gập/mở — giữ panel «Bộ lọc» gọn: mở sẵn khi mục đã có lựa chọn. */
 function FilterSection({
@@ -339,27 +249,8 @@ function FilterSection({
   );
 }
 
-function parseSort(v: unknown): ProductSort | undefined {
-  if (
-    v === "default" ||
-    v === "code_asc" ||
-    v === "code_desc" ||
-    v === "name_asc" ||
-    v === "name_desc" ||
-    v === "price_asc" ||
-    v === "price_desc" ||
-    v === "stock_desc" ||
-    v === "stock_asc" ||
-    v === "hot_first"
-  )
-    return v;
-  return undefined;
-}
 
 /** Giá lẻ — dùng cho sort theo giá. */
-function priceOf(p: Product): number {
-  return Number(p.retail_price) || 0;
-}
 
 type SanPhamSearch = {
   nhom?: string;
