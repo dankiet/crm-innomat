@@ -61,7 +61,72 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import { PaginationBar } from "@/components/PaginationBar";
+import { parseCsv } from "@/lib/product-facets";
+import { parsePositiveInt } from "@/lib/gallery-sort";
+type MediaStorageSearch = {
+  tab?: FlatMediaTab;
+  category?: string;
+  roomSlug?: ImageRoomTagSlug;
+  publicFilter?: "all" | "public" | "hidden";
+  colors?: string[];
+  surfaces?: string[];
+  shapes?: string[];
+  textures?: string[];
+  collections?: string[];
+  q?: string;
+  sort?: FlatMediaSort;
+  page?: number;
+  pageSize?: number;
+};
+
+const FLAT_MEDIA_TABS: readonly string[] = ["all", "map", "concept", "featured", "unassigned"];
+const FLAT_MEDIA_SORTS: readonly string[] = ["newest", "oldest", "code_asc", "code_desc"];
+const PUBLIC_FILTERS: readonly string[] = ["all", "public", "hidden"];
+
+function parseMediaTab(v: unknown): FlatMediaTab | undefined {
+  return typeof v === "string" && FLAT_MEDIA_TABS.includes(v) ? (v as FlatMediaTab) : undefined;
+}
+function parseMediaSort(v: unknown): FlatMediaSort | undefined {
+  return typeof v === "string" && FLAT_MEDIA_SORTS.includes(v) ? (v as FlatMediaSort) : undefined;
+}
+function parseMediaRoomSlug(v: unknown): ImageRoomTagSlug | undefined {
+  if (typeof v !== "string" || v === "all") return undefined;
+  return IMAGE_ROOM_TAGS.some((t) => t.id === v) ? (v as ImageRoomTagSlug) : undefined;
+}
+function parseMediaPublicFilter(v: unknown): "all" | "public" | "hidden" | undefined {
+  return typeof v === "string" && PUBLIC_FILTERS.includes(v)
+    ? (v as "all" | "public" | "hidden")
+    : undefined;
+}
+/** Param mảng URL: nhận JSON array hoặc CSV ("a,b"). Output undefined khi rỗng. */
+function parseMediaArrayParam(v: unknown): string[] | undefined {
+  const arr = Array.isArray(v) ? (v as unknown[]) : parseCsv(v);
+  const out = arr.filter((x): x is string => typeof x === "string" && x !== "");
+  return out.length ? out : undefined;
+}
+
 export const Route = createFileRoute("/_app/luu-tru")({
+  validateSearch: (search: Record<string, unknown>): MediaStorageSearch => {
+    const pageSize = Number(search.pageSize);
+    return {
+      tab: parseMediaTab(search.tab),
+      category:
+        typeof search.category === "string" && search.category !== "all"
+          ? search.category.slice(0, 80)
+          : undefined,
+      roomSlug: parseMediaRoomSlug(search.roomSlug),
+      publicFilter: parseMediaPublicFilter(search.publicFilter),
+      colors: parseMediaArrayParam(search.colors),
+      surfaces: parseMediaArrayParam(search.surfaces),
+      shapes: parseMediaArrayParam(search.shapes),
+      textures: parseMediaArrayParam(search.textures),
+      collections: parseMediaArrayParam(search.collections),
+      q: typeof search.q === "string" ? search.q.slice(0, 120) : undefined,
+      sort: parseMediaSort(search.sort),
+      page: parsePositiveInt(search.page),
+      pageSize: (PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize) ? pageSize : undefined,
+    };
+  },
   errorComponent: ({ error }) => (
     <div className="p-8 rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300">
       <h2 className="text-base font-bold">Lỗi tải Lưu trữ</h2>
@@ -508,23 +573,35 @@ function BulkRoomTagPopover({
 }
 
 function MediaStoragePage() {
-  const [tab, setTab] = useState<FlatMediaTab>("all");
-  const [category, setCategory] = useState<string>("all");
-  const [roomSlug, setRoomSlug] = useState<ImageRoomTagSlug | "all">("all");
-  const [publicFilter, setPublicFilter] = useState<"all" | "public" | "hidden">("all");
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [selectedSurfaces, setSelectedSurfaces] = useState<string[]>([]);
-  const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
-  const [selectedTextures, setSelectedTextures] = useState<string[]>([]);
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const searchParams = Route.useSearch();
+  const navigate = Route.useNavigate();
+  // Filter & phân trang — nguồn là URL (validateSearch), không còn useState
+  const tab = searchParams.tab ?? "all";
+  const category = searchParams.category ?? "all";
+  const roomSlug = searchParams.roomSlug ?? "all";
+  const publicFilter = searchParams.publicFilter ?? "all";
+  const selectedColors = searchParams.colors ?? [];
+  const selectedSurfaces = searchParams.surfaces ?? [];
+  const selectedShapes = searchParams.shapes ?? [];
+  const selectedTextures = searchParams.textures ?? [];
+  const selectedCollections = searchParams.collections ?? [];
+  const sort = searchParams.sort ?? "newest";
+  const page = searchParams.page ?? 1;
+  const pageSize = searchParams.pageSize ?? 24;
+
+  /** Đổi filter: ghi URL và luôn reset về trang 1 (đúng hành vi cũ). */
+  function patchFilters(patch: Partial<MediaStorageSearch>) {
+    navigate({ search: (prev) => ({ ...prev, ...patch, page: undefined }) });
+  }
+  function gotoPage(newPage: number) {
+    navigate({ search: (prev) => ({ ...prev, page: newPage === 1 ? undefined : newPage }) });
+  }
   const [colorOptions, setColorOptions] = useState<{ value: string; label: string }[]>([]);
   const [surfaceOptions, setSurfaceOptions] = useState<{ value: string; label: string }[]>([]);
   const [shapeOptions, setShapeOptions] = useState<{ value: string; label: string }[]>([]);
   const [textureOptions, setTextureOptions] = useState<{ value: string; label: string }[]>([]);
   const [collectionOptions, setCollectionOptions] = useState<{ value: string; label: string }[]>([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sort, setSort] = useState<FlatMediaSort>("newest");
+  const [search, setSearch] = useState(() => searchParams.q ?? "");
   const [currentHeroImage, setCurrentHeroImage] = useState<string>("");
 
   // Load danh mục filter options scoped chính xác theo nhóm danh mục đang chọn (category)
@@ -552,14 +629,6 @@ function MediaStoragePage() {
     };
   }, [category]);
 
-  // Reset các facet filter khi đổi danh mục gạch để không bị dính giá trị của danh mục khác
-  useEffect(() => {
-    setSelectedColors([]);
-    setSelectedSurfaces([]);
-    setSelectedShapes([]);
-    setSelectedTextures([]);
-    setSelectedCollections([]);
-  }, [category]);
   useEffect(() => {
     fetchLpHeroImageFn()
       .then((res) => {
@@ -594,9 +663,6 @@ function MediaStoragePage() {
     }
   }
 
-  // Pagination state
-  const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(24);
 
   const [items, setItems] = useState<FlatMediaItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -627,20 +693,28 @@ function MediaStoragePage() {
   const gridTopRef = useRef<HTMLDivElement | null>(null);
   const [, startTransition] = useTransition();
 
-  // Debounce search 300ms
+  // Giữ ô tìm kiếm đồng bộ khi URL đổi (Back/Forward/share link)
   useEffect(() => {
+    setSearch(searchParams.q ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.q]);
+
+  // Debounce 300ms rồi commit q lên URL (fetch được kích bởi effect phía dưới)
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === (searchParams.q ?? "")) return;
     const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
+      patchFilters({ q: trimmed || undefined });
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
 
-  function loadData(targetPage = page, targetPageSize = pageSize) {
+  function loadData() {
     fetchFlatMediaImagesFn({
       data: {
         tab,
         category: category === "all" ? undefined : category,
-        search: debouncedSearch || undefined,
+        search: searchParams.q || undefined,
         roomSlug: roomSlug === "all" ? undefined : roomSlug,
         publicFilter: publicFilter === "all" ? undefined : publicFilter,
         colors: selectedColors.length ? selectedColors : undefined,
@@ -649,8 +723,8 @@ function MediaStoragePage() {
         textures: selectedTextures.length ? selectedTextures : undefined,
         collections: selectedCollections.length ? selectedCollections : undefined,
         sort,
-        page: targetPage,
-        pageSize: targetPageSize,
+        page,
+        pageSize,
       },
     })
       .then((res) => {
@@ -692,25 +766,24 @@ function MediaStoragePage() {
       .catch(() => {});
   }
 
-  // Khi đổi filter, sort, search, pageSize -> về trang 1
+  // Fetch dữ liệu theo toàn bộ filter/sort/search/page/pageSize (nguồn URL)
+  // ⚠️ Dep phải là giá trị ỔN ĐỊNH về identity: dùng searchParams.colors
+  // (mảng do router giữ, chỉ đổi khi URL đổi) — KHÔNG dùng biến `?? []`
+  // suy ra mỗi render (làm effect chạy vô hạn).
   useEffect(() => {
-    setPage(1);
-    loadData(1, pageSize);
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, category, roomSlug, publicFilter, selectedColors, selectedSurfaces, selectedShapes, selectedTextures, selectedCollections, sort, debouncedSearch, pageSize]);
+  }, [tab, category, roomSlug, publicFilter, searchParams.colors, searchParams.surfaces, searchParams.shapes, searchParams.textures, searchParams.collections, sort, searchParams.q, page, pageSize]);
 
   function handlePageChange(newPage: number) {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
-    setPage(newPage);
-    loadData(newPage, pageSize);
+    gotoPage(newPage);
     gridTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function handlePageSizeChange(newSize: number) {
     if (newSize === pageSize) return;
-    setPageSize(newSize);
-    setPage(1);
-    loadData(1, newSize);
+    patchFilters({ pageSize: newSize === 24 ? undefined : newSize });
   }
 
   async function handleQuickSetRoomTags(item: FlatMediaItem, slugs: ImageRoomTagSlug[]) {
@@ -754,7 +827,7 @@ function MediaStoragePage() {
       toast.success(`Đã gán bối cảnh cho ${res.updated} ảnh`);
       setBulkRoomPopoverOpen(false);
       clearSelection();
-      loadData(page, pageSize);
+      loadData();
       syncCountsOnly();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi gán bối cảnh hàng loạt");
@@ -960,7 +1033,7 @@ function MediaStoragePage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && loadData(1, pageSize)}
+              onKeyDown={(e) => e.key === "Enter" && patchFilters({ q: search.trim() || undefined })}
               placeholder="Tìm mã SP, tên gạch..."
               className="h-9 w-full text-xs pl-9 pr-8 rounded-full bg-card border border-border/80 outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/15 text-foreground placeholder:text-muted-foreground/60 shadow-2xs"
             />
@@ -969,7 +1042,7 @@ function MediaStoragePage() {
                 type="button"
                 onClick={() => {
                   setSearch("");
-                  setDebouncedSearch("");
+                  patchFilters({ q: undefined });
                 }}
                 aria-label="Xoá tìm kiếm"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground cursor-pointer"
@@ -986,7 +1059,7 @@ function MediaStoragePage() {
             </span>
             <button
               type="button"
-              onClick={() => setCategory("all")}
+              onClick={() => patchFilters({ category: undefined, colors: undefined, surfaces: undefined, shapes: undefined, textures: undefined, collections: undefined })}
               className={cn(
                 "h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer",
                 category === "all"
@@ -1002,7 +1075,7 @@ function MediaStoragePage() {
                 <button
                   key={g.slug}
                   type="button"
-                  onClick={() => setCategory(g.category)}
+                  onClick={() => patchFilters({ category: g.category, colors: undefined, surfaces: undefined, shapes: undefined, textures: undefined, collections: undefined })}
                   className={cn(
                     "h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer",
                     active
@@ -1024,7 +1097,7 @@ function MediaStoragePage() {
               title="Chọn màu"
               options={colorOptions}
               selected={selectedColors}
-              onChange={setSelectedColors}
+              onChange={(next) => patchFilters({ colors: next.length ? next : undefined })}
               searchable
             />
           </FilterChip>
@@ -1033,7 +1106,7 @@ function MediaStoragePage() {
               title="Chọn bề mặt"
               options={surfaceOptions}
               selected={selectedSurfaces}
-              onChange={setSelectedSurfaces}
+              onChange={(next) => patchFilters({ surfaces: next.length ? next : undefined })}
               searchable
             />
           </FilterChip>
@@ -1042,7 +1115,7 @@ function MediaStoragePage() {
               title="Chọn kiểu dáng"
               options={shapeOptions}
               selected={selectedShapes}
-              onChange={setSelectedShapes}
+              onChange={(next) => patchFilters({ shapes: next.length ? next : undefined })}
               searchable
             />
           </FilterChip>
@@ -1051,7 +1124,7 @@ function MediaStoragePage() {
               title="Chọn hiệu ứng vân"
               options={textureOptions}
               selected={selectedTextures}
-              onChange={setSelectedTextures}
+              onChange={(next) => patchFilters({ textures: next.length ? next : undefined })}
               searchable
             />
           </FilterChip>
@@ -1060,20 +1133,16 @@ function MediaStoragePage() {
               title="Chọn bộ sưu tập"
               options={collectionOptions}
               selected={selectedCollections}
-              onChange={setSelectedCollections}
+              onChange={(next) => patchFilters({ collections: next.length ? next : undefined })}
               searchable
             />
           </FilterChip>
           {(selectedColors.length > 0 || selectedSurfaces.length > 0 || selectedShapes.length > 0 || selectedTextures.length > 0 || selectedCollections.length > 0) ? (
             <button
               type="button"
-              onClick={() => {
-                setSelectedColors([]);
-                setSelectedSurfaces([]);
-                setSelectedShapes([]);
-                setSelectedTextures([]);
-                setSelectedCollections([]);
-              }}
+              onClick={() =>
+                patchFilters({ colors: undefined, surfaces: undefined, shapes: undefined, textures: undefined, collections: undefined })
+              }
               className="h-8 px-3 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-strong/60 transition-colors cursor-pointer"
             >
               Xóa bộ lọc SP
@@ -1095,10 +1164,7 @@ function MediaStoragePage() {
                   key={t.key}
                   type="button"
                   onClick={() => {
-                    setTab(t.key);
-                    if (t.key !== "concept") {
-                      setRoomSlug("all");
-                    }
+                    patchFilters({ tab: t.key === "all" ? undefined : t.key, roomSlug: t.key !== "concept" ? undefined : roomSlug === "all" ? undefined : roomSlug });
                     clearSelection();
                   }}
                   className={cn(
@@ -1134,7 +1200,7 @@ function MediaStoragePage() {
               <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs items-center animate-in fade-in-0 duration-150">
                 <button
                   type="button"
-                  onClick={() => setPublicFilter("all")}
+                  onClick={() => patchFilters({ publicFilter: undefined })}
                   className={cn(
                     "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors cursor-pointer",
                     publicFilter === "all"
@@ -1146,7 +1212,7 @@ function MediaStoragePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPublicFilter("public")}
+                  onClick={() => patchFilters({ publicFilter: "public" })}
                   className={cn(
                     "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
                     publicFilter === "public"
@@ -1164,7 +1230,7 @@ function MediaStoragePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPublicFilter("hidden")}
+                  onClick={() => patchFilters({ publicFilter: "hidden" })}
                   className={cn(
                     "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer",
                     publicFilter === "hidden"
@@ -1191,7 +1257,7 @@ function MediaStoragePage() {
                   <button
                     key={opt.key}
                     type="button"
-                    onClick={() => setSort(opt.key)}
+                    onClick={() => patchFilters({ sort: opt.key === "newest" ? undefined : opt.key })}
                     className={cn(
                       "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer",
                       active
@@ -1249,7 +1315,7 @@ function MediaStoragePage() {
             {/* Refresh */}
             <button
               type="button"
-              onClick={() => loadData(page, pageSize)}
+              onClick={() => loadData()}
               title="Tải lại dữ liệu"
               className="size-7 grid place-items-center rounded-full border border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-surface-strong/60 transition-colors cursor-pointer"
             >
@@ -1267,10 +1333,7 @@ function MediaStoragePage() {
             </span>
             <button
               type="button"
-              onClick={() => {
-                setTab("concept");
-                setRoomSlug("all");
-              }}
+              onClick={() => patchFilters({ tab: "concept", roomSlug: undefined })}
               className={cn(
                 "inline-flex items-center gap-1.5 h-7 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer",
                 tab === "concept" && roomSlug === "all"
@@ -1297,10 +1360,7 @@ function MediaStoragePage() {
                 <button
                   key={tag.id}
                   type="button"
-                  onClick={() => {
-                    setTab("concept");
-                    setRoomSlug(tag.id);
-                  }}
+                  onClick={() => patchFilters({ tab: "concept", roomSlug: tag.id })}
                   className={cn(
                     "inline-flex items-center gap-1.5 h-7 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer",
                     active
@@ -1325,7 +1385,7 @@ function MediaStoragePage() {
             {roomSlug !== "all" ? (
               <button
                 type="button"
-                onClick={() => setRoomSlug("all")}
+                onClick={() => patchFilters({ roomSlug: undefined })}
                 className="h-7 px-2.5 rounded-full text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
               >
                 Xóa lọc bối cảnh
