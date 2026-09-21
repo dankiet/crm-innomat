@@ -60,6 +60,7 @@ import {
   type SortDir,
   type SortFieldOption,
 } from "@/components/SortMenu";
+import { compareCollectionName, decodeGallerySort, encodeGallerySort, normalizeSearchText, parseGallerySort, parsePositiveInt, parseViewerIndex, searchTokens, sortCollectionItemsByStockDesc, timeMs, type GallerySort, type GallerySortField } from "@/lib/gallery-sort";
 import {
   Dialog,
   DialogContent,
@@ -96,17 +97,7 @@ const LIBRARY_CATEGORY_CHIPS = LIBRARY_CATEGORY_SLUGS.map((slug) => {
   return { slug, category: group.category, label: group.label };
 });
 
-type GallerySort =
-  | "created_desc"
-  | "created_asc"
-  | "updated_desc"
-  | "updated_asc"
-  | "name_asc"
-  | "name_desc"
-  | "items_desc"
-  | "items_asc";
 
-type GallerySortField = "created" | "updated" | "name" | "items";
 
 const GALLERY_SORT_FIELDS: SortFieldOption<GallerySortField>[] = [
   {
@@ -143,44 +134,7 @@ const GALLERY_SORT_FIELDS: SortFieldOption<GallerySortField>[] = [
   },
 ];
 
-function decodeGallerySort(value: GallerySort): {
-  field: GallerySortField;
-  dir?: SortDir;
-} {
-  switch (value) {
-    case "created_asc":
-      return { field: "created", dir: "asc" };
-    case "created_desc":
-      return { field: "created", dir: "desc" };
-    case "updated_asc":
-      return { field: "updated", dir: "asc" };
-    case "updated_desc":
-      return { field: "updated", dir: "desc" };
-    case "name_asc":
-      return { field: "name", dir: "asc" };
-    case "name_desc":
-      return { field: "name", dir: "desc" };
-    case "items_asc":
-      return { field: "items", dir: "asc" };
-    case "items_desc":
-      return { field: "items", dir: "desc" };
-    default:
-      return { field: "created", dir: "desc" };
-  }
-}
 
-function encodeGallerySort(field: GallerySortField, dir: SortDir): GallerySort {
-  switch (field) {
-    case "created":
-      return dir === "asc" ? "created_asc" : "created_desc";
-    case "updated":
-      return dir === "asc" ? "updated_asc" : "updated_desc";
-    case "name":
-      return dir === "asc" ? "name_asc" : "name_desc";
-    case "items":
-      return dir === "asc" ? "items_asc" : "items_desc";
-  }
-}
 
 type ThuVienSearch = {
   sort?: GallerySort;
@@ -194,20 +148,6 @@ type ThuVienSearch = {
   v?: number;
 };
 
-function parseGallerySort(v: unknown): GallerySort | undefined {
-  if (
-    v === "created_desc" ||
-    v === "created_asc" ||
-    v === "updated_desc" ||
-    v === "updated_asc" ||
-    v === "name_asc" ||
-    v === "name_desc" ||
-    v === "items_desc" ||
-    v === "items_asc"
-  )
-    return v;
-  return undefined;
-}
 
 function parseLibraryCategory(v: unknown): LibraryCategorySlug | undefined {
   if (typeof v !== "string") return undefined;
@@ -216,39 +156,9 @@ function parseLibraryCategory(v: unknown): LibraryCategorySlug | undefined {
     : undefined;
 }
 
-function parsePositiveInt(v: unknown): number | undefined {
-  const n =
-    typeof v === "number"
-      ? v
-      : typeof v === "string" && v.trim() !== ""
-        ? Number(v)
-        : NaN;
-  if (!Number.isFinite(n) || n <= 0) return undefined;
-  return Math.floor(n);
-}
 
-function compareCollectionName(a: GalleryCollection, b: GalleryCollection): number {
-  const byName = a.name.localeCompare(b.name, "vi", { sensitivity: "base" });
-  if (byName !== 0) return byName;
-  return a.id - b.id;
-}
 
-function timeMs(value: string | undefined): number {
-  if (!value) return 0;
-  const t = new Date(value).getTime();
-  return Number.isFinite(t) ? t : 0;
-}
 
-function parseViewerIndex(v: unknown): number | undefined {
-  const n =
-    typeof v === "number"
-      ? v
-      : typeof v === "string" && v.trim() !== ""
-        ? Number(v)
-        : NaN;
-  if (!Number.isFinite(n) || n < 0) return undefined;
-  return Math.floor(n);
-}
 
 export const Route = createFileRoute("/_app/thu-vien")({
   validateSearch: (search: Record<string, unknown>): ThuVienSearch => {
@@ -311,19 +221,7 @@ const inputClass =
 const inputSearchClass =
   "h-9 w-full rounded-lg border border-border bg-card pl-9 text-sm outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/10";
 
-function normalizeSearchText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/\u0111/g, "d")
-    .replace(/\u0110/g, "D")
-    .toLocaleLowerCase("vi")
-    .trim();
-}
 
-function searchTokens(query: string): string[] {
-  return splitSearchTokens(query, normalizeSearchText);
-}
 
 async function copyProductCodes(codes: string[], successMessage: string): Promise<void> {
   const text = [...new Set(codes.map((code) => code.trim()).filter(Boolean))].join(" ");
@@ -347,68 +245,6 @@ async function copyProductCodes(codes: string[], successMessage: string): Promis
  * remaining photos of the same product stay right after it, then other products
  * by stock. So sorting never moves/replaces the đại diện tile.
  */
-function sortCollectionItemsByStockDesc(
-  items: GalleryCollectionItem[],
-  coverPath?: string | null,
-): GalleryCollectionItem[] {
-  type Cluster = {
-    key: string;
-    stock: number;
-    firstOrder: number;
-    items: GalleryCollectionItem[];
-  };
-  const clusters: Cluster[] = [];
-  const byProduct = new Map<number, Cluster>();
-  const cover = coverPath?.trim() || "";
-
-  items.forEach((item, index) => {
-    const stock = Number(item.total_stock) || 0;
-    if (item.product_id != null) {
-      let cluster = byProduct.get(item.product_id);
-      if (!cluster) {
-        cluster = {
-          key: `p-${item.product_id}`,
-          stock,
-          firstOrder: index,
-          items: [],
-        };
-        byProduct.set(item.product_id, cluster);
-        clusters.push(cluster);
-      }
-      cluster.items.push(item);
-      return;
-    }
-    clusters.push({
-      key: `i-${item.id}`,
-      stock,
-      firstOrder: index,
-      items: [item],
-    });
-  });
-
-  // Within each product cluster, put the cover photo first so badge stays on
-  // the lead tile of that product when we pin the cover cluster.
-  if (cover) {
-    for (const cluster of clusters) {
-      const coverIdx = cluster.items.findIndex((item) => item.path === cover);
-      if (coverIdx > 0) {
-        const [coverItem] = cluster.items.splice(coverIdx, 1);
-        cluster.items.unshift(coverItem!);
-      }
-    }
-  }
-
-  clusters.sort((a, b) => {
-    const aIsCover = cover ? a.items.some((item) => item.path === cover) : false;
-    const bIsCover = cover ? b.items.some((item) => item.path === cover) : false;
-    if (aIsCover !== bIsCover) return aIsCover ? -1 : 1;
-    const byStock = b.stock - a.stock;
-    if (byStock !== 0) return byStock;
-    return a.firstOrder - b.firstOrder;
-  });
-
-  return clusters.flatMap((cluster) => cluster.items);
-}
 
 function GalleryPage() {
   const router = useRouter();
