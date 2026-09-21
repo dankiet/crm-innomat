@@ -15,7 +15,8 @@
     "storage:backup": "node scripts/storage-backup.mjs",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:enable-rls": "node scripts/enable-rls.mjs",
-    "db:seed-admin": "node scripts/seed-admin.mjs"
+    "db:seed-admin": "node scripts/seed-admin.mjs",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
