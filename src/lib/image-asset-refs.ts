@@ -1,0 +1,122 @@
+/**
+ * Hàm thuần cho Image Asset Registry — KHÔNG import alias `@/` (node --test không
+ * resolve tsconfig paths; các lib thuần trong repo đều alias-free như file này).
+ *
+ *  - content-addressing: sha256 = identity của physical image.
+ *  - parse ref → sha256 / storage_key (managed refs: /images/* hoặc supabase.co/*).
+ *  - metadata qua sharp (header-only, không re-encode).
+ */
+import { createHash } from "node:crypto";
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+const MANAGED_FILE = /^([0-9a-f]{64})(\.[a-z0-9]+)?$/i;
+
+export function contentHashOf(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+/** Ref hình ảnh do CRM quản lý: /images/<sha>.<ext> hoặc supabase.co/<prefix>/<sha>.<ext>. */
+export function isRegistryRef(ref: string): boolean {
+  if (!ref) return false;
+  if (ref.startsWith("/images/")) return true;
+  try {
+    return new URL(ref).hostname.endsWith("supabase.co");
+  } catch {
+    return false;
+  }
+}
+
+/** Tên file (tail) từ ref — "<sha>.<ext>" với managed ref hợp lệ, "" nếu không. */
+export function registryFileName(ref: string): string {
+  if (!ref) return "";
+  const base = ref.startsWith("/images/")
+    ? ref.slice("/images/".length)
+    : (() => {
+        try {
+          return (new URL(ref).pathname.split("/").pop() ?? "").trim();
+        } catch {
+          return "";
+        }
+      })();
+  return MANAGED_FILE.test(base) ? base : "";
+}
+
+/** sha256 (64 hex) từ managed ref; null nếu ref không phải managed/hợp lệ. */
+export function sha256FromRef(ref: string): string | null {
+  const file = registryFileName(ref);
+  if (!file) return null;
+  const m = MANAGED_FILE.exec(file);
+  return m ? m[1]!.toLowerCase() : null;
+}
+
+/** storage_key content-address: "<sha256>.<ext>" — ổn định mọi môi trường. */
+export function storageKeyForRef(ref: string): string {
+  return registryFileName(ref);
+}
+
+/** Không log toàn bộ ref (chứa URL) — chỉ phần storage key. */
+export function storageSafeRef(ref: string): string {
+  return registryFileName(ref) || ref.slice(0, 80);
+}
+
+/** Metadata ảnh (width/height/format) qua sharp — đọc header, không re-encode. */
+export async function assetMetadataFromBuffer(buffer: Buffer): Promise<{
+  width: number;
+  height: number;
+  format: string;
+}> {
+  const sharp = (await import("sharp")).default;
+  const meta = await sharp(buffer).metadata();
+  return {
+    width: meta.width ?? 0,
+    height: meta.height ?? 0,
+    format: meta.format ?? "",
+  };
+}
+
+export const ASSET_MAX_SIDE = 1600;
+
+/**
+ * Chuẩn buffer ảnh (rotate → resize ≤1600 → webp 82%) + metadata kết quả.
+ * Giữ nguyên buffer nếu đã là webp ≤1600. Không re-encode khi chỉ cần metadata.
+ */
+export async function normalizeWebpBuffer(input: Buffer): Promise<{
+  buffer: Buffer;
+  width: number;
+  height: number;
+  mimeType: string;
+}> {
+  const sharp = (await import("sharp")).default;
+  let pipeline = sharp(input, { failOn: "none" }).rotate();
+  const meta = await pipeline.metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+
+  if (meta.format === "webp" && width <= ASSET_MAX_SIDE && height <= ASSET_MAX_SIDE) {
+    const outMeta = await sharp(input).metadata();
+    return {
+      buffer: input,
+      width: outMeta.width ?? width,
+      height: outMeta.height ?? height,
+      mimeType: "image/webp",
+    };
+  }
+
+  if (width > ASSET_MAX_SIDE || height > ASSET_MAX_SIDE) {
+    pipeline = pipeline.resize({
+      width: ASSET_MAX_SIDE,
+      height: ASSET_MAX_SIDE,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+  }
+
+  const buffer = await pipeline.webp({ quality: 82, effort: 4 }).toBuffer();
+  const outMeta = await sharp(buffer).metadata();
+  return {
+    buffer,
+    width: outMeta.width ?? width,
+    height: outMeta.height ?? height,
+    mimeType: "image/webp",
+  };
+}
