@@ -4,6 +4,7 @@ import {
   BLANK_FILTER_VALUE,
   addFacetCount,
   compareProductCode,
+  countFacet,
   decodeProductSort,
   encodeProductSort,
   matchesFacet,
@@ -69,4 +70,19 @@ test("compareProductCode: so mã số học, rồi id", () => {
 test("priceOf: giá lẻ, rỗng → 0", () => {
   assert.equal(priceOf({ retail_price: 100000 } as never), 100000);
   assert.equal(priceOf({ retail_price: null } as never), 0);
+});
+
+test("countFacet: đếm theo getter, sort giảm dần, blank → Blank", () => {
+  const rows = [
+    { p: { supplier: "Innomat" } },
+    { p: { supplier: "Innomat" } },
+    { p: { supplier: "Hiệp Thủy" } },
+    { p: { supplier: "" } },
+  ];
+  const out = countFacet(rows as never, (p) => p.supplier);
+  assert.deepEqual(out, [
+    { value: "Innomat", count: 2, label: "Innomat" },
+    { value: "Hiệp Thủy", count: 1, label: "Hiệp Thủy" },
+    { value: BLANK_FILTER_VALUE, count: 1, label: "Blank" },
+  ]);
 });

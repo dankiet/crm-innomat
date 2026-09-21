@@ -37,7 +37,7 @@ import {
   SortMenu,
   type SortFieldOption,
 } from "@/components/SortMenu";
-import { addFacetCount, compareProductCode, decodeProductSort, encodeProductSort, matchesFacet, parseCsv, parseSort, priceOf, toFacetOption, type FacetKey, type ProductSort, type ProductSortField } from "@/lib/product-facets";
+import { addFacetCount, compareProductCode, countFacet, decodeProductSort, encodeProductSort, matchesFacet, parseCsv, parseSort, priceOf, toFacetOption, type FacetKey, type ProductSort, type ProductSortField } from "@/lib/product-facets";
 import { deleteProductFn, fetchProducts } from "@/api/functions";
 import type { Product } from "@/lib/types";
 import { formatVND } from "@/lib/format";
@@ -659,15 +659,10 @@ function ProductsPage() {
       );
   }, [matchIndexed]);
 
-  const surfaceOptions = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { p } of matchIndexed("surface")) {
-      addFacetCount(map, p.surface);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(toFacetOption);
-  }, [matchIndexed]);
+  const surfaceOptions = useMemo(
+    () => countFacet(matchIndexed("surface"), (p) => p.surface),
+    [matchIndexed],
+  );
 
 
   const shapeOptions = useMemo(() => {
@@ -680,35 +675,20 @@ function ProductsPage() {
       .map(toFacetOption);
   }, [matchIndexed]);
 
-  const textureOptions = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { p } of matchIndexed("texture")) {
-      addFacetCount(map, p.texture);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(toFacetOption);
-  }, [matchIndexed]);
+  const textureOptions = useMemo(
+    () => countFacet(matchIndexed("texture"), (p) => p.texture),
+    [matchIndexed],
+  );
 
-  const collectionOptions = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { p } of matchIndexed("collection")) {
-      addFacetCount(map, p.collections);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(toFacetOption);
-  }, [matchIndexed]);
+  const collectionOptions = useMemo(
+    () => countFacet(matchIndexed("collection"), (p) => p.collections),
+    [matchIndexed],
+  );
 
-  const supplierOptions = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { p } of matchIndexed("supplier")) {
-      addFacetCount(map, p.supplier);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(toFacetOption);
-  }, [matchIndexed]);
+  const supplierOptions = useMemo(
+    () => countFacet(matchIndexed("supplier"), (p) => p.supplier),
+    [matchIndexed],
+  );
 
   const hotInScope = useMemo(
     () => indexed.filter(({ p }) => p.is_hot).length,

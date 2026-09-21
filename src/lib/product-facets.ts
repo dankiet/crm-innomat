@@ -39,6 +39,25 @@ export function toFacetOption([value, count]: [string, number]) {
   return { value, count, label: value === BLANK_FILTER_VALUE ? "Blank" : value };
 }
 
+/**
+ * Đếm facet từ danh sách dòng đã lọc, sort theo count giảm dần rồi sinh option.
+ * Khuôn lặp của 4 memo trong /san-pham (surface/texture/collection/supplier).
+ * Lưu ý KHÔNG áp cho color (chuẩn hoá tông màu + thứ tự riêng) và shape
+ * (sort theo alphabet) — chúng là biến thể có chủ đích.
+ */
+export function countFacet(
+  rows: ReadonlyArray<{ p: Product }>,
+  getter: (p: Product) => string | null | undefined,
+): Array<{ value: string; count: number; label: string }> {
+  const map = new Map<string, number>();
+  for (const { p } of rows) {
+    addFacetCount(map, getter(p));
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(toFacetOption);
+}
+
 export type ProductSort =
   | "default"
   | "code_asc"
