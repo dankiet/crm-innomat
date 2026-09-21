@@ -22,6 +22,7 @@ import {
 import { statusMeta, type Customer, type CustomerStatus } from "@/lib/types";
 import { formatVND, formatVNDShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 
 type KhachHangSearch = {
   q?: string;
@@ -79,11 +80,11 @@ function CustomersPage() {
     q: string;
   };
   const [filter, setFilter] = useLocalStorageState<"all" | CustomerStatus>(
-    "khach-hang.statusFilter",
+    STORAGE_KEYS.customerStatusFilter,
     "all",
   );
   const [viewMode, setViewMode] = useLocalStorageState<ViewMode>(
-    "khach-hang.viewMode",
+    STORAGE_KEYS.customerViewMode,
     "grid",
   );
   const [searchDraft, setSearchDraft] = useState(qParam || "");

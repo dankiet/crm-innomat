@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-
-const SHORTLIST_STORAGE_KEY = "ebg_architect_shortlist_ids_v1";
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 
 /**
  * Hook lưu trữ Shortlist vật liệu an toàn cho SSR (TanStack Start / Vite).
@@ -18,7 +17,7 @@ export function useShortlistStorage(initialIds: string[] = []): {
   // 1. Client-mount: Đọc dữ liệu từ localStorage
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(SHORTLIST_STORAGE_KEY);
+      const stored = window.localStorage.getItem(STORAGE_KEYS.architectShortlist);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
@@ -33,7 +32,7 @@ export function useShortlistStorage(initialIds: string[] = []): {
   // 2. Helper ghi vào localStorage an toàn
   const persistToStorage = useCallback((ids: string[]) => {
     try {
-      window.localStorage.setItem(SHORTLIST_STORAGE_KEY, JSON.stringify(ids));
+      window.localStorage.setItem(STORAGE_KEYS.architectShortlist, JSON.stringify(ids));
     } catch {
       // Bỏ qua lỗi ghi storage (hết quota, chế độ ẩn danh...)
     }

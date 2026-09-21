@@ -22,6 +22,7 @@ import { useLocalStorageState } from "@/hooks/useLocalStorageState";
 import { fetchCustomers, setCustomerStatus } from "@/api/functions";
 import { pipelineStages, statusMeta, type Customer, type CustomerStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 
 type CoHoiSearch = { q?: string };
 
@@ -279,11 +280,11 @@ function PipelinePage() {
     return () => clearTimeout(t);
   }, [searchDraft, qParam, navigate]);
 
-  const [viewMode, setViewMode] = useLocalStorageState<ViewMode>("pipeline.viewMode", "board");
+  const [viewMode, setViewMode] = useLocalStorageState<ViewMode>(STORAGE_KEYS.pipelineViewMode, "board");
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [quoteCustomerId, setQuoteCustomerId] = useState<number | null>(null);
   const [hiddenStagesList, setHiddenStagesList] = useLocalStorageState<CustomerStatus[]>(
-    "pipeline.hiddenStages",
+    STORAGE_KEYS.pipelineHiddenStages,
     [],
   );
   const hiddenStages = useMemo(() => new Set(hiddenStagesList), [hiddenStagesList]);

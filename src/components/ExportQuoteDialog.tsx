@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { useLocalStorageState } from "@/hooks/useLocalStorageState";
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 
 const DEFAULT_TERMS =
   "Tạm ứng 40% giá trị đơn hàng.\nThanh toán số tiền còn lại trong vòng 10 ngày kể từ ngày nhận đủ hàng.";
@@ -16,7 +17,6 @@ const DELIVERY_OPT1 =
 const DELIVERY_OPT2 =
   "Trong vòng 7-10 ngày kể từ ngày xác nhận đặt hàng và tạm ứng.";
 
-const STORAGE_KEY = "quote-export-project-site";
 const HISTORY_LIMIT = 12;
 
 type SiteMemory = {
@@ -79,7 +79,7 @@ export function ExportQuoteDialog({
   customerId?: number;
 }) {
   const [stored, setStored] = useLocalStorageState<StoredExportSites>(
-    STORAGE_KEY,
+    STORAGE_KEYS.quoteExportProjectSite,
     EMPTY_STORED,
   );
 
@@ -117,7 +117,7 @@ export function ExportQuoteDialog({
     let mem = stored.byCustomer?.[key];
     if (!mem && typeof window !== "undefined") {
       try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
+        const raw = window.localStorage.getItem(STORAGE_KEYS.quoteExportProjectSite);
         if (raw) {
           const parsed = JSON.parse(raw) as StoredExportSites;
           mem = parsed.byCustomer?.[key];

@@ -28,6 +28,7 @@ import {
   type QuoteStatus,
 } from "@/lib/types";
 import { formatVND } from "@/lib/format";
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 import { toast } from "sonner";
 
 const QUOTE_STATUSES: QuoteStatus[] = ["draft", "sent", "accepted", "expired"];
@@ -92,10 +93,10 @@ function QuotesPage() {
   const [deletingOrder, setDeletingOrder] = useState<number | null>(null);
   const [quoteStatusFilter, setQuoteStatusFilter] = useLocalStorageState<
     QuoteStatus[]
-  >("bao-gia.quoteStatusFilter", []);
+  >(STORAGE_KEYS.quoteStatusFilter, []);
   const [orderStatusFilter, setOrderStatusFilter] = useLocalStorageState<
     OrderStatus[]
-  >("bao-gia.orderStatusFilter", []);
+  >(STORAGE_KEYS.orderStatusFilter, []);
 
   const [searchDraft, setSearchDraft] = useState(qParam || "");
   const committedSearchRef = useRef(qParam || "");
