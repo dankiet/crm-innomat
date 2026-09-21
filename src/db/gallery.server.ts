@@ -1,7 +1,6 @@
 import { getDb, type AsyncDb, type SqlValue } from "./driver";
-import { isPublicImagePathReferenced } from "./crm.server";
 import { saveBase64Image } from "@/lib/image-upload.server";
-import { deleteImageRef, isManagedImageRef } from "@/lib/storage.server";
+import { releaseUnreferencedImageRef } from "./crm.server";
 import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate, ProductImageKind } from "@/lib/types";
 import { nowUtc } from "@/lib/format";
 
@@ -37,11 +36,8 @@ async function getItemRow(db: AsyncDb, id: number): Promise<GalleryCollectionIte
 }
 
 async function deleteUnreferencedPaths(paths: string[]): Promise<void> {
-  const db = getDb();
   for (const path of [...new Set(paths)]) {
-    if (isManagedImageRef(path) && !(await isPublicImagePathReferenced(db, path))) {
-      await deleteImageRef(path);
-    }
+    await releaseUnreferencedImageRef(path);
   }
 }
 

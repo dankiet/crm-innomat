@@ -11,8 +11,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
 
+import { contentHashOf } from "@/lib/image-asset-refs";
 import { StorageClient } from "@supabase/storage-js";
 
 let storageClient: StorageClient | null = null;
@@ -53,7 +53,7 @@ const MIME_BY_EXT: Record<string, string> = {
 };
 
 function filenameFor(buffer: Buffer, ext: string): string {
-  const hash = createHash("sha256").update(buffer).digest("hex");
+  const hash = contentHashOf(buffer);
   const safeExt = ext.startsWith(".") ? ext : `.${ext}`;
   return `${hash}${safeExt.toLowerCase()}`;
 }

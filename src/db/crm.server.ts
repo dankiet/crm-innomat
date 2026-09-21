@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage.server";
-import { normalizeUploadImageBuffer } from "@/lib/image-upload.server";
+import { normalizeUploadImageBufferMeta } from "@/lib/image-upload.server";
+import {
+  ensureImageAssetForRef,
+  getOrCreateImageAsset,
+  markImageAssetOrphanedForPath,
+} from "@/lib/image-assets.server";
+import { sha256FromRef, storageKeyForRef } from "@/lib/image-asset-refs";
 import path from "node:path";
 import { getDb, type SqlValue } from "./index.server";
 import { unitPriceForProduct, effectiveDiscountPct } from "@/lib/pricing";
@@ -259,9 +265,7 @@ export async function deleteProduct(id: number): Promise<{ ok: true; code: strin
   await runTx();
 
   for (const web of new Set(imagePaths)) {
-    if (!web || !isManagedImageRef(web)) continue;
-    if (await isPublicImagePathReferenced(db, web)) continue;
-    await deleteImageRef(web);
+    await releaseUnreferencedImageRef(web);
   }
 
   return { ok: true, code: product.code };
@@ -285,6 +289,18 @@ export async function isPublicImagePathReferenced(
       )
       .get(publicPath, publicPath, publicPath, publicPath, publicPath),
   );
+}
+
+/**
+ * Xoá physical image + đánh dấu orphan trong registry — CHỈ khi ref là managed
+ * và không còn bảng nào trỏ tới. Dùng ở mọi điểm xoá (product/gallery/mapping).
+ */
+export async function releaseUnreferencedImageRef(ref: string): Promise<void> {
+  if (!ref || !isManagedImageRef(ref)) return;
+  const db = getDb();
+  if (await isPublicImagePathReferenced(db, ref)) return;
+  await deleteImageRef(ref);
+  await markImageAssetOrphanedForPath(db, ref);
 }
 
 async function syncPrimaryImagePath(productId: number) {
@@ -453,13 +469,39 @@ export async function addProductImage(input: {
 
   const created = (await listProductImages(input.product_id)).find((image) => image.id === newId);
   if (!created) throw new Error("Không thể đọc ảnh vừa thêm");
+  // Flow add-by-path (kể cả addProductImageByPathFn): đăng ký best-effort theo ref.
+  await ensureImageAssetForRef(getDb(), pathStr);
   return created;
 }
 
 /** Chuẩn ảnh SP khi upload: cạnh dài tối đa (giữ tỉ lệ). */
 
-async function saveManagedImage(buffer: Buffer, ext: string): Promise<string> {
-  return await putImageBuffer(buffer, ext);
+async function saveManagedImage(
+  buffer: Buffer,
+  ext: string,
+  meta?: { width: number; height: number; mimeType: string },
+): Promise<string> {
+  const ref = await putImageBuffer(buffer, ext);
+  if (meta) {
+    const sha256 = sha256FromRef(ref);
+    if (sha256) {
+      try {
+        await getOrCreateImageAsset(getDb(), {
+          sha256,
+          storageKey: storageKeyForRef(ref),
+          mimeType: meta.mimeType,
+          byteSize: Buffer.byteLength(buffer),
+          width: meta.width,
+          height: meta.height,
+        });
+      } catch (error) {
+        console.error(
+          `[image-assets] register_failed ${error instanceof Error ? error.message.slice(0, 120) : String(error)}`,
+        );
+      }
+    }
+  }
+  return ref;
 }
 
 /** Lưu file upload vào public/images theo hash nội dung sau normalize. */
@@ -486,8 +528,8 @@ export async function uploadProductImageFile(input: {
     throw new Error("Ảnh quá lớn (tối đa 12MB)");
   }
 
-  const normalized = await normalizeUploadImageBuffer(rawBuf);
-  const publicPath = await saveManagedImage(normalized, ".webp");
+  const { buffer: normalized, width, height, mimeType } = await normalizeUploadImageBufferMeta(rawBuf);
+  const publicPath = await saveManagedImage(normalized, ".webp", { width, height, mimeType });
   return await addProductImage({
     product_id: input.product_id,
     path: publicPath,
@@ -632,9 +674,7 @@ export async function deleteProductImage(imageId: number): Promise<{
   await syncPrimaryImagePath(row.product_id);
 
   // Chỉ xóa file được CRM quản lý khi không còn bản ghi nào dùng chung path.
-  if (isManagedImageRef(row.path) && !(await isPublicImagePathReferenced(db, row.path))) {
-    await deleteImageRef(row.path);
-  }
+  await releaseUnreferencedImageRef(row.path);
 
   return {
     product_id: row.product_id,
@@ -1432,8 +1472,8 @@ export async function uploadMappingImageFile(input: {
     throw new Error("Ảnh quá lớn (tối đa 12MB)");
   }
 
-  const normalized = await normalizeUploadImageBuffer(rawBuf);
-  return { path: await saveManagedImage(normalized, ".webp") };
+  const { buffer: normalized, width, height, mimeType } = await normalizeUploadImageBufferMeta(rawBuf);
+  return { path: await saveManagedImage(normalized, ".webp", { width, height, mimeType }) };
 }
 
 /**
