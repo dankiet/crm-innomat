@@ -3,11 +3,11 @@
 Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:migrate`
 (idempotent — mọi lệnh đều `IF NOT EXISTS` / `IF EXISTS`, chạy lại an toàn).
 
-## 25 bảng
+## 26 bảng
 
-Số dòng thật của từng bảng (đo 2026-09-19 trên DB production): xem
-[audit-2026-09-19](audit-2026-09-19.md) §G0b — **không chép lại ở đây** để tránh hai bản số liệu
-trôi lệch nhau. §G cũng ghi rõ `public` có đúng 25 bảng, **0 bảng mồ côi**.
+> Số dòng thật của từng bảng: xem [audit-2026-09-19](audit-2026-09-19.md) §G0b — **không
+> chép lại ở đây** để tránh hai bản số liệu trôi lệch nhau. Mốc đó đo 25 bảng; từ 2026-09-21
+> có thêm `image_assets` (Image Asset Registry) → **26 bảng**.
 
 ### Catalog sản phẩm
 
@@ -74,6 +74,7 @@ kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [n
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `gallery_collections`      | Bộ sưu tập hình, có `cover_path`                                                                                                                       |
 | `gallery_collection_items` | `UNIQUE(collection_id, path)`, `sort_order`; giữ `product_code`/`product_name` để hiển thị kể cả khi sản phẩm bị xoá (`product_id ON DELETE SET NULL`) |
+| `image_assets`             | **Registry ảnh chuẩn** — 1 record / 1 physical image (content-addressed). `UNIQUE(sha256)`; `storage_key` = `<sha256>.<ext>`; metadata `mime_type`/`byte_size`/`width`/`height` lấy tại bước upload (sharp); `last_referenced_at` touch mỗi lần được trỏ tới; `orphaned_at` khi path cuối bị xoá. Các bảng cũ (product_images.path, products.image_path, customer_mapping_items.image_path/custom_product_image_path, gallery_collection_items.path) VẪN giữ path — chưa chuyển FK, xem service `src/lib/image-assets.server.ts` |
 
 ### Nhật ký
 
