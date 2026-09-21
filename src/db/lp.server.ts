@@ -25,7 +25,7 @@ import type {
   LpMaterial,
   ShortlistContextItem,
 } from "@/lib/lp-types";
-import { nowLocal } from "@/lib/format";
+import { nowUtc } from "@/lib/format";
 
 function clip(raw: string | undefined | null, max: number): string {
   return (raw ?? "").trim().slice(0, max);
@@ -521,7 +521,7 @@ export async function createLpLead(
     : null;
   if (recent) return { ok: true, duplicate: true };
 
-  const ts = nowLocal();
+  const ts = nowUtc();
   const consent = input.consent_marketing ? 1 : 0;
 
   // Extract shortlist codes from both input.shortlist_codes and input.shortlist_details
@@ -640,7 +640,7 @@ export async function setLpLeadStatus(
 ): Promise<{ ok: true }> {
   await getDb()
     .prepare("UPDATE lp_leads SET status = ?, handled_by = ?, handled_at = ? WHERE id = ?")
-    .run(status, userId, nowLocal(), id);
+    .run(status, userId, nowUtc(), id);
   return { ok: true };
 }
 
@@ -703,7 +703,7 @@ export async function convertLpLeadToCustomer(
       owner_id: ownerId,
     });
 
-    const ts = nowLocal();
+    const ts = nowUtc();
 
     // 2. Tạo Note nghiệp vụ chi tiết cho Sales
     const breakdownText =
@@ -791,7 +791,7 @@ async function getLpSetting(key: string, defaultValue = ""): Promise<string> {
 
 async function setLpSetting(key: string, value: string): Promise<void> {
   const db = getDb();
-  const ts = nowLocal();
+  const ts = nowUtc();
   await db
     .prepare(
       `INSERT INTO lp_settings (key, value, updated_at)

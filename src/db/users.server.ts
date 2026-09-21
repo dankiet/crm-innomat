@@ -7,7 +7,7 @@ import {
   validateUsername,
 } from "./auth.server";
 import type { AppUser, Role, SessionUser } from "@/lib/auth-types";
-import { nowLocal } from "@/lib/format";
+import { nowUtc } from "@/lib/format";
 
 export async function listUsers(): Promise<AppUser[]> {
   return await getDb()
@@ -37,7 +37,7 @@ export async function createUserAsync(input: {
   if (existing) throw new Error(`Username "${username}" đã tồn tại`);
 
   const password_hash = await hashPassword(input.password);
-  const ts = nowLocal();
+  const ts = nowUtc();
   await getDb()
     .prepare(
       `INSERT INTO users (username, password_hash, display_name, role, phone, is_active, created_at, updated_at)
@@ -113,7 +113,7 @@ export async function updateUser(
       `UPDATE users SET display_name = ?, role = ?, is_active = ?, phone = ?, updated_at = ?
        WHERE id = ?`,
     )
-    .run(displayName, role, isActive, (input.phone !== undefined ? input.phone.trim() : (existing.phone ?? "")), nowLocal(), id);
+    .run(displayName, role, isActive, (input.phone !== undefined ? input.phone.trim() : (existing.phone ?? "")), nowUtc(), id);
 
   if (!isActive) {
     await deleteSessionsForUser(id);
@@ -143,7 +143,7 @@ export async function resetUserPassword(
   const password_hash = await hashPassword(newPassword);
   await getDb()
     .prepare("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
-    .run(password_hash, nowLocal(), id);
+    .run(password_hash, nowUtc(), id);
 
   // Kick other sessions except allow actor to keep theirs if self-reset
   if (actor.id !== id) {
@@ -178,7 +178,7 @@ export async function assignCustomerOwner(
     .prepare(
       "UPDATE customers SET owner_id = ?, updated_at = ? WHERE id = ?",
     )
-    .run(ownerId, nowLocal(), customerId);
+    .run(ownerId, nowUtc(), customerId);
 
   return {
     customer_id: customerId,

@@ -13,14 +13,15 @@ export function formatVNDShort(amount: number): string {
 }
 
 /**
- * Timestamp `YYYY-MM-DD HH:mm:ss` (UTC) — định dạng dùng thống nhất cho mọi cột
- * `created_at` / `updated_at` / `last_seen_at` trong schema.
+ * Timestamp `YYYY-MM-DD HH:mm:ss` — luôn là GIỜ UTC (từng bị đặt tên `nowLocal`
+ * gây hiểu nhầm; đã đổi tên 2026-09-19, không đổi giá trị).
+ * Định dạng dùng thống nhất cho mọi cột `created_at` / `updated_at` / `last_seen_at`.
  */
-export function nowLocal(): string {
+export function nowUtc(): string {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
 
-/** Timestamp sau `days` ngày, cùng định dạng với `nowLocal` (dùng cho `expires_at`). */
+/** Timestamp sau `days` ngày, cùng định dạng với `nowUtc` (dùng cho `expires_at`). */
 export function expiresAt(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);

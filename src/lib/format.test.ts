@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { escapeHtml, formatVND, formatVNDShort, nowLocal } from "./format.ts";
+import { escapeHtml, formatVND, formatVNDShort, nowUtc } from "./format.ts";
 
 test("formatVND: dấu chấm nghìn + hậu tố đ", () => {
   assert.equal(formatVND(0), "0đ");
@@ -28,6 +28,6 @@ test("escapeHtml: null/undefined → rỗng", () => {
   assert.equal(escapeHtml(0), "0");
 });
 
-test("nowLocal: đúng dạng YYYY-MM-DD HH:mm:ss", () => {
-  assert.match(nowLocal(), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+test("nowUtc: đúng dạng YYYY-MM-DD HH:mm:ss", () => {
+  assert.match(nowUtc(), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 });

@@ -1,4 +1,4 @@
-import { getDb } from "./index.server";
+import { getDb } from "../db/index.server";
 import { VAT_RATE } from "@/lib/pricing";
 import { readImageBytes } from "@/lib/storage.server";
 import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";

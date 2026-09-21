@@ -8,7 +8,7 @@
 import { randomBytes } from "node:crypto";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb } from "./index.server";
-import { expiresAt, nowLocal } from "@/lib/format";
+import { expiresAt, nowUtc } from "@/lib/format";
 
 const PUBLIC_SESSION_COOKIE = "public_session";
 const PUBLIC_SESSION_DAYS = 30;
@@ -94,7 +94,7 @@ async function upsertPublicUser(
   rawMeta?: unknown,
 ): Promise<PublicUser> {
   const db = getDb();
-  const now = nowLocal();
+  const now = nowUtc();
   const metaJson = rawMeta ? JSON.stringify(rawMeta) : null;
 
   const row = await db
@@ -130,7 +130,7 @@ async function createPublicSession(
 ): Promise<{ token: string; expiresAt: string }> {
   const token = randomBytes(32).toString("hex");
   const exp = expiresAt(PUBLIC_SESSION_DAYS);
-  const now = nowLocal();
+  const now = nowUtc();
 
   await getDb()
     .prepare(
@@ -149,7 +149,7 @@ async function createPublicSession(
 export async function getCurrentPublicUser(): Promise<PublicUser | null> {
   const token = getPublicSessionToken();
   if (!token) return null;
-  const now = nowLocal();
+  const now = nowUtc();
 
   const user = await getDb()
     .prepare(
@@ -305,7 +305,7 @@ export async function handleSupabaseCallback(params: {
             lpSlug = matchSlug[1];
           }
 
-          const now = nowLocal();
+          const now = nowUtc();
           await getDb()
             .prepare(
               `INSERT INTO lp_leads

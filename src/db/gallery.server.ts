@@ -3,7 +3,7 @@ import { isPublicImagePathReferenced } from "./crm.server";
 import { saveBase64Image } from "@/lib/image-upload.server";
 import { deleteImageRef, isManagedImageRef } from "@/lib/storage.server";
 import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate, ProductImageKind } from "@/lib/types";
-import { nowLocal } from "@/lib/format";
+import { nowUtc } from "@/lib/format";
 
 const MAX_BULK_IMAGE_IDS = 5_000;
 const BULK_CHUNK_SIZE = 400;
@@ -102,7 +102,7 @@ export async function createGalleryCollection(input: {
   createdBy?: number | null;
 }): Promise<GalleryCollection> {
   const db = getDb();
-  const now = nowLocal();
+  const now = nowUtc();
   const result = await db
     .prepare(
       `INSERT INTO gallery_collections
@@ -126,7 +126,7 @@ export async function updateGalleryCollection(input: {
        SET name = ?, description = ?, updated_at = ?
        WHERE id = ?`,
     )
-    .run(cleanName(input.name), input.description?.trim() ?? "", nowLocal(), input.id);
+    .run(cleanName(input.name), input.description?.trim() ?? "", nowUtc(), input.id);
   if (!result.changes) throw new Error("Không tìm thấy bộ sưu tập");
   const updatedCollection = (await getCollectionRow(db, input.id))!;
   if (oldCollection && updatedCollection.name !== oldCollection.name) {
@@ -223,7 +223,7 @@ export async function addGalleryProductImages(input: {
            WHERE i.id IN (${placeholders}) AND i.path <> ''
            ON CONFLICT (collection_id, path) DO NOTHING`,
         )
-        .run(input.collectionId, nextSort, nowLocal(), ...(chunk as SqlValue[]));
+        .run(input.collectionId, nextSort, nowUtc(), ...(chunk as SqlValue[]));
       added += result.changes;
       await tx
         .prepare(
@@ -252,7 +252,7 @@ export async function addGalleryProductImages(input: {
              updated_at = ?
          WHERE id = ?`,
       )
-      .run(first?.path ?? "", nowLocal(), input.collectionId);
+      .run(first?.path ?? "", nowUtc(), input.collectionId);
   })();
 
   const collection = await getCollectionRow(db, input.collectionId);
@@ -288,7 +288,7 @@ export async function uploadGalleryImage(input: {
           path,
           input.caption?.trim() ?? "",
           Number(maxRow?.max_sort ?? -1) + 1,
-          nowLocal(),
+          nowUtc(),
         );
       await tx
         .prepare(
@@ -297,7 +297,7 @@ export async function uploadGalleryImage(input: {
                updated_at = ?
            WHERE id = ?`,
         )
-        .run(path, nowLocal(), input.collectionId);
+        .run(path, nowUtc(), input.collectionId);
       return (await tx
         .prepare("SELECT * FROM gallery_collection_items WHERE collection_id = ? AND path = ?")
         .get<GalleryCollectionItem>(input.collectionId, path))!;
@@ -327,7 +327,7 @@ export async function setGalleryCover(input: {
     await applyGalleryItemOrder(tx, input.collectionId, itemIds);
     const result = await tx
       .prepare("UPDATE gallery_collections SET cover_path = ?, updated_at = ? WHERE id = ?")
-      .run(item.path, nowLocal(), input.collectionId);
+      .run(item.path, nowUtc(), input.collectionId);
     if (!result.changes) throw new Error("Không tìm thấy bộ sưu tập");
   })();
   return (await getCollectionRow(db, input.collectionId))!;
@@ -357,7 +357,7 @@ export async function reorderGalleryItems(input: {
     await applyGalleryItemOrder(tx, input.collectionId, itemIds);
     await tx
       .prepare("UPDATE gallery_collections SET updated_at = ? WHERE id = ?")
-      .run(nowLocal(), input.collectionId);
+      .run(nowUtc(), input.collectionId);
   })();
   return { ok: true };
 }
@@ -385,7 +385,7 @@ export async function removeGalleryItem(itemId: number): Promise<{
              updated_at = ?
          WHERE id = ?`,
       )
-      .run(item.path, next?.path ?? "", nowLocal(), item.collection_id);
+      .run(item.path, next?.path ?? "", nowUtc(), item.collection_id);
   })();
   await deleteUnreferencedPaths([item.path]);
   return { ok: true, collectionId: item.collection_id };

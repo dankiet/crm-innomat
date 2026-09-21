@@ -1,4 +1,4 @@
-import { getDb } from "./index.server";
+import { getDb } from "../db/index.server";
 import { logoDataUrl } from "@/lib/brand-assets.server";
 import {
   EXPORT_AREA_MAX_SIDE,
@@ -7,7 +7,7 @@ import {
   exportStampDataUrl,
   mapLimit,
 } from "@/lib/image-export.server";
-import { normalizeMappingPriceBasis } from "./crm.server";
+import { normalizeMappingPriceBasis } from "../db/crm.server";
 import { basisToDiscountType, unitPriceForProduct } from "@/lib/pricing";
 import { escapeHtml } from "@/lib/format";
 

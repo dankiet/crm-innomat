@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { getDb } from "./index.server";
 import type { AppUser, Role, SessionUser } from "@/lib/auth-types";
-import { expiresAt, nowLocal } from "@/lib/format";
+import { expiresAt, nowUtc } from "@/lib/format";
 
 const scryptAsync = promisify(scrypt);
 
@@ -63,7 +63,7 @@ async function createSession(
       `INSERT INTO sessions (id, user_id, expires_at, created_at, last_seen_at, user_agent)
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(sessionId, userId, exp, nowLocal(), nowLocal(), userAgent.slice(0, 300));
+    .run(sessionId, userId, exp, nowUtc(), nowUtc(), userAgent.slice(0, 300));
   return { sessionId, expiresAt: exp };
 }
 
@@ -97,7 +97,7 @@ function getSessionIdFromCookie(): string | undefined {
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const sid = getSessionIdFromCookie();
   if (!sid) return null;
-  const now = nowLocal();
+  const now = nowUtc();
   const touchBefore = new Date(Date.now() - 15 * 60 * 1000)
     .toISOString()
     .slice(0, 19)

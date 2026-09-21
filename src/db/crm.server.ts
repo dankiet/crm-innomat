@@ -29,7 +29,7 @@ import type {
 import { IMAGE_ROOM_TAGS } from "@/lib/types";
 import { isPhoneMatchable, phonesMatch } from "@/lib/phone";
 import { statusMeta } from "@/lib/types";
-import { nowLocal } from "@/lib/format";
+import { nowUtc } from "@/lib/format";
 
 /** Bỏ dấu tiếng Việt + chỉ giữ [A-Z0-9], viết hoa. VD "Kim Áo" → "KIMAO". */
 function slugifyCode(raw: string): string {
@@ -362,7 +362,7 @@ export async function setProductImageRoomTags(
   if (slugs.length > 0 && row.kind !== "concept") {
     throw new Error("Chỉ ảnh Concept mới được gán room tag");
   }
-  const now = nowLocal();
+  const now = nowUtc();
   await db.transaction(async (tx) => {
     await tx
       .prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?")
@@ -608,7 +608,7 @@ export async function deleteProductImage(imageId: number): Promise<{
                  updated_at = ?
              WHERE id = ?`,
           )
-          .run(row.path, next?.path ?? "", nowLocal(), collectionId);
+          .run(row.path, next?.path ?? "", nowUtc(), collectionId);
       }
     }
 
@@ -828,7 +828,7 @@ export async function createCustomer(input: {
   const email = assertEmailOptional(input.email);
   const company = (input.company ?? "").trim();
 
-  const ts = nowLocal();
+  const ts = nowUtc();
   const info = await db
     .prepare(
       `INSERT INTO customers (name, source, phone, email, company, short_name, region, status, note, owner_id, created_at, updated_at)
@@ -853,7 +853,7 @@ export async function createCustomer(input: {
 export async function updateCustomerStatus(id: number, status: CustomerStatus) {
   await getDb()
     .prepare("UPDATE customers SET status = ?, updated_at = ? WHERE id = ?")
-    .run(status, nowLocal(), id);
+    .run(status, nowUtc(), id);
   return await getCustomer(id);
 }
 
@@ -1009,7 +1009,7 @@ export async function addManualCustomerProduct(input: {
           (customer_id, product_id, product_code, product_name, sample_sent, source, created_at)
          VALUES (?, ?, ?, ?, 0, 'manual', ?)`,
       )
-      .run(input.customer_id, product.id, product.code, product.name, nowLocal());
+      .run(input.customer_id, product.id, product.code, product.name, nowUtc());
     rowId = Number(info.lastInsertRowid);
   }
 
@@ -1055,7 +1055,7 @@ export async function setCustomerProductSampleSent(
   if (!existing) throw new Error("Không tìm thấy dòng sản phẩm");
   await db
     .prepare("UPDATE customer_product_samples SET sample_sent = ?, sample_sent_at = ? WHERE id = ?")
-    .run(sent ? 1 : 0, sent ? nowLocal() : null, id);
+    .run(sent ? 1 : 0, sent ? nowUtc() : null, id);
   return { ok: true };
 }
 
@@ -1555,7 +1555,7 @@ export async function updateCustomer(
       (input.region ?? existing.region).trim(),
       input.status ?? existing.status,
       (input.note ?? existing.note).trim(),
-      nowLocal(),
+      nowUtc(),
       id,
     );
   return (await getCustomer(id))!;
@@ -1743,7 +1743,7 @@ async function upsertCustomerProductSampleFromQuote(
         (customer_id, product_id, product_code, product_name, sample_sent, source, created_at)
        VALUES (?, ?, ?, ?, 0, 'quote', ?)`,
       )
-      .run(customerId, productId, productCode, productName, nowLocal());
+      .run(customerId, productId, productCode, productName, nowUtc());
   }
 }
 
@@ -1778,7 +1778,7 @@ export async function createQuote(input: {
   if (!input.items?.length) throw new Error("Báo giá cần ít nhất 1 sản phẩm");
 
   const code = await buildEntityCode("QT", "quotes", customer);
-  const ts = nowLocal();
+  const ts = nowUtc();
   const discountType = input.discount_type ?? "custom";
   const includeVat = input.prices_include_vat ? 1 : 0;
   const shippingFee = Math.round(Number(input.shipping_fee) || 0);
@@ -1947,7 +1947,7 @@ export async function updateQuote(input: {
     input.shipping_fee !== undefined
       ? Math.round(Number(input.shipping_fee) || 0)
       : (existing.shipping_fee ?? 0);
-  const ts = nowLocal();
+  const ts = nowUtc();
 
   const runTx = db.transaction(async () => {
     await db
@@ -2109,7 +2109,7 @@ async function createOrder(input: {
     throw new Error("Không tìm thấy khách hàng");
   }
   const code = await buildEntityCode("DH", "orders", customer);
-  const ts = nowLocal();
+  const ts = nowUtc();
   const shippingFee = Math.round(Number(input.shipping_fee) || 0);
   const info = await db
     .prepare(
@@ -2161,7 +2161,7 @@ export async function updateOrderStatus(id: number, status: OrderStatus): Promis
   }
   await getDb()
     .prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?")
-    .run(status, nowLocal(), id);
+    .run(status, nowUtc(), id);
 
   return (await getOrder(id))!;
 }
@@ -2207,7 +2207,7 @@ export async function createOrderFromQuote(quoteId: number): Promise<Order> {
   });
   await db
     .prepare("UPDATE quotes SET status = 'accepted', updated_at = ? WHERE id = ?")
-    .run(nowLocal(), quoteId);
+    .run(nowUtc(), quoteId);
   return order;
 }
 
@@ -2247,7 +2247,7 @@ export async function addPayment(input: {
       input.customer_id,
       input.order_id ?? null,
       Math.round(input.amount),
-      input.paid_at ?? nowLocal(),
+      input.paid_at ?? nowUtc(),
       input.note ?? "",
     );
   return (await getDb()
@@ -2435,7 +2435,7 @@ export async function createNote(input: {
   // Must set created_at explicitly — column default is '' and listNotes
   // orders by created_at DESC, so blank timestamps sink new notes to the
   // bottom (or off the LIMIT window) and look like they never synced.
-  const ts = nowLocal();
+  const ts = nowUtc();
   const info = await getDb()
     .prepare(
       `INSERT INTO notes (customer_id, author, author_user_id, content, created_at)

@@ -7,7 +7,7 @@
  */
 import { getDb, type SqlValue } from "./index.server";
 import { getProduct, loadProductImageRoomTags, normalizeRoomSlugs } from "./crm.server";
-import { nowLocal } from "@/lib/format";
+import { nowUtc } from "@/lib/format";
 import type { ImageRoomTagSlug, Product, ProductImageKind, ProductImageRoomTag } from "@/lib/types";
 
 // --- RECOVERED FUNCTIONS ---
@@ -624,7 +624,7 @@ export async function setImageRoomTagsDirect(
     .get<{ id: number; kind: ProductImageKind; product_id: number }>(imageId));
   if (!row) throw new Error("Không tìm thấy ảnh này");
   const slugs = normalizeRoomSlugs(roomSlugs);
-  const now = nowLocal();
+  const now = nowUtc();
   await db.transaction(async (tx) => {
     if (slugs.length > 0 && row.kind !== "concept") {
       await tx.prepare("UPDATE product_images SET kind = 'concept' WHERE id = ?").run(imageId);
@@ -658,7 +658,7 @@ export async function bulkSetProductImageRoomTags(
   if (!cleanIds.length) return { updated: 0 };
   const slugs = normalizeRoomSlugs(roomSlugs);
   const db = getDb();
-  const now = nowLocal();
+  const now = nowUtc();
   let updated = 0;
 
   await db.transaction(async (tx) => {

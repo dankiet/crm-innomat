@@ -864,7 +864,7 @@ export const exportMappingPrintFn = createServerFn({ method: "POST" })
     const { requireUser, assertCanAccessCustomer } = await import("@/db/auth.server");
     const me = await requireUser();
     const { exportMappingToHtml, getMappingCustomerId } =
-      await import("@/db/export-mapping.server");
+      await import("@/render/export-mapping.server");
     const customerId = await getMappingCustomerId(data.mappingId);
     if (customerId == null) throw new Error("Không tìm thấy mapping");
     await assertCanAccessCustomer(me, customerId);
@@ -1523,7 +1523,7 @@ export const exportQuotePrintFn = createServerFn({ method: "POST" })
     const quote = await getQuote(data.quoteId);
     if (!quote) throw new Error("Không tìm thấy báo giá");
     await assertCanAccessCustomer(me, quote.customer_id);
-    const { exportQuoteToHtml } = await import("@/db/export-quote.server");
+    const { exportQuoteToHtml } = await import("@/render/export-quote.server");
     const { writeAudit } = await import("@/db/audit.server");
     const result = await exportQuoteToHtml(
       data.quoteId,
