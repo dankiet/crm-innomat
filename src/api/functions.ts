@@ -13,7 +13,7 @@ import type {
   ImageRoomTagSlug,
 } from "@/lib/types";
 import type { Role } from "@/lib/auth-types";
-import type { FlatMediaSort, FlatMediaTab } from "@/db/crm.server";
+import type { FlatMediaSort, FlatMediaTab } from "@/db/media.server";
 // ─── Auth ───────────────────────────────────────────────────
 
 export const fetchMe = createServerFn({ method: "GET" }).handler(async () => {
@@ -363,7 +363,7 @@ export const updateProductFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
-    const { updateProduct } = await import("@/db/crm.server");
+    const { updateProduct } = await import("@/db/media.server");
     const { writeAudit } = await import("@/db/audit.server");
     const { id, ...rest } = data;
     const product = await updateProduct(id, rest);
@@ -407,7 +407,7 @@ export const createProductFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
-    const { createProduct } = await import("@/db/crm.server");
+    const { createProduct } = await import("@/db/media.server");
     const { writeAudit } = await import("@/db/audit.server");
     const product = await createProduct(data);
     await writeAudit({
@@ -1763,7 +1763,7 @@ export const fetchFlatMediaImagesFn = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { requireUser } = await import("@/db/auth.server");
     await requireUser();
-    const { listFlatMediaImages } = await import("@/db/crm.server");
+    const { listFlatMediaImages } = await import("@/db/media.server");
     return await listFlatMediaImages(data);
   });
 
@@ -1777,7 +1777,7 @@ export const bulkSetProductImageKindFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
-    const { bulkSetProductImageKind } = await import("@/db/crm.server");
+    const { bulkSetProductImageKind } = await import("@/db/media.server");
     const { writeAudit } = await import("@/db/audit.server");
     const result = await bulkSetProductImageKind(data.imageIds, data.kind);
     await writeAudit({
@@ -1800,7 +1800,7 @@ export const setImageRoomTagsDirectFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
-    const { setImageRoomTagsDirect } = await import("@/db/crm.server");
+    const { setImageRoomTagsDirect } = await import("@/db/media.server");
     const { writeAudit } = await import("@/db/audit.server");
     const tags = await setImageRoomTagsDirect(data.imageId, data.roomSlugs);
     await writeAudit({
@@ -1825,7 +1825,7 @@ export const bulkSetProductImageRoomTagsFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireAdmin } = await import("@/db/auth.server");
     const me = await requireAdmin();
-    const { bulkSetProductImageRoomTags } = await import("@/db/crm.server");
+    const { bulkSetProductImageRoomTags } = await import("@/db/media.server");
     const { writeAudit } = await import("@/db/audit.server");
     const result = await bulkSetProductImageRoomTags(data.imageIds, data.roomSlugs, data.mode);
     await writeAudit({

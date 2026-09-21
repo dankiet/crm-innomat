@@ -3,14 +3,8 @@
  * Upsert theo Mã báo giá (code). Không đụng ảnh.
  */
 import * as XLSX from "xlsx";
-import {
-  createProduct,
-  getProduct,
-  listProducts,
-  updateProduct,
-  type ProductCreateInput,
-  type ProductUpdate,
-} from "./crm.server";
+import { createProduct, updateProduct, type ProductCreateInput, type ProductUpdate } from "./media.server";
+import { getProduct, listProducts } from "./crm.server";
 import type { Product } from "@/lib/types";
 
 /** Header = tên cột DB (snake_case) */

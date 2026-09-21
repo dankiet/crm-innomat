@@ -53,7 +53,7 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ProductImage";
-import type { FlatMediaItem, FlatMediaSort, FlatMediaTab } from "@/db/crm.server";
+import type { FlatMediaItem, FlatMediaSort, FlatMediaTab } from "@/db/media.server";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { ImageRoomTagPicker } from "@/components/ImageRoomTagPicker";
 import { cn } from "@/lib/utils";
