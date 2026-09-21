@@ -42,6 +42,8 @@ URL là nơi giữ trạng thái lọc — người dùng copy link là bạn th
 | `/bao-gia`    | `q`, `tab`                                                                                                                                                      | `tab` chỉ nhận `quotes` \| `orders`           |
 | `/thu-vien`   | `sort`, `cat`, `c`, `v`                                                                                                                                         | `c` = collection id, `v` = index viewer       |
 | `/san-pham`   | `nhom`, `q`, `colors`, `surfaces`, `sizes`, `shapes`, `textures`, `collections`, `supplier`, `hot`, `web`, `view`, `stockLocation`, `sort` | Các filter nhiều giá trị nhận cả array và CSV |
+| `/khong-gian` | `category`, `room`, `status`, `color`, `q`, `page`, `limit`                                                                               | `room` = tab không gian (`living_room`…), `status` = `"1"` \| `"0"` (mặc định `all`), `color` = id palette, `limit` ∈ {24, 48, 96} |
+| `/luu-tru`    | `tab`, `category`, `roomSlug`, `publicFilter`, `colors`, `surfaces`, `shapes`, `textures`, `collections`, `q`, `sort`, `page`, `pageSize` | `tab` = `map` \| `concept` \| `featured` \| `unassigned` (mặc định `all`), `roomSlug` = id thẻ phòng, `publicFilter` = `public` \| `hidden`, `sort` = `oldest` \| `code_asc` \| `code_desc`, `pageSize` ∈ {24, 48, 96} |
 | `/leads`      | `status`                                                                                                                                   | `new` \| `contacted` \| `converted` \| `spam` \| `all` |
 
 Mọi route đều có `validateSearch` để chuẩn hoá — giá trị lạ bị bỏ (`undefined`), không throw. Nhờ vậy

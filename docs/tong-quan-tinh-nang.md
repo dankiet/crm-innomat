@@ -148,7 +148,9 @@ UTM).
 
 ## 11. Lookbook / Concept — `/khong-gian`
 
-`/khong-gian` — ảnh bối cảnh (Concept) gắn theo không gian.
+`/khong-gian` — ảnh bối cảnh (Concept) gắn theo không gian. Bộ lọc (không gian,
+nhóm, trạng thái LD-page, tông màu, tìm kiếm) + phân trang **lưu trong URL**
+(`validateSearch`, giá trị mặc định bị bỏ — link chia sẻ tái hiện đúng trạng thái).
 
 - `listCrmConceptImages` — danh sách cho CRM.
 - `setConceptImagePublic` — bật/tắt hiển thị công khai trên LP.
@@ -161,6 +163,8 @@ Kho ảnh vận hành: mọi ảnh sản phẩm + phân loại.
 
 - **Tab**: Tất cả / Chỉ ảnh MAP / Bối cảnh (Concept) / Tuyển chọn Trang chủ / Chưa gán thẻ.
 - **Bộ lọc**: Màu, Bề mặt, Kiểu dáng, **Hiệu ứng vân**, Bộ sưu tập (lọc server-side).
+- **Phân trang + bộ lọc lưu trong URL** (`validateSearch`, giá trị mặc định bị bỏ —
+  link chia sẻ tái hiện đúng trạng thái).
 - **Thao tác nhanh**: gán thẻ phòng (`product_image_room_tags`), đặt hạng "Tuyển chọn",
   bật/tắt hiển thị trên LP, gán hàng loạt.
 - Nén ảnh WebP, xoá an toàn theo tham chiếu: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
