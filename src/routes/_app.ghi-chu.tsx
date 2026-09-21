@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { NewNoteDialog } from "@/components/NewNoteDialog";
 import { fetchNotes } from "@/api/functions";
@@ -39,9 +40,7 @@ function NotesPage() {
 
       <div className="bg-card ring-1 ring-black/5 rounded-xl overflow-hidden max-w-4xl">
         {notes.length === 0 ? (
-          <p className="p-12 text-center text-sm text-muted-foreground">
-            Chưa có ghi chú. Thêm ghi chú để theo dõi hoạt động bán hàng.
-          </p>
+          <EmptyState>Chưa có ghi chú. Thêm ghi chú để theo dõi hoạt động bán hàng.</EmptyState>
         ) : (
           notes.map((n, idx) => (
             <div

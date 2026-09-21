@@ -10,6 +10,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { fetchLpLeadsFn, setLpLeadStatusFn, convertLpLeadFn, deleteLpLeadFn } from "@/api/lp";
 import { LP_FORM_KIND_LABEL, LP_LEAD_STATUS_LABEL, type LpLead, type LpLeadStatus } from "@/lib/lp-types";
@@ -153,9 +154,7 @@ function LeadsPage() {
 
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-black/5">
         {leads.length === 0 ? (
-          <p className="p-12 text-center text-sm text-muted-foreground">
-            Chưa có lead nào ở trạng thái này.
-          </p>
+          <EmptyState>Chưa có lead nào ở trạng thái này.</EmptyState>
         ) : (
           leads.map((lead, idx) => (
             <div

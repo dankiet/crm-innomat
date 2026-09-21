@@ -1,5 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { PageFilterBar, PageSearchInput } from "@/components/PageFilterBar";
 import {
@@ -255,11 +256,11 @@ function DebtPage() {
 
       <div className="bg-card ring-1 ring-black/5 rounded-xl overflow-hidden">
         {visible.length === 0 ? (
-          <div className="p-12 text-center text-sm text-muted-foreground">
+          <EmptyState>
             {search.trim() || filter !== "all"
               ? "Không có khách phù hợp bộ lọc."
               : "Chưa có công nợ. Tạo đơn hàng từ báo giá để ghi nhận."}
-          </div>
+          </EmptyState>
         ) : (
           <div className="table-scroll">
           <table className="w-full text-sm min-w-[640px]">
