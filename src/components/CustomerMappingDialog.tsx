@@ -59,6 +59,7 @@ import {
 import { formatVND } from "@/lib/format";
 import { openProductQuickSheet, type ProductQuickSheetRow } from "@/lib/product-quick-sheet";
 import { basisToDiscountType, unitPriceForProduct } from "@/lib/pricing";
+import { autoPriceFor, blankDraft, key, type CustomProduct, type Draft } from "@/lib/mapping-draft";
 import type { Customer, CustomerMapping, MappingPriceBasis, Product } from "@/lib/types";
 import {
   buildExactCodeSet,
@@ -79,41 +80,8 @@ function basisLabel(basis: MappingPriceBasis): string {
 }
 
 /** Giá tự động của 1 phương án theo căn cứ giá — 0 khi chưa chọn sản phẩm. */
-function autoPriceFor(item: Draft, basis: MappingPriceBasis): number {
-  if (item.product) {
-    return unitPriceForProduct(item.product, basisToDiscountType(basis));
-  }
-  if (item.customProduct) {
-    return Number(item.customProduct.retailPrice.replace(/\D/g, "")) || 0;
-  }
-  return 0;
-}
 
-type Draft = {
-  key: string;
-  areaGroupKey: string;
-  collapsed: boolean;
-  imagePath: string;
-  imageDataUrl: string | null;
-  sourceName: string;
-  description: string;
-  size: string;
-  product: Product | null;
-  customProduct: CustomProduct | null;
-  /** "" = tự tính theo căn cứ giá; chuỗi số = giá chốt tay */
-  priceOverride: string;
-};
 
-type CustomProduct = {
-  code: string;
-  name: string;
-  size: string;
-  surface: string;
-  retailPrice: string;
-  imagePath: string;
-  imageDataUrl: string | null;
-  imageName: string;
-};
 
 type ImportItem = {
   key: string;
@@ -130,25 +98,7 @@ const MAX_PDF_PAGES = 50;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_PDF_BYTES = 100 * 1024 * 1024;
 
-function key() {
-  return Math.random().toString(36).slice(2);
-}
 
-function blankDraft(): Draft {
-  return {
-    key: key(),
-    areaGroupKey: key(),
-    collapsed: false,
-    imagePath: "",
-    imageDataUrl: null,
-    sourceName: "",
-    description: "",
-    size: "",
-    product: null,
-    customProduct: null,
-    priceOverride: "",
-  };
-}
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
