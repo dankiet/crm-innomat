@@ -152,10 +152,15 @@ UTM).
 nhóm, trạng thái LD-page, tông màu, tìm kiếm) + phân trang **lưu trong URL**
 (`validateSearch`, giá trị mặc định bị bỏ — link chia sẻ tái hiện đúng trạng thái).
 
+**Image Workspace**: `/khong-gian` (Lookbook mode) và `/luu-tru` (Kho ảnh mode) là
+hai mode của cùng một workspace — mode switch trên đầu trang, giữ `q` và ánh xạ
+`room` ↔ `roomSlug` khi chuyển. Lookbook có nút "Quản lý ảnh" (về Kho ảnh giữ
+context); card concept trong Kho ảnh có "Lookbook →" (sang Lookbook giữ room).
+
 - `listCrmConceptImages` — danh sách cho CRM.
 - `setConceptImagePublic` — bật/tắt hiển thị công khai trên LP.
 - `updateConceptDescription` — mô tả (AI description).
-- `demoteConceptImage` — bỏ khỏi LP.
+- `demoteConceptImage` — bỏ khỏi LP (concept → ảnh thường, về Kho ảnh).
 
 ## 12. Lưu trữ ảnh — `/luu-tru`
 
