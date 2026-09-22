@@ -51,6 +51,7 @@ import {
   type ProductImageRow,
 } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
+import { WorkspaceModeSwitch } from "@/components/image-workspace/WorkspaceModeSwitch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ProductImage";
 import type { FlatMediaItem, FlatMediaSort, FlatMediaTab } from "@/db/media.server";
@@ -211,6 +212,9 @@ function QuickRoomTagPopover({
             </span>
             <span className="text-[10px] text-muted-foreground font-mono">#{item.id}</span>
           </div>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Gán phòng sẽ đưa ảnh vào Concept và hiển thị trong Lookbook.
+          </p>
 
           <div className="grid grid-cols-1 gap-1 max-h-48 overflow-y-auto pr-1">
             {IMAGE_ROOM_TAGS.map((tag) => {
@@ -1017,11 +1021,20 @@ function MediaStoragePage() {
 
   return (
     <div ref={gridTopRef} className="space-y-5 pb-28">
-      <PageHeader
-        eyebrow="Landing Page"
-        title="Lưu trữ"
-        description="Quản lý toàn bộ tài nguyên ảnh sản phẩm: phân loại ảnh MAP, Concept, gán thẻ phòng Lookbook, chọn ảnh bìa Hero và 12 vị trí Tuyển chọn trang chủ."
-      />
+      {/* Workspace header + mode switch */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">
+            Image Workspace
+          </p>
+          <PageHeader
+            eyebrow="Landing Page"
+            title="Kho ảnh"
+            description="Quản lý toàn bộ tài nguyên ảnh sản phẩm: phân loại ảnh MAP, Concept, gán thẻ phòng Lookbook, chọn ảnh bìa Hero và 12 vị trí Tuyển chọn trang chủ."
+          />
+        </div>
+        <WorkspaceModeSwitch mode="assets" />
+      </div>
 
       {/* Filter toolbar — Cấu trúc 2 tầng chuẩn Advisor Astra 6 + Sub-strip bối cảnh ngữ cảnh */}
       <div className="mb-5 space-y-3">
@@ -1544,6 +1557,17 @@ function MediaStoragePage() {
                           item={img}
                           onSave={(slugs) => handleQuickSetRoomTags(img, slugs)}
                         />
+                        {isConcept ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate({ to: "/khong-gian", search: img.room_tags[0] ? { room: img.room_tags[0].room_slug } : {} })}
+                            className="inline-flex items-center gap-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 text-[9px] font-semibold transition-colors cursor-pointer"
+                            title="Xem trong Lookbook"
+                            aria-label="Xem trong Lookbook"
+                          >
+                            <span>Lookbook →</span>
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
