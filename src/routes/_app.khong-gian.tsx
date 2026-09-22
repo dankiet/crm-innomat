@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
+import { WorkspaceModeSwitch } from "@/components/image-workspace/WorkspaceModeSwitch";
 import {
   Dialog,
   DialogContent,
@@ -491,13 +492,13 @@ function ConceptHubPage() {
     }
   }
 
-  // Mở modal sửa lời bình AI
+  // Mở modal sửa mô tả
   function openEditDescription(item: CrmConceptItem) {
     setEditingItem(item);
     setEditDescText(item.ai_description || "");
   }
 
-  // Lưu lời bình kiến trúc AI
+  // Lưu mô tả concept
   async function handleSaveDescription() {
     if (!editingItem) return;
     setIsSavingDesc(true);
@@ -528,7 +529,7 @@ function ConceptHubPage() {
         setPreviewItem((prev) => (prev ? { ...prev, ai_description: newDesc } : null));
       }
 
-      toast.success("Đã cập nhật lời bình kiến trúc AI");
+      toast.success("Đã cập nhật mô tả");
       setEditingItem(null);
     } catch (err) {
       toast.error("Lỗi khi lưu mô tả: " + (err instanceof Error ? err.message : String(err)));
@@ -540,11 +541,20 @@ function ConceptHubPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* 1. Header trang */}
-      <PageHeader
-        eyebrow="Lookbook & Phối cảnh AI"
-        title="Lookbook Bối Cảnh"
-        description="Kiểm duyệt ảnh không gian thực tế do AI phân tích, điều khiển hiển thị trên Landing Page."
-      />
+      {/* Workspace header + mode switch */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">
+            Image Workspace
+          </p>
+          <PageHeader
+            eyebrow="Lookbook & Phối cảnh AI"
+            title="Lookbook Bối Cảnh"
+            description="Xem xét concept đã sẵn sàng cho Landing Page: mô tả, phòng, trạng thái xuất bản."
+          />
+        </div>
+        <WorkspaceModeSwitch mode="lookbook" />
+      </div>
 
       {/* 2. Stats Bar (4 Stat Chips phong cách Innomat Arch Journal) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -604,7 +614,7 @@ function ConceptHubPage() {
         {/* Chip 4: Đã có lời bình AI */}
         <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs transition-all hover:border-border">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Đã có lời bình AI</span>
+            <span className="text-xs font-medium text-muted-foreground">Đã có mô tả</span>
             <div className="grid size-8 place-items-center rounded-xl bg-moss/10 text-moss">
               <Sparkles className="size-4" />
             </div>
@@ -937,13 +947,16 @@ function ConceptHubPage() {
                     <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       <span className="inline-flex items-center gap-1 text-terracotta">
                         <Sparkles className="size-3" />
-                        Lời bình AI
+                        Mô tả
+                        <span className="rounded bg-muted px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          AI-generated
+                        </span>
                       </span>
                       <button
                         type="button"
                         onClick={() => openEditDescription(item)}
                         className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
-                        title="Chỉnh sửa nhanh lời bình kiến trúc"
+                        title="Chỉnh sửa mô tả"
                       >
                         <Pencil className="size-2.5" />
                         <span>Sửa</span>
@@ -956,7 +969,7 @@ function ConceptHubPage() {
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground/60 italic">
-                        Chưa có lời bình AI cho bối cảnh này. Nhấn nút "Sửa" để bổ sung.
+                        Chưa có mô tả cho concept này. Bấm "Sửa" để tạo mô tả (AI-generated).
                       </p>
                     )}
                   </div>
@@ -997,9 +1010,34 @@ function ConceptHubPage() {
                     </button>
                   )}
 
+                  {/* 1.5. Đi tới Kho ảnh (giữ context room/product) */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate({
+                        to: "/luu-tru",
+                        search: {
+                          tab: "concept",
+                          roomSlug: item.room_tags[0]?.room_slug as
+                            | import("@/lib/types").ImageRoomTagSlug
+                            | undefined,
+                        },
+                      })
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg border border-border/80 bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
+                    title="Quản lý ảnh trong Kho ảnh"
+                    aria-label="Quản lý ảnh trong Kho ảnh"
+                  >
+                    <span>Quản lý ảnh</span>
+                  </button>
+
                   {/* 2. Nút "Hạ về thường" (Demote to normal): 2-step inline confirm */}
                   {demoteConfirmId === item.image_id ? (
-                    <div className="flex items-center gap-1 animate-in fade-in-0 duration-150">
+                    <div className="flex flex-col gap-1 animate-in fade-in-0 duration-150">
+                      <span className="text-[10px] leading-snug text-muted-foreground">
+                        Ảnh sẽ rời khỏi Lookbook và trở lại Kho ảnh.
+                      </span>
+                      <div className="flex items-center gap-1">
                       <button
                         type="button"
                         disabled={busyDemoteId === item.image_id}
@@ -1020,6 +1058,7 @@ function ConceptHubPage() {
                       >
                         Hủy
                       </button>
+                      </div>
                     </div>
                   ) : (
                     <button
