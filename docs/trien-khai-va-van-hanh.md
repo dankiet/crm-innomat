@@ -171,6 +171,8 @@ npm run images:gc -- --batch 500 # giới hạn candidate mỗi lượt
 
 - **An toàn chạy lặp**: claim atomic (`gc_claimed_at`), re-check reference trước khi xoá,
   lỗi storage → unclaim tự động để lần sau retry, idempotent.
+- **Yêu cầu Node ≥ 22.15** cho `images:gc` (dùng `registerHooks` của Node qua
+  `scripts/ts-alias.mjs` để import service TS thật — không nhân bản logic).
 - **Scheduler production (Vercel serverless = không có process nền)**: chạy bằng cron bên ngoài
   (GitHub Actions / máy chạy `.env`) gọi lệnh trên, hoặc endpoint có secret — repo chưa khai
   cron để tránh thêm hạ tầng. Mỗi lượt nên chạy nhiều lần (batch) cho tới khi `candidates=0`.
