@@ -24,6 +24,7 @@ import { Fragment, useEffect, useState } from "react";
 import type { SessionUser } from "@/lib/auth-types";
 import { ROLE_LABEL, initialsFromName } from "@/lib/auth-types";
 import { logoutFn, fetchProductFieldValues } from "@/api/functions";
+import { fetchNewLeadsCountFn } from "@/api/lp";
 import { useHistoryLayer } from "@/hooks/useHistoryLayer";
 const SIZE_SUBTAB_SLUGS = new Set(["gach-bong", "gach-op-lat"]);
 
@@ -75,6 +76,8 @@ type NavItem = {
   label: string;
   icon: typeof LayoutGrid;
   search?: { nhom: string };
+  /** Giá trị badge hiển thị bên phải (vd số lead chưa xử lý). */
+  badge?: string | number;
 };
 
 /**
@@ -107,6 +110,7 @@ function NavLink({
   expanded?: boolean;
 }) {
   const Icon = item.icon;
+  const badge = item.badge;
   return (
     <Link
       to={item.to}
@@ -119,10 +123,18 @@ function NavLink({
           : "border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground"
       }`}
     >
-      <Icon className={`size-[17px] shrink-0 ${active ? "text-primary" : "text-muted-foreground/75 group-hover:text-primary"}`} />
+      <Icon
+        className={`size-[17px] shrink-0 ${active ? "text-primary" : "text-muted-foreground/75 group-hover:text-primary"}`}
+      />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-      {expandable ? (
-        <ChevronRight className={`size-3.5 text-primary/70 transition-transform ${expanded ? "rotate-90" : ""}`} />
+      {badge != null && Number(badge) > 0 ? (
+        <span className="ml-auto inline-flex min-w-[20px] items-center justify-center rounded-full bg-terracotta px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
+          {badge}
+        </span>
+      ) : expandable ? (
+        <ChevronRight
+          className={`size-3.5 text-primary/70 transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
       ) : active ? (
         <ChevronRight className="size-3.5 text-primary/70" />
       ) : null}
@@ -173,7 +185,9 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
   const currentNhom = search?.nhom;
   const [catalogExpanded, setCatalogExpanded] = useState(isCatalogActive);
   const [expandedSizeGroup, setExpandedSizeGroup] = useState<string | null>(() => {
-    return isCatalogActive && currentNhom && SIZE_SUBTAB_SLUGS.has(currentNhom) ? currentNhom : null;
+    return isCatalogActive && currentNhom && SIZE_SUBTAB_SLUGS.has(currentNhom)
+      ? currentNhom
+      : null;
   });
 
   useEffect(() => {
@@ -187,6 +201,23 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
 
   const [sizeOptions, setSizeOptions] = useState<string[]>([]);
   const [loadingSizes, setLoadingSizes] = useState(false);
+
+  // Badge "Hộp thư Lead": đếm lead status='new' (chưa ai xử lý).
+  // Refetch mỗi lần đổi pathname — xử lý lead xong rời trang là giảm đúng.
+  const [newLeadsCount, setNewLeadsCount] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchNewLeadsCountFn()
+      .then((n) => {
+        if (!cancelled) setNewLeadsCount(typeof n === "number" ? n : null);
+      })
+      .catch(() => {
+        if (!cancelled) setNewLeadsCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (!expandedSizeGroup || !SIZE_SUBTAB_SLUGS.has(expandedSizeGroup)) {
@@ -240,10 +271,17 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold tracking-tight text-foreground">Innomat CRM</p>
-          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Showroom workspace</p>
+          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Showroom workspace
+          </p>
         </div>
         {onMobileClose ? (
-          <button type="button" onClick={onMobileClose} className="grid size-9 place-items-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden" aria-label="Đóng menu">
+          <button
+            type="button"
+            onClick={onMobileClose}
+            className="grid size-9 place-items-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
+            aria-label="Đóng menu"
+          >
             <X className="size-5" />
           </button>
         ) : null}
@@ -262,7 +300,11 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                 {group.items.map((item) => (
                   <NavLink
                     key={item.to}
-                    item={item}
+                    item={
+                      item.to === "/leads" && newLeadsCount != null && newLeadsCount > 0
+                        ? { ...item, badge: newLeadsCount }
+                        : item
+                    }
                     active={pathname === item.to}
                     onClick={linkCloseHandler(item)}
                   />
@@ -273,7 +315,9 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
         })}
 
         <section>
-          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">Catalog</p>
+          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">
+            Catalog
+          </p>
           <div className="space-y-1">
             <NavLink
               item={{
@@ -291,74 +335,85 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
               }}
             />
             {catalogExpanded ? (
-              <div className={`ml-4 border-l pl-3 ${isCatalogActive ? "border-primary/30" : "border-border/70"}`}>
-              {PRODUCT_GROUPS.map((group) => {
-                const Icon = productIcons[group.slug] ?? LayoutGrid;
-                const active = isCatalogActive && search?.nhom === group.slug;
-                const canHaveSizes = SIZE_SUBTAB_SLUGS.has(group.slug);
-                const isExpanded = expandedSizeGroup === group.slug;
+              <div
+                className={`ml-4 border-l pl-3 ${isCatalogActive ? "border-primary/30" : "border-border/70"}`}
+              >
+                {PRODUCT_GROUPS.map((group) => {
+                  const Icon = productIcons[group.slug] ?? LayoutGrid;
+                  const active = isCatalogActive && search?.nhom === group.slug;
+                  const canHaveSizes = SIZE_SUBTAB_SLUGS.has(group.slug);
+                  const isExpanded = expandedSizeGroup === group.slug;
 
-                return (
-                  <Fragment key={group.slug}>
-                    <div className="rounded-lg hover:bg-accent/60 transition-colors">
-                      <Link
-                        to="/san-pham"
-                        search={{ nhom: group.slug }}
-                        onClick={() => {
-                          if (canHaveSizes) {
-                            setExpandedSizeGroup((prev) => (prev === group.slug && active ? null : group.slug));
-                          } else {
-                            setExpandedSizeGroup(null);
-                          }
-                          if (active) onMobileClose?.();
-                        }}
-                        className={`flex items-center justify-between gap-2 px-2.5 py-2 text-xs transition-colors ${
-                          active ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Icon className="size-3.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">{group.label}</span>
-                        </div>
-                        {canHaveSizes ? (
-                          <ChevronRight
-                            className={`size-3 shrink-0 transition-transform ${
-                              isExpanded ? "rotate-90 text-primary" : "text-muted-foreground/60"
-                            }`}
-                          />
-                        ) : null}
-                      </Link>
-                    </div>
-                    {canHaveSizes && isExpanded ? (
-                      <div className="ml-5 border-l border-border/70 pl-2 py-0.5 space-y-0.5 animate-in fade-in-0 duration-150">
-                        {sizeOptions.map((size) => {
-                          const isSizeActive = active && Array.isArray(search?.sizes) && search.sizes.includes(size);
-                          return (
-                            <Link
-                              key={size}
-                              to="/san-pham"
-                              search={{ nhom: group.slug, sizes: [size] }}
-                              onClick={onMobileClose}
-                              className={`block truncate rounded-md px-2 py-1 text-[11px] transition-colors ${
-                                isSizeActive
-                                  ? "bg-primary/10 font-semibold text-primary"
-                                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                  return (
+                    <Fragment key={group.slug}>
+                      <div className="rounded-lg hover:bg-accent/60 transition-colors">
+                        <Link
+                          to="/san-pham"
+                          search={{ nhom: group.slug }}
+                          onClick={() => {
+                            if (canHaveSizes) {
+                              setExpandedSizeGroup((prev) =>
+                                prev === group.slug && active ? null : group.slug,
+                              );
+                            } else {
+                              setExpandedSizeGroup(null);
+                            }
+                            if (active) onMobileClose?.();
+                          }}
+                          className={`flex items-center justify-between gap-2 px-2.5 py-2 text-xs transition-colors ${
+                            active
+                              ? "font-semibold text-primary"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Icon className="size-3.5 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                          </div>
+                          {canHaveSizes ? (
+                            <ChevronRight
+                              className={`size-3 shrink-0 transition-transform ${
+                                isExpanded ? "rotate-90 text-primary" : "text-muted-foreground/60"
                               }`}
-                            >
-                              {size}
-                            </Link>
-                          );
-                        })}
-                        {loadingSizes ? (
-                          <span className="block px-2 py-1 text-[11px] text-muted-foreground/70 italic">Đang tải kích thước…</span>
-                        ) : !sizeOptions.length ? (
-                          <span className="block px-2 py-1 text-[11px] text-muted-foreground/70 italic">Không có kích thước</span>
-                        ) : null}
+                            />
+                          ) : null}
+                        </Link>
                       </div>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
+                      {canHaveSizes && isExpanded ? (
+                        <div className="ml-5 border-l border-border/70 pl-2 py-0.5 space-y-0.5 animate-in fade-in-0 duration-150">
+                          {sizeOptions.map((size) => {
+                            const isSizeActive =
+                              active && Array.isArray(search?.sizes) && search.sizes.includes(size);
+                            return (
+                              <Link
+                                key={size}
+                                to="/san-pham"
+                                search={{ nhom: group.slug, sizes: [size] }}
+                                onClick={onMobileClose}
+                                className={`block truncate rounded-md px-2 py-1 text-[11px] transition-colors ${
+                                  isSizeActive
+                                    ? "bg-primary/10 font-semibold text-primary"
+                                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                                }`}
+                              >
+                                {size}
+                              </Link>
+                            );
+                          })}
+                          {loadingSizes ? (
+                            <span className="block px-2 py-1 text-[11px] text-muted-foreground/70 italic">
+                              Đang tải kích thước…
+                            </span>
+                          ) : !sizeOptions.length ? (
+                            <span className="block px-2 py-1 text-[11px] text-muted-foreground/70 italic">
+                              Không có kích thước
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </div>
             ) : null}
             <NavLink
@@ -371,7 +426,9 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
 
         {user.role === "admin" ? (
           <section>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">Quản trị</p>
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">
+              Quản trị
+            </p>
             <div className="space-y-1">
               {adminNav.map((item) => (
                 <NavLink
@@ -388,13 +445,20 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
 
       <div className="space-y-2 border-t border-border/70 p-4 safe-pb">
         <div className="flex items-center gap-3 rounded-xl bg-accent/55 p-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{initialsFromName(displayName)}</div>
+          <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {initialsFromName(displayName)}
+          </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">{ROLE_LABEL[user.role]}</p>
           </div>
         </div>
-        <button type="button" onClick={() => void onLogout()} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" aria-label="Đăng xuất">
+        <button
+          type="button"
+          onClick={() => void onLogout()}
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          aria-label="Đăng xuất"
+        >
           <LogOut className="size-4" />
           Đăng xuất
         </button>
@@ -404,10 +468,25 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
 
   return (
     <>
-      <aside className="relative z-40 hidden w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">{nav}</aside>
-      <div className={`fixed inset-0 z-50 lg:hidden ${mobileOpen ? "pointer-events-auto" : "pointer-events-none"}`} aria-hidden={!mobileOpen}>
-        <button type="button" className={`absolute inset-0 bg-black/30 backdrop-blur-[1px] transition-opacity ${mobileOpen ? "opacity-100" : "opacity-0"}`} onClick={onMobileClose} aria-label="Đóng menu" tabIndex={mobileOpen ? 0 : -1} />
-        <aside className={`absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-border bg-card shadow-2xl transition-transform duration-200 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>{nav}</aside>
+      <aside className="relative z-40 hidden w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">
+        {nav}
+      </aside>
+      <div
+        className={`fixed inset-0 z-50 lg:hidden ${mobileOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+        aria-hidden={!mobileOpen}
+      >
+        <button
+          type="button"
+          className={`absolute inset-0 bg-black/30 backdrop-blur-[1px] transition-opacity ${mobileOpen ? "opacity-100" : "opacity-0"}`}
+          onClick={onMobileClose}
+          aria-label="Đóng menu"
+          tabIndex={mobileOpen ? 0 : -1}
+        />
+        <aside
+          className={`absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-border bg-card shadow-2xl transition-transform duration-200 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        >
+          {nav}
+        </aside>
       </div>
     </>
   );
