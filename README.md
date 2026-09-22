@@ -52,6 +52,7 @@ Windows: bấm đúp `START_LOCAL.bat` để mở dev server + browser trên por
 | `npm run db:enable-rls`           | Bật RLS cho mọi bảng public                                   |
 | `npm run db:seed-admin`           | Tạo/đặt lại admin từ `CRM_ADMIN_*`                            |
 | `npm run storage:backup`          | Mirror bucket Supabase về `public/images`                     |
+| `npm run images:gc`               | Delayed GC ảnh orphan (giữ physical `IMAGE_GC_RETENTION_HOURS` giờ); `--dry-run` xem candidate |
 | `npm run clean:generated`         | Xoá output build/generated                                    |
 
 ## Cấu trúc thư mục

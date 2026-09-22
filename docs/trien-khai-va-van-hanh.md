@@ -157,3 +157,21 @@ npm run clean:generated    # xoá output build/generated
 ```
 
 Cả `clean-generated.mjs` và `prune-deploy-backup.mjs` đều **từ chối xoá** đường dẫn ngoài workspace.
+
+## Delayed GC ảnh orphan (vận hành)
+
+Physical image không bị xoá ngay khi mất reference — asset vào trạng thái `orphaned_at`,
+giữ file tới hết `IMAGE_GC_RETENTION_HOURS` (mặc định **24h**) rồi GC mới xoá:
+
+```bash
+npm run images:gc           # chạy GC (batch mặc định 100)
+npm run images:gc -- --dry-run   # xem candidate mà không xoá (lần đầu production nên chạy trước)
+npm run images:gc -- --batch 500 # giới hạn candidate mỗi lượt
+```
+
+- **An toàn chạy lặp**: claim atomic (`gc_claimed_at`), re-check reference trước khi xoá,
+  lỗi storage → unclaim tự động để lần sau retry, idempotent.
+- **Scheduler production (Vercel serverless = không có process nền)**: chạy bằng cron bên ngoài
+  (GitHub Actions / máy chạy `.env`) gọi lệnh trên, hoặc endpoint có secret — repo chưa khai
+  cron để tránh thêm hạ tầng. Mỗi lượt nên chạy nhiều lần (batch) cho tới khi `candidates=0`.
+- Không có metrics infra trong project → log có cấu trúc `[image-gc]` ở server log.
