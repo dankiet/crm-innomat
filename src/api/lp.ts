@@ -16,6 +16,18 @@ export const fetchLpMaterialsFn = createServerFn({ method: "GET" })
     });
   });
 
+export const fetchLpMaterialsByIdsFn = createServerFn({ method: "GET" })
+  .inputValidator((data: { ids: number[] }) => ({
+    ids: (data?.ids ?? [])
+      .map((v) => Number(v))
+      .filter((v) => Number.isInteger(v) && v > 0)
+      .slice(0, 500),
+  }))
+  .handler(async ({ data }) => {
+    const { listPublicMaterialsByIds } = await import("@/db/lp.server");
+    return await listPublicMaterialsByIds(data.ids);
+  });
+
 export const fetchPublicCatalogFn = createServerFn({ method: "GET" })
   .inputValidator(
     (data?: {
@@ -43,16 +55,10 @@ export const fetchPublicCatalogFn = createServerFn({ method: "GET" })
   });
 
 export const fetchPublicSpaceCollectionsFn = createServerFn({ method: "GET" })
-  .inputValidator(
-    (data?: {
-      seed?: number | null;
-      limit?: number | null;
-    }) => data ?? {},
-  )
+  .inputValidator((data?: { seed?: number | null; limit?: number | null }) => data ?? {})
   .handler(async ({ data }) => {
-    const { listPublicSpaceCollections, getLookbookCycleSeed } = await import(
-      "@/db/space-collections.server"
-    );
+    const { listPublicSpaceCollections, getLookbookCycleSeed } =
+      await import("@/db/space-collections.server");
     const { getCurrentPublicUser } = await import("@/db/auth-public.server");
     const user = await getCurrentPublicUser();
 
@@ -196,7 +202,6 @@ export const deleteLpLeadFn = createServerFn({ method: "POST" })
     return result;
   });
 
-
 export const bulkSetProductsPublicFn = createServerFn({ method: "POST" })
   .inputValidator((data: { productIds: number[]; is_public: number }) => data)
   .handler(async ({ data }) => {
@@ -248,13 +253,12 @@ export const setFeaturedSlotFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const fetchFeaturedSlotsFn = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { requireUser } = await import("@/db/auth.server");
-    await requireUser();
-    const { listFeaturedSlots } = await import("@/db/lp.server");
-    return await listFeaturedSlots();
-  });
+export const fetchFeaturedSlotsFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser } = await import("@/db/auth.server");
+  await requireUser();
+  const { listFeaturedSlots } = await import("@/db/lp.server");
+  return await listFeaturedSlots();
+});
 
 // ─── CRM Admin: Concept Manager / Lookbook Hub ────────────────
 

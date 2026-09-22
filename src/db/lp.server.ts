@@ -36,6 +36,17 @@ function clip(raw: string | undefined | null, max: number): string {
 /**
  * Các mã gạch để hiển thị trên LP (10-12 mã tuyển chọn).
  */
+const PUBLIC_MATERIAL_SELECT = `SELECT p.id, p.code, p.name, p.category, p.size,
+              COALESCE(p.surface, '') AS surface,
+              COALESCE(p.color, '')   AS color,
+              COALESCE(p.shape, '')   AS shape,
+              COALESCE(map_img.path, p.image_path, '') AS image,
+              p.featured_rank
+         FROM products p
+         LEFT JOIN product_images map_img ON map_img.product_id = p.id AND map_img.kind = 'map'`;
+
+const HAS_MATERIAL_IMAGE = "(COALESCE(p.image_path, '') <> '' OR map_img.path IS NOT NULL)";
+
 export async function listPublicMaterials(opts?: {
   category?: string | null;
   limit?: number;
@@ -46,7 +57,7 @@ export async function listPublicMaterials(opts?: {
     "p.is_public = 1",
     "p.featured_rank IS NOT NULL",
     "p.featured_rank BETWEEN 1 AND 12",
-    "(COALESCE(p.image_path, '') <> '' OR map_img.path IS NOT NULL)",
+    HAS_MATERIAL_IMAGE,
   ];
 
   const cat = opts?.category?.trim();
@@ -60,19 +71,31 @@ export async function listPublicMaterials(opts?: {
 
   return (await db
     .prepare(
-      `SELECT p.id, p.code, p.name, p.category, p.size,
-              COALESCE(p.surface, '') AS surface,
-              COALESCE(p.color, '')   AS color,
-              COALESCE(p.shape, '')   AS shape,
-              COALESCE(map_img.path, p.image_path, '') AS image,
-              p.featured_rank
-         FROM products p
-         LEFT JOIN product_images map_img ON map_img.product_id = p.id AND map_img.kind = 'map'
+      `${PUBLIC_MATERIAL_SELECT}
         WHERE ${where.join(" AND ")}
         ORDER BY p.featured_rank ASC, p.id
         LIMIT ?`,
     )
     .all<LpMaterial>(...params)) as LpMaterial[];
+}
+
+/**
+ * Lấy material theo đúng bộ ID canonical (product ids) — dùng cho shortlist/moodboard.
+ * KHÔNG giới hạn featured-12; không áp limit. ID không tồn tại/đã xoá đơn giản
+ * không nằm trong kết quả (graceful, không tạo mock, không mutate storage).
+ */
+export async function listPublicMaterialsByIds(ids: number[]): Promise<LpMaterial[]> {
+  const unique = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 500);
+  if (unique.length === 0) return [];
+  const db = getDb();
+  const placeholders = unique.map(() => "?").join(", ");
+  return (await db
+    .prepare(
+      `${PUBLIC_MATERIAL_SELECT}
+        WHERE p.is_public = 1 AND p.id IN (${placeholders}) AND ${HAS_MATERIAL_IMAGE}
+        ORDER BY p.id`,
+    )
+    .all<LpMaterial>(...unique)) as LpMaterial[];
 }
 export type FeaturedSlotInfo = {
   rank: number;
@@ -113,15 +136,16 @@ export async function listFeaturedSlots(): Promise<FeaturedSlotInfo[]> {
  *   3. Gán product mới vào `rank`, đồng thời tự động Bật Online (`is_public = 1`) nếu chưa.
  *   Trong cùng 1 transaction để tránh trạng thái inconsistent giữa các query.
  */
-export async function setFeaturedSlot(rankInput: number, productIdInput: number | null): Promise<void> {
+export async function setFeaturedSlot(
+  rankInput: number,
+  productIdInput: number | null,
+): Promise<void> {
   const rank = Number(rankInput);
   const productId = productIdInput == null ? null : Number(productIdInput);
   const db = getDb();
   await db.transaction(async (tx) => {
     // 1) Clear mọi sản phẩm đang ngồi vị trí `rank` (nếu có)
-    await tx
-      .prepare("UPDATE products SET featured_rank = NULL WHERE featured_rank = ?")
-      .run(rank);
+    await tx.prepare("UPDATE products SET featured_rank = NULL WHERE featured_rank = ?").run(rank);
 
     if (productId == null || isNaN(productId)) {
       // Chỉ yêu cầu GỠ khỏi slot -> thoát transaction tại đây
@@ -130,7 +154,9 @@ export async function setFeaturedSlot(rankInput: number, productIdInput: number 
 
     // 2) Clear slot cũ của product này (nếu product này đang ở vị trí khác)
     await tx
-      .prepare("UPDATE products SET featured_rank = NULL WHERE id = ? AND featured_rank IS DISTINCT FROM ?")
+      .prepare(
+        "UPDATE products SET featured_rank = NULL WHERE id = ? AND featured_rank IS DISTINCT FROM ?",
+      )
       .run(productId, rank);
 
     // 3) Gán product vào slot mới, đồng thời ép nó phải Online để hiển thị trên Thư viện web
@@ -186,7 +212,7 @@ export async function listPublicCatalog(opts?: {
   }
 
   // 1. Lọc theo bảng màu kiến trúc chuẩn (colorPalettes: ID[])
-  const activePalettes = (opts?.colorPalettes?.filter(Boolean) ?? []);
+  const activePalettes = opts?.colorPalettes?.filter(Boolean) ?? [];
   if (activePalettes.length > 0) {
     const matchedDbValues: string[] = [];
     for (const pid of activePalettes) {
@@ -203,9 +229,12 @@ export async function listPublicCatalog(opts?: {
     }
   } else {
     // Fallback lọc màu theo chuỗi raw (nếu có)
-    const rawColors = (opts?.colors?.filter(Boolean) ?? []).length > 0
-      ? (opts?.colors?.filter(Boolean) ?? [])
-      : (opts?.color?.trim() ? [opts.color.trim()] : []);
+    const rawColors =
+      (opts?.colors?.filter(Boolean) ?? []).length > 0
+        ? (opts?.colors?.filter(Boolean) ?? [])
+        : opts?.color?.trim()
+          ? [opts.color.trim()]
+          : [];
     if (rawColors.length > 0) {
       const placeholders = rawColors.map(() => "?").join(", ");
       where.push(`p.color IN (${placeholders})`);
@@ -214,7 +243,7 @@ export async function listPublicCatalog(opts?: {
   }
 
   // 2. Lọc theo nhóm Cảm xúc Bề mặt (surfaceFinishes: ID[])
-  const activeFinishes = (opts?.surfaceFinishes?.filter(Boolean) ?? []);
+  const activeFinishes = opts?.surfaceFinishes?.filter(Boolean) ?? [];
   if (activeFinishes.length > 0) {
     const matchedSurfaces: string[] = [];
     for (const fid of activeFinishes) {
@@ -228,9 +257,12 @@ export async function listPublicCatalog(opts?: {
       params.push(...uniqueSurfaces);
     }
   } else {
-    const rawSurfaces = (opts?.surfaces?.filter(Boolean) ?? []).length > 0
-      ? (opts?.surfaces?.filter(Boolean) ?? [])
-      : (opts?.surface?.trim() ? [opts.surface.trim()] : []);
+    const rawSurfaces =
+      (opts?.surfaces?.filter(Boolean) ?? []).length > 0
+        ? (opts?.surfaces?.filter(Boolean) ?? [])
+        : opts?.surface?.trim()
+          ? [opts.surface.trim()]
+          : [];
     if (rawSurfaces.length > 0) {
       const placeholders = rawSurfaces.map(() => "?").join(", ");
       where.push(`p.surface IN (${placeholders})`);
@@ -239,7 +271,7 @@ export async function listPublicCatalog(opts?: {
   }
 
   // 3. Lọc theo nhóm Kiểu dáng Hình học (formatFamilies: ID[])
-  const activeFamilies = (opts?.formatFamilies?.filter(Boolean) ?? []);
+  const activeFamilies = opts?.formatFamilies?.filter(Boolean) ?? [];
   if (activeFamilies.length > 0) {
     const matchedShapes: string[] = [];
     for (const fid of activeFamilies) {
@@ -253,9 +285,12 @@ export async function listPublicCatalog(opts?: {
       params.push(...uniqueShapes);
     }
   } else {
-    const rawShapes = (opts?.shapes?.filter(Boolean) ?? []).length > 0
-      ? (opts?.shapes?.filter(Boolean) ?? [])
-      : (opts?.shape?.trim() ? [opts.shape.trim()] : []);
+    const rawShapes =
+      (opts?.shapes?.filter(Boolean) ?? []).length > 0
+        ? (opts?.shapes?.filter(Boolean) ?? [])
+        : opts?.shape?.trim()
+          ? [opts.shape.trim()]
+          : [];
     if (rawShapes.length > 0) {
       const placeholders = rawShapes.map(() => "?").join(", ");
       where.push(`p.shape IN (${placeholders})`);
@@ -263,9 +298,12 @@ export async function listPublicCatalog(opts?: {
     }
   }
 
-  const rawSizes = (opts?.sizes?.filter(Boolean) ?? []).length > 0
-    ? (opts?.sizes?.filter(Boolean) ?? [])
-    : (opts?.size?.trim() ? [opts.size.trim()] : []);
+  const rawSizes =
+    (opts?.sizes?.filter(Boolean) ?? []).length > 0
+      ? (opts?.sizes?.filter(Boolean) ?? [])
+      : opts?.size?.trim()
+        ? [opts.size.trim()]
+        : [];
   if (rawSizes.length > 0) {
     const placeholders = rawSizes.map(() => "?").join(", ");
     where.push(`p.size IN (${placeholders})`);
@@ -803,7 +841,8 @@ async function setLpSetting(key: string, value: string): Promise<void> {
 }
 
 export async function getHeroImageSetting(): Promise<string> {
-  const defaultHero = "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/fe2aef755acdc0f9b7e1911403a8ff4d79eff43cb8862b97e86977dea4e679ad.webp";
+  const defaultHero =
+    "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/fe2aef755acdc0f9b7e1911403a8ff4d79eff43cb8862b97e86977dea4e679ad.webp";
   return await getLpSetting("hero_image", defaultHero);
 }
 
