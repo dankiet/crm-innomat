@@ -13,7 +13,7 @@ import {
 import { submitLpLeadFn } from "@/api/lp";
 import { trackEvent } from "@/lib/lp-tracking";
 import { LP_PROJECT_STAGES, LP_PROJECT_TYPES } from "@/lib/lp-types";
-import { curatedMaterials } from "@/data/mockData";
+import { useShortlistedMaterials } from "./useShortlistedMaterials";
 type ProjectBriefFormProps = {
   intent: string;
   shortlistMaterialIds?: string[];
@@ -53,10 +53,10 @@ export function ProjectBriefForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Find shortlisted materials details
-  const shortlistedItems = curatedMaterials.filter((m) =>
-    shortlistMaterialIds.includes(m.id)
-  );
+  // Shortlist resolve theo canonical ID (KHÔNG filter trên curated m1..m12).
+  const { materials: shortlistedItems, missingIds: shortlistMissingIds } =
+    useShortlistedMaterials(shortlistMaterialIds);
+  const shortlistMissingCount = shortlistMissingIds.length;
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const inputFiles = Array.from(e.target.files ?? []);
@@ -184,7 +184,8 @@ export function ProjectBriefForm({
         <h3 className="brief-success-title">Em đã tiếp nhận brief của bạn!</h3>
         <p className="brief-success-desc">
           Cảm ơn <b>{fullName}</b> {studio ? `(${studio})` : ""}. Đội ngũ chuyên gia vật liệu của{" "}
-          <b>Em bán gạch</b> sẽ xem xét concept, chuẩn bị bảng moodboard PDF và liên hệ trao đổi qua Zalo số <b>{phone}</b> trong vòng <b>4 giờ làm việc</b>.
+          <b>Em bán gạch</b> sẽ xem xét concept, chuẩn bị bảng moodboard PDF và liên hệ trao đổi qua
+          Zalo số <b>{phone}</b> trong vòng <b>4 giờ làm việc</b>.
         </p>
 
         {shortlistedItems.length > 0 && (
@@ -246,6 +247,13 @@ export function ProjectBriefForm({
             </div>
             <span className="text-[11px] text-[#788075]">Tự động đính kèm vào brief</span>
           </div>
+
+          {shortlistMissingCount > 0 ? (
+            <p className="text-[11px] text-[#788075] mb-2">
+              {shortlistMissingCount} mã đã không còn trong thư viện — đã tự bỏ qua khỏi danh sách
+              gửi.
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap gap-2">
             {shortlistedItems.map((mat) => (
@@ -398,8 +406,10 @@ export function ProjectBriefForm({
 
       {/* Row 7: File Attachment */}
       <div className="form-field">
-        <span className="form-label">Đính kèm mặt bằng, phối cảnh hoặc moodboard (tối đa 4 file, &lt;10MB)</span>
-        
+        <span className="form-label">
+          Đính kèm mặt bằng, phối cảnh hoặc moodboard (tối đa 4 file, &lt;10MB)
+        </span>
+
         <div className="file-upload-box">
           <input
             type="file"
@@ -464,7 +474,9 @@ export function ProjectBriefForm({
 
       <p className="form-footer-promise">
         <Sparkles size={14} className="text-[#657151]" />
-        <span>Em cam kết phản hồi đề xuất và hỗ trợ gửi mẫu thực tế trong vòng 4 giờ làm việc.</span>
+        <span>
+          Em cam kết phản hồi đề xuất và hỗ trợ gửi mẫu thực tế trong vòng 4 giờ làm việc.
+        </span>
       </p>
     </form>
   );

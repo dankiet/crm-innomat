@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -21,6 +21,7 @@ import { MaterialModal } from "./MaterialModal";
 import { SpaceLookbookSection } from "./SpaceLookbookSection";
 import { MaterialLibraryPage } from "./MaterialLibraryPage";
 import { useShortlistStorage } from "./useShortlistStorage";
+import { useShortlistedMaterials } from "./useShortlistedMaterials";
 import { trackEvent } from "@/lib/lp-tracking";
 import {
   tileLines,
@@ -105,10 +106,12 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
     }
   };
 
-  // Shortlisted material objects
-  const shortlistedMaterials = useMemo(() => {
-    return liveMaterials.filter((m) => selectedIds.includes(m.id));
-  }, [selectedIds, liveMaterials]);
+  // Shortlist = resolve theo canonical ID (KHÔNG filter trên 12 material của Home).
+  const {
+    materials: shortlistedMaterials,
+    missingIds: shortlistMissingIds,
+    loading: shortlistLoading,
+  } = useShortlistedMaterials(selectedIds);
 
   const handleNextMaterial = () => {
     if (!activeModalMaterial) return;
@@ -155,10 +158,19 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
               <span>em bán gạch</span>
             </a>
 
-            <nav className={menuOpen ? "nav-links is-open" : "nav-links"} aria-label="Điều hướng chính">
-              <a href="#dong-gach" onClick={() => setMenuOpen(false)}>Chọn dòng gạch</a>
-              <a href="#vat-lieu-tuyen-chon" onClick={() => setMenuOpen(false)}>Vật liệu tuyển chọn</a>
-              <a href="#khong-gian" onClick={() => setMenuOpen(false)}>Không gian</a>
+            <nav
+              className={menuOpen ? "nav-links is-open" : "nav-links"}
+              aria-label="Điều hướng chính"
+            >
+              <a href="#dong-gach" onClick={() => setMenuOpen(false)}>
+                Chọn dòng gạch
+              </a>
+              <a href="#vat-lieu-tuyen-chon" onClick={() => setMenuOpen(false)}>
+                Vật liệu tuyển chọn
+              </a>
+              <a href="#khong-gian" onClick={() => setMenuOpen(false)}>
+                Không gian
+              </a>
               <a
                 href="#thu-vien"
                 onClick={(e) => {
@@ -169,7 +181,9 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
               >
                 Thư viện mã gạch
               </a>
-              <a href="#quy-trinh" onClick={() => setMenuOpen(false)}>Quy trình &amp; Cam kết</a>
+              <a href="#quy-trinh" onClick={() => setMenuOpen(false)}>
+                Quy trình &amp; Cam kết
+              </a>
             </nav>
 
             <div className="header-actions">
@@ -214,12 +228,16 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                   <span /> DÀNH CHO KIẾN TRÚC SƯ &amp; STUDIO THIẾT KẾ
                 </p>
                 <h1>
-                  Bắt đầu từ<br />
-                  <em>một mã</em> gạch<br />
+                  Bắt đầu từ
+                  <br />
+                  <em>một mã</em> gạch
+                  <br />
                   phù hợp.
                 </h1>
                 <p className="hero-intro">
-                  Một tài liệu vật liệu theo chiều dọc dành cho concept: bắt đầu từ màu sắc, bề mặt và nhịp gạch trước khi bạn cần tới thông số kỹ thuật. Em chọn trước các mã tiêu biểu để bạn khởi đầu nhanh cho công trình.
+                  Một tài liệu vật liệu theo chiều dọc dành cho concept: bắt đầu từ màu sắc, bề mặt
+                  và nhịp gạch trước khi bạn cần tới thông số kỹ thuật. Em chọn trước các mã tiêu
+                  biểu để bạn khởi đầu nhanh cho công trình.
                 </p>
                 <div className="hero-buttons">
                   <button
@@ -238,7 +256,8 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                   </button>
                 </div>
                 <div className="hero-footnote">
-                  <span className="footnote-line" /> Vật liệu tuyển chọn → Lookbook Không gian → Thư viện gạch → Shortlist &amp; Brief
+                  <span className="footnote-line" /> Vật liệu tuyển chọn → Lookbook Không gian → Thư
+                  viện gạch → Shortlist &amp; Brief
                 </div>
               </div>
 
@@ -267,7 +286,8 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
               <div className="intent-heading">
                 <p className="section-kicker">CHỌN DÒNG GẠCH THEO CONCEPT</p>
                 <h2 id="intent-title">
-                  Chọn dòng trước,<br />
+                  Chọn dòng trước,
+                  <br />
                   rồi chọn <em>mã</em>.
                 </h2>
               </div>
@@ -293,17 +313,23 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
             </section>
 
             {/* 4. Section 02: Vật Liệu Tuyển Chọn (Curated Picks) */}
-            <section id="vat-lieu-tuyen-chon" className="library-section" aria-labelledby="library-title">
+            <section
+              id="vat-lieu-tuyen-chon"
+              className="library-section"
+              aria-labelledby="library-title"
+            >
               <div className="library-topline">
                 <div>
                   <p className="section-kicker">CURATED SELECTION · 2026 EDITION</p>
                   <h2 id="library-title">
-                    Vật liệu<br />
+                    Vật liệu
+                    <br />
                     tuyển chọn.
                   </h2>
                 </div>
                 <p className="library-lede">
-                  Những bề mặt đất nung, gốm men rạn, mosaic và gạch ốp lát tiêu biểu. Đây là lớp mở đầu cô đọng để bạn chạm vào cảm xúc bề mặt trước khi đi sâu vào Thư viện mã gạch.
+                  Những bề mặt đất nung, gốm men rạn, mosaic và gạch ốp lát tiêu biểu. Đây là lớp mở
+                  đầu cô đọng để bạn chạm vào cảm xúc bề mặt trước khi đi sâu vào Thư viện mã gạch.
                 </p>
               </div>
               {/* Ledger */}
@@ -327,7 +353,9 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-border/80 bg-surface-strong/30 p-8 text-center my-6">
-                  <p className="text-sm font-semibold text-foreground">Bộ tuyển chọn đang được cập nhật</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    Bộ tuyển chọn đang được cập nhật
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Vui lòng quay lại sau để xem các mẫu vật liệu mới nhất.
                   </p>
@@ -339,7 +367,10 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                   <BookOpen size={20} className="text-[#B94A2E] shrink-0" />
                   <div>
                     <strong>{selectedIds.length} mã đang nằm trong shortlist của bạn</strong>
-                    <span>Em sẽ dùng danh sách này làm điểm khởi đầu khi đọc brief dự án và chuẩn bị mẫu.</span>
+                    <span>
+                      Em sẽ dùng danh sách này làm điểm khởi đầu khi đọc brief dự án và chuẩn bị
+                      mẫu.
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -366,7 +397,8 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
                 <div>
                   <Layers3 size={18} />
                   <span>
-                    Cần tra cứu toàn bộ danh mục và tải file ảnh Map vật liệu? Mời bạn ghé trang Thư viện mã gạch chuyên sâu.
+                    Cần tra cứu toàn bộ danh mục và tải file ảnh Map vật liệu? Mời bạn ghé trang Thư
+                    viện mã gạch chuyên sâu.
                   </span>
                 </div>
                 <button
@@ -389,21 +421,27 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
             />
 
             {/* 6. Section 04: Quy Trình & Cam Kết (Deliverables) */}
-            <section id="quy-trinh" className="deliverables-section" aria-labelledby="deliverables-title">
+            <section
+              id="quy-trinh"
+              className="deliverables-section"
+              aria-labelledby="deliverables-title"
+            >
               <div className="deliverables-visual">
                 <img
                   src={fnbCollectionImage}
                   alt="Bề mặt gạch trong không gian F&B có ánh sáng tự nhiên"
                 />
                 <span className="visual-note">
-                  VẬT LIỆU CẦN ĐƯỢC<br />
+                  VẬT LIỆU CẦN ĐƯỢC
+                  <br />
                   ĐẶT ĐÚNG BỐI CẢNH
                 </span>
               </div>
               <div className="deliverables-copy">
                 <p className="section-kicker">KHI BẠN ĐÃ CÓ SHORTLIST</p>
                 <h2 id="deliverables-title">
-                  Thứ bạn nhận lại<br />
+                  Thứ bạn nhận lại
+                  <br />
                   không chỉ là mã gạch.
                 </h2>
                 <div className="deliverable-list">
@@ -425,16 +463,19 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
               <div className="brief-heading">
                 <p className="section-kicker">BẮT ĐẦU TỪ ĐÂY</p>
                 <h2 id="brief-title">
-                  Bạn đang có dự án<br />
+                  Bạn đang có dự án
+                  <br />
                   cần tìm vật liệu?
                 </h2>
                 <p>
-                  Điền những gì bạn đã có. Nếu concept còn đang ở dạng vài ghi chú hoặc moodboard sơ phác, cũng hoàn toàn đủ để bắt đầu một cuộc trao đổi chuyên sâu.
+                  Điền những gì bạn đã có. Nếu concept còn đang ở dạng vài ghi chú hoặc moodboard sơ
+                  phác, cũng hoàn toàn đủ để bắt đầu một cuộc trao đổi chuyên sâu.
                 </p>
                 <div className="brief-promise">
                   <Sparkles size={18} />
                   <span>
-                    Ưu tiên tư vấn theo context dự án,<br />
+                    Ưu tiên tư vấn theo context dự án,
+                    <br />
                     không gửi một bảng giá chung chung.
                   </span>
                 </div>
@@ -461,7 +502,8 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
               <span>em bán gạch</span>
             </div>
             <p>
-              Vật liệu cho concept kiến trúc.<br />
+              Vật liệu cho concept kiến trúc.
+              <br />
               Từ shortlist đến công trình thực tế.
             </p>
             <div className="footer-contact">
@@ -535,6 +577,9 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
         isOpen={moodboardOpen}
         onClose={() => setMoodboardOpen(false)}
         shortlistedMaterials={shortlistedMaterials}
+        selectedCount={selectedIds.length}
+        missingIds={shortlistMissingIds}
+        loading={shortlistLoading}
         onRemove={toggleMaterial}
         onClearAll={clearShortlist}
         onGoToBrief={() => {

@@ -1,19 +1,18 @@
 import { useState, useEffect } from "react";
-import {
-  X,
-  Trash2,
-  ArrowRight,
-  BookOpen,
-  Sparkles,
-  Check,
-  Copy,
-} from "lucide-react";
+import { X, Trash2, ArrowRight, BookOpen, Sparkles, Check, Copy } from "lucide-react";
 import type { Material } from "@/data/mockData";
 
 type MoodboardDrawerProps = {
   isOpen: boolean;
   onClose: () => void;
+  /** Các material resolve được từ shortlistIds (shared resolver). */
   shortlistedMaterials: Material[];
+  /** Số ID đang shortlist (selectedIds.length) — KHÔNG dùng độ dài list resolve. */
+  selectedCount?: number;
+  /** ID canonical còn trong storage nhưng không resolve được (đã xoá/ẩn). */
+  missingIds?: string[];
+  /** Đang fetch resolution (hiển thị chờ nhẹ, không flash trống). */
+  loading?: boolean;
   onRemove: (id: string) => void;
   onClearAll: () => void;
   onGoToBrief: () => void;
@@ -24,6 +23,9 @@ export function MoodboardDrawer({
   isOpen,
   onClose,
   shortlistedMaterials,
+  selectedCount,
+  missingIds = [],
+  loading = false,
   onRemove,
   onClearAll,
   onGoToBrief,
@@ -43,7 +45,9 @@ export function MoodboardDrawer({
 
   if (!isOpen) return null;
 
-  const count = shortlistedMaterials.length;
+  // Count hiển thị = số ID đang shortlist (storage), KHÔNG phụ thuộc resolve.
+  const count = selectedCount ?? shortlistedMaterials.length;
+  const hasMissing = missingIds.length > 0;
 
   const handleCopySpecList = async () => {
     if (count === 0) return;
@@ -51,7 +55,7 @@ export function MoodboardDrawer({
       "📋 [DANH SÁCH MÃ VẬT LIỆU SHORTLIST — EM BÁN GẠCH]",
       ...shortlistedMaterials.map(
         (m, i) =>
-          `${i + 1}. [${m.code}] ${m.name} — ${m.type} (Khổ: ${m.size} | Bề mặt: ${m.finish})`
+          `${i + 1}. [${m.code}] ${m.name} — ${m.type} (Khổ: ${m.size} | Bề mặt: ${m.finish})`,
       ),
       "\nLiên hệ nhận mẫu thực tế & File ảnh Map: Hotline / Zalo 0909 xxx xxx",
     ];
@@ -89,6 +93,12 @@ export function MoodboardDrawer({
                 BẢNG PHỐI VẬT LIỆU
               </p>
               <h3 className="moodboard-title">Moodboard Shortlist ({count})</h3>
+              {hasMissing ? (
+                <p className="moodboard-missing-note">
+                  {missingIds.length} mã đã không còn trong thư viện và sẽ được bỏ qua khi gửi
+                  brief.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -160,12 +170,18 @@ export function MoodboardDrawer({
 
         {/* Drawer Body */}
         <div className="moodboard-body">
-          {count === 0 ? (
+          {count === 0 && loading ? (
+            <div className="moodboard-empty">
+              <Sparkles size={36} className="text-[#B9B4A9] mb-3" />
+              <h4>Đang tải shortlist…</h4>
+            </div>
+          ) : count === 0 ? (
             <div className="moodboard-empty">
               <Sparkles size={36} className="text-[#B9B4A9] mb-3" />
               <h4>Chưa có mã nào trong Shortlist</h4>
               <p>
-                Hãy lướt danh mục <b>Vật liệu tuyển chọn</b> hoặc <b>Thư viện mã gạch</b> và bấm <b>"+ Lưu vào Moodboard"</b> để gom bảng vật liệu cho công trình.
+                Hãy lướt danh mục <b>Vật liệu tuyển chọn</b> hoặc <b>Thư viện mã gạch</b> và bấm{" "}
+                <b>"+ Lưu vào Moodboard"</b> để gom bảng vật liệu cho công trình.
               </p>
             </div>
           ) : (
