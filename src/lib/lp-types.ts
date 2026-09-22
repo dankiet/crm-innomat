@@ -112,8 +112,10 @@ export type LpLead = {
   /** Tên file khách nói sẽ gửi (CSV) — file chưa nằm trên server. */
   attachment_names: string;
   form_kind: LpFormKind;
-  /** Mã gạch trong shortlist, phân cách bằng dấu phẩy. */
+  /** Mã gạch trong shortlist, phân cách bằng dấu phẩy (canonical product ids). */
   shortlist_codes: string;
+  /** Danh sách sản phẩm resolve được từ shortlist_codes (code/name) — decorate ở listLpLeads. */
+  shortlist_products?: Array<{ id: number; code: string; name: string }>;
   /** JSON chi tiết ngữ cảnh (mã gạch, bối cảnh không gian, vị trí ghim). */
   shortlist_details?: string;
   status: LpLeadStatus;

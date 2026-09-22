@@ -656,7 +656,7 @@ export async function listLpLeads(opts?: {
   }
   params.push(Math.min(Math.max(Math.floor(opts?.limit ?? 200), 1), 500));
 
-  return (await db
+  const rows = (await db
     .prepare(
       `SELECT l.*, u.display_name AS handled_by_name,
               CASE WHEN l.phone_norm = '' THEN 1
@@ -669,6 +669,48 @@ export async function listLpLeads(opts?: {
         LIMIT ?`,
     )
     .all<LpLead>(...params)) as LpLead[];
+
+  // Decorate shortlist_codes (canonical product ids) -> code/name để inbox
+  // hiển thị mã gạch thật thay vì id thô. Id không còn tồn tại được bỏ qua
+  // graceful (vẫn giữ CSV gốc trong DB). 1 query cho toàn bộ page.
+  const wantedIds = new Set<number>();
+  for (const lead of rows) {
+    for (const raw of lead.shortlist_codes.split(",")) {
+      const id = Number(raw.trim());
+      if (Number.isInteger(id) && id > 0) wantedIds.add(id);
+    }
+  }
+  if (wantedIds.size > 0) {
+    const placeholders = [...wantedIds].map(() => "?").join(", ");
+    const products = (await db
+      .prepare(`SELECT id, code, name FROM products WHERE id IN (${placeholders})`)
+      .all<{ id: number; code: string; name: string }>(...[...wantedIds])) as Array<{
+      id: number;
+      code: string;
+      name: string;
+    }>;
+    const byId = new Map<number, { id: number; code: string; name: string }>();
+    for (const p of products) byId.set(Number(p.id), p);
+    for (const lead of rows) {
+      const resolved: Array<{ id: number; code: string; name: string }> = [];
+      for (const raw of lead.shortlist_codes.split(",")) {
+        const id = Number(raw.trim());
+        const product = byId.get(id);
+        if (product) resolved.push(product);
+      }
+      if (resolved.length > 0) lead.shortlist_products = resolved;
+    }
+  }
+  return rows;
+}
+
+/** Số lead status 'new' (chưa ai xử lý) — dùng cho badge sidebar. */
+export async function countNewLpLeads(): Promise<number> {
+  const db = getDb();
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM lp_leads WHERE status = 'new'")
+    .get<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 export async function setLpLeadStatus(

@@ -155,6 +155,13 @@ export const fetchLpLeadsFn = createServerFn({ method: "GET" })
     return await listLpLeads(data);
   });
 
+export const fetchNewLeadsCountFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser } = await import("@/db/auth.server");
+  await requireUser();
+  const { countNewLpLeads } = await import("@/db/lp.server");
+  return await countNewLpLeads();
+});
+
 export const setLpLeadStatusFn = createServerFn({ method: "POST" })
   .inputValidator((data: { id: number; status: LpLeadStatus }) => data)
   .handler(async ({ data }) => {
