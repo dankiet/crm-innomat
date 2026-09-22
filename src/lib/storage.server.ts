@@ -25,7 +25,9 @@ function config(): { url: string; key: string; bucket: string } | null {
   return {
     url: url.replace(/\/+$/, ""),
     key,
-    bucket: (process.env.SUPABASE_STORAGE_BUCKET ?? "crm-images").replace(/^\//, "").replace(/\/+$/, ""),
+    bucket: (process.env.SUPABASE_STORAGE_BUCKET ?? "crm-images")
+      .replace(/^\//, "")
+      .replace(/\/+$/, ""),
   };
 }
 
@@ -75,10 +77,7 @@ function publicUrl(cfg: { url: string; bucket: string }, objectPath: string): st
 }
 
 /** Lưu buffer ảnh → trả về ref (Supabase URL hoặc đường dẫn /images/...). */
-export async function putImageBuffer(
-  buffer: Buffer,
-  ext: string,
-): Promise<string> {
+export async function putImageBuffer(buffer: Buffer, ext: string): Promise<string> {
   const filename = filenameFor(buffer, ext);
   const objectPath = `${STORAGE_PREFIX}/${filename}`;
 
@@ -86,7 +85,8 @@ export async function putImageBuffer(
   if (storage) {
     const cfg = config()!;
     const { error } = await storage.from(cfg.bucket).upload(objectPath, buffer, {
-      contentType: MIME_BY_EXT[filename.slice(filename.lastIndexOf("."))] ?? "application/octet-stream",
+      contentType:
+        MIME_BY_EXT[filename.slice(filename.lastIndexOf("."))] ?? "application/octet-stream",
       cacheControl: "31536000",
       upsert: true,
     });
@@ -103,9 +103,7 @@ export async function putImageBuffer(
 }
 
 /** Đọc bytes ảnh từ ref (Supabase URL hoặc đường dẫn cục bộ). null nếu không tồn tại. */
-export async function readImageBytes(
-  ref: string,
-): Promise<Buffer | null> {
+export async function readImageBytes(ref: string): Promise<Buffer | null> {
   if (!ref) return null;
   if (/^https?:\/\//.test(ref)) {
     try {
@@ -136,7 +134,9 @@ export async function deleteImageRef(ref: string): Promise<void> {
     const cfg = config()!;
     try {
       const url = new URL(ref);
-      const objectPath = decodeURIComponent(url.pathname.replace(`/storage/v1/object/public/${cfg.bucket}/`, ""));
+      const objectPath = decodeURIComponent(
+        url.pathname.replace(`/storage/v1/object/public/${cfg.bucket}/`, ""),
+      );
       if (objectPath && objectPath !== url.pathname) {
         await storage.from(cfg.bucket).remove([objectPath]);
       }
@@ -153,4 +153,20 @@ export async function deleteImageRef(ref: string): Promise<void> {
       /* ignore */
     }
   }
+}
+
+/**
+ * Xoá physical object theo storage_key ("<sha256>.<ext>") — dùng riêng cho
+ * Delayed GC. Local mode: /images/<key>; Supabase: publicUrl(cfg, <prefix>/<key>).
+ * Idempotent: ref/chưa tồn tại đều không throw (deleteImageRef bỏ qua lỗi).
+ */
+export async function deleteImageObject(storageKey: string): Promise<void> {
+  if (!storageKey) return;
+  const storage = await loadStorage();
+  if (storage) {
+    const cfg = config()!;
+    await deleteImageRef(publicUrl(cfg, `${STORAGE_PREFIX}/${storageKey}`));
+    return;
+  }
+  await deleteImageRef(`/images/${storageKey}`);
 }

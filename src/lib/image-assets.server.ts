@@ -36,6 +36,8 @@ export interface ImageAssetRow {
   updated_at: string;
   last_referenced_at: string;
   orphaned_at: string | null;
+  gc_claimed_at: string | null;
+  gc_completed_at: string | null;
 }
 
 export interface ImageAssetInput {
@@ -149,10 +151,11 @@ export async function getOrCreateImageAsset(
     });
     return null;
   }
-  logImageAssets(
-    row.created_at === ts ? "asset_created" : "asset_deduplicated",
-    { id: row.id, sha256: sha256.slice(0, 12), storage_key: row.storage_key },
-  );
+  logImageAssets(row.created_at === ts ? "asset_created" : "asset_deduplicated", {
+    id: row.id,
+    sha256: sha256.slice(0, 12),
+    storage_key: row.storage_key,
+  });
   return row;
 }
 

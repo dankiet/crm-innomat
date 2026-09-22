@@ -16,6 +16,7 @@
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:enable-rls": "node scripts/enable-rls.mjs",
     "db:seed-admin": "node scripts/seed-admin.mjs",
+    "images:gc": "node --import ./scripts/ts-alias.mjs ./scripts/image-gc.ts",
     "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {

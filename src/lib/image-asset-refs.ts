@@ -76,6 +76,29 @@ export async function assetMetadataFromBuffer(buffer: Buffer): Promise<{
 
 export const ASSET_MAX_SIDE = 1600;
 
+/** Retention mặc định của Delayed GC (giờ) — IMAGE_GC_RETENTION_HOURS nếu có. */
+export const GC_RETENTION_HOURS_DEFAULT = 24;
+
+export function gcRetentionHours(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.IMAGE_GC_RETENTION_HOURS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : GC_RETENTION_HOURS_DEFAULT;
+}
+
+/** now - retention, cùng định dạng nowUtc() ('YYYY-MM-DD HH:MM:SS') để so chuỗi. */
+export function gcCutoffUtc(retentionHours: number, now: Date = new Date()): string {
+  return new Date(now.getTime() - Math.max(0, retentionHours) * 3_600_000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+}
+
+/** Độ tuổi orphan (giờ) — cho báo cáo dry-run. */
+export function orphanAgeHours(orphanedAt: string, now: Date = new Date()): number {
+  const t = Date.parse(orphanedAt.replace(" ", "T") + "Z");
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, (now.getTime() - t) / 3_600_000);
+}
+
 /**
  * Chuẩn buffer ảnh (rotate → resize ≤1600 → webp 82%) + metadata kết quả.
  * Giữ nguyên buffer nếu đã là webp ≤1600. Không re-encode khi chỉ cần metadata.
