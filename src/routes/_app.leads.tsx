@@ -13,7 +13,12 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { fetchLpLeadsFn, setLpLeadStatusFn, convertLpLeadFn, deleteLpLeadFn } from "@/api/lp";
-import { LP_FORM_KIND_LABEL, LP_LEAD_STATUS_LABEL, type LpLead, type LpLeadStatus } from "@/lib/lp-types";
+import {
+  LP_FORM_KIND_LABEL,
+  LP_LEAD_STATUS_LABEL,
+  type LpLead,
+  type LpLeadStatus,
+} from "@/lib/lp-types";
 
 type LeadsSearch = { status?: LpLeadStatus | "all"; q?: string };
 
@@ -166,9 +171,7 @@ function LeadsPage() {
                   {lead.full_name || "(không tên)"}
                 </span>
                 {lead.studio ? (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    · {lead.studio}
-                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">· {lead.studio}</span>
                 ) : null}
                 <a href={`tel:${lead.phone}`} className="text-sm font-medium text-terracotta">
                   {lead.phone}
@@ -196,14 +199,38 @@ function LeadsPage() {
               </div>
 
               {/* Chi tiết dự án KTS */}
-              {(lead.project_name || lead.project_type || lead.project_stage || lead.area || lead.attachment_names) ? (
+              {lead.project_name ||
+              lead.project_type ||
+              lead.project_stage ||
+              lead.area ||
+              lead.attachment_names ? (
                 <div className="mt-2 rounded-lg bg-surface-strong/60 p-2.5 text-xs text-foreground ring-1 ring-black/5">
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {lead.project_name ? <span><strong>Dự án:</strong> {lead.project_name}</span> : null}
-                    {lead.project_type ? <span><strong>Loại:</strong> {lead.project_type}</span> : null}
-                    {lead.project_stage ? <span><strong>Giai đoạn:</strong> {lead.project_stage}</span> : null}
-                    {lead.area ? <span><strong>Diện tích:</strong> {lead.area}</span> : null}
-                    {lead.attachment_names ? <span className="text-amber-700"><strong>File:</strong> {lead.attachment_names}</span> : null}
+                    {lead.project_name ? (
+                      <span>
+                        <strong>Dự án:</strong> {lead.project_name}
+                      </span>
+                    ) : null}
+                    {lead.project_type ? (
+                      <span>
+                        <strong>Loại:</strong> {lead.project_type}
+                      </span>
+                    ) : null}
+                    {lead.project_stage ? (
+                      <span>
+                        <strong>Giai đoạn:</strong> {lead.project_stage}
+                      </span>
+                    ) : null}
+                    {lead.area ? (
+                      <span>
+                        <strong>Diện tích:</strong> {lead.area}
+                      </span>
+                    ) : null}
+                    {lead.attachment_names ? (
+                      <span className="text-amber-700">
+                        <strong>File:</strong> {lead.attachment_names}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
@@ -213,7 +240,12 @@ function LeadsPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] font-medium text-muted-foreground">Mã đã lưu:</span>
                   {(() => {
-                    let items: { code: string; space_title?: string; application_position?: string }[] = [];
+                    let items: {
+                      code: string;
+                      name?: string;
+                      space_title?: string;
+                      application_position?: string;
+                    }[] = [];
                     if (lead.shortlist_details) {
                       try {
                         items = JSON.parse(lead.shortlist_details);
@@ -221,18 +253,37 @@ function LeadsPage() {
                         // fallback
                       }
                     }
-                    if (!items.length && lead.shortlist_codes) {
-                      items = lead.shortlist_codes.split(",").filter(Boolean).map((c) => ({ code: c.trim() }));
+                    if (
+                      !items.length &&
+                      lead.shortlist_products &&
+                      lead.shortlist_products.length > 0
+                    ) {
+                      // Resolve chuẩn từ product ids (canonical) → code/name.
+                      items = lead.shortlist_products.map((p) => ({
+                        code: p.code,
+                        name: p.name,
+                      }));
+                    } else if (!items.length && lead.shortlist_codes) {
+                      // Fallback: id thô (sản phẩm đã bị xoá/ẩn) — giữ nguyên, không tự xoá.
+                      items = lead.shortlist_codes
+                        .split(",")
+                        .filter(Boolean)
+                        .map((c) => ({ code: c.trim() }));
                     }
                     return items.map((item, i) => (
                       <span
                         key={i}
+                        title={item.name || undefined}
                         className="inline-flex items-center gap-1 rounded bg-surface-strong px-2 py-0.5 text-xs font-medium text-foreground ring-1 ring-black/5"
                       >
                         <span className="font-semibold text-terracotta">{item.code}</span>
+                        {item.name ? (
+                          <span className="text-[10px] text-muted-foreground">{item.name}</span>
+                        ) : null}
                         {item.space_title ? (
                           <span className="text-[10px] text-muted-foreground">
-                            ({item.space_title}{item.application_position ? `: ${item.application_position}` : ""})
+                            ({item.space_title}
+                            {item.application_position ? `: ${item.application_position}` : ""})
                           </span>
                         ) : null}
                       </span>
