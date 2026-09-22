@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { putImageBuffer, deleteImageRef, isManagedImageRef } from "@/lib/storage.server";
+import { putImageBuffer, isManagedImageRef } from "@/lib/storage.server";
 import { normalizeUploadImageBufferMeta } from "@/lib/image-upload.server";
 import {
   ensureImageAssetForRef,
@@ -265,7 +265,7 @@ export async function deleteProduct(id: number): Promise<{ ok: true; code: strin
   await runTx();
 
   for (const web of new Set(imagePaths)) {
-    await releaseUnreferencedImageRef(web);
+    await orphanImageRefIfUnreferenced(web);
   }
 
   return { ok: true, code: product.code };
@@ -292,14 +292,14 @@ export async function isPublicImagePathReferenced(
 }
 
 /**
- * Xoá physical image + đánh dấu orphan trong registry — CHỈ khi ref là managed
- * và không còn bảng nào trỏ tới. Dùng ở mọi điểm xoá (product/gallery/mapping).
+ * Đánh dấu orphan trong registry khi ref là managed và KHÔNG còn bảng nào
+ * trỏ tới. KHÔNG xoá physical file — delayed GC xoá sau retention period
+ * (task 2). Dùng ở mọi điểm xoá (product/gallery).
  */
-export async function releaseUnreferencedImageRef(ref: string): Promise<void> {
+export async function orphanImageRefIfUnreferenced(ref: string): Promise<void> {
   if (!ref || !isManagedImageRef(ref)) return;
   const db = getDb();
   if (await isPublicImagePathReferenced(db, ref)) return;
-  await deleteImageRef(ref);
   await markImageAssetOrphanedForPath(db, ref);
 }
 
@@ -674,7 +674,7 @@ export async function deleteProductImage(imageId: number): Promise<{
   await syncPrimaryImagePath(row.product_id);
 
   // Chỉ xóa file được CRM quản lý khi không còn bản ghi nào dùng chung path.
-  await releaseUnreferencedImageRef(row.path);
+  await orphanImageRefIfUnreferenced(row.path);
 
   return {
     product_id: row.product_id,

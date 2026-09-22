@@ -1,6 +1,6 @@
 import { getDb, type AsyncDb, type SqlValue } from "./driver";
 import { saveBase64Image } from "@/lib/image-upload.server";
-import { releaseUnreferencedImageRef } from "./crm.server";
+import { orphanImageRefIfUnreferenced } from "./crm.server";
 import type { GalleryCollection, GalleryCollectionItem, GalleryImageCandidate, ProductImageKind } from "@/lib/types";
 import { nowUtc } from "@/lib/format";
 
@@ -35,9 +35,9 @@ async function getItemRow(db: AsyncDb, id: number): Promise<GalleryCollectionIte
   );
 }
 
-async function deleteUnreferencedPaths(paths: string[]): Promise<void> {
+async function orphanUnreferencedPaths(paths: string[]): Promise<void> {
   for (const path of [...new Set(paths)]) {
-    await releaseUnreferencedImageRef(path);
+    await orphanImageRefIfUnreferenced(path);
   }
 }
 
@@ -299,7 +299,7 @@ export async function uploadGalleryImage(input: {
         .get<GalleryCollectionItem>(input.collectionId, path))!;
     })();
   } catch (error) {
-    await deleteUnreferencedPaths([path]);
+    await orphanUnreferencedPaths([path]);
     throw error;
   }
 }
@@ -383,7 +383,7 @@ export async function removeGalleryItem(itemId: number): Promise<{
       )
       .run(item.path, next?.path ?? "", nowUtc(), item.collection_id);
   })();
-  await deleteUnreferencedPaths([item.path]);
+  await orphanUnreferencedPaths([item.path]);
   return { ok: true, collectionId: item.collection_id };
 }
 
@@ -398,6 +398,6 @@ export async function deleteGalleryCollection(id: number): Promise<{
     .prepare("SELECT path FROM gallery_collection_items WHERE collection_id = ?")
     .all<{ path: string }>(id);
   await db.prepare("DELETE FROM gallery_collections WHERE id = ?").run(id);
-  await deleteUnreferencedPaths(paths.map((row) => row.path));
+  await orphanUnreferencedPaths(paths.map((row) => row.path));
   return { ok: true, name: collection.name };
 }
