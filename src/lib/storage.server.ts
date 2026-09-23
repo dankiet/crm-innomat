@@ -54,8 +54,8 @@ const MIME_BY_EXT: Record<string, string> = {
   ".gif": "image/gif",
 };
 
-function filenameFor(buffer: Buffer, ext: string): string {
-  const hash = contentHashOf(buffer);
+async function filenameFor(buffer: Buffer, ext: string): Promise<string> {
+  const hash = await contentHashOf(buffer);
   const safeExt = ext.startsWith(".") ? ext : `.${ext}`;
   return `${hash}${safeExt.toLowerCase()}`;
 }
@@ -78,7 +78,7 @@ function publicUrl(cfg: { url: string; bucket: string }, objectPath: string): st
 
 /** Lưu buffer ảnh → trả về ref (Supabase URL hoặc đường dẫn /images/...). */
 export async function putImageBuffer(buffer: Buffer, ext: string): Promise<string> {
-  const filename = filenameFor(buffer, ext);
+  const filename = await filenameFor(buffer, ext);
   const objectPath = `${STORAGE_PREFIX}/${filename}`;
 
   const storage = await loadStorage();

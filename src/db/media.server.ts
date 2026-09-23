@@ -473,43 +473,58 @@ export async function listFlatMediaImages(opts?: {
     listWhere.push("(i.kind = 'normal' OR i.kind IS NULL OR i.kind = '')");
   }
 
-  // Tuyển chọn Trang chủ — secondary filter (không phải tab chính)
-  if (opts?.selected === "yes") {
+  // Tuyển chọn Trang chủ — secondary filter, CHỈ hợp lệ ở tab MAP (UI ẩn ở tab khác).
+  const selectionKey = opts?.tab === "map" ? opts.selected : undefined;
+  if (selectionKey === "yes") {
     listWhere.push("p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12");
-  } else if (opts?.selected === "no") {
+  } else if (selectionKey === "no") {
     listWhere.push("p.featured_rank IS NULL");
   }
 
-  // Sử dụng / lifecycle — reuse Reference Resolver (same 7 nguồn).
+  // Sử dụng / lifecycle — reuse Reference Resolver (same 7 nguồn, không nhân bản).
+  // UI expose 2 trạng thái: in_use (Đang dùng) và expiring (Chờ xóa).
   const usage = opts?.usage ?? "all";
-  if (usage !== "all") {
-    const otherRefs = otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')");
-    if (usage === "in_use") {
-      listWhere.push(`EXISTS ${otherRefs}`);
-    } else {
-      const notOther = `NOT EXISTS ${otherRefs}`;
-      const pending = "ast.orphaned_at IS NOT NULL AND ast.gc_completed_at IS NULL";
-      if (usage === "expiring") {
-        listWhere.push(`${notOther} AND ${pending}`);
-      } else {
-        listWhere.push(`${notOther} AND NOT (${pending})`);
-      }
-    }
+  if (usage === "in_use") {
+    listWhere.push(
+      `EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`,
+    );
+  } else if (usage === "expiring") {
+    const notOther = `NOT EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`;
+    listWhere.push(`${notOther} AND ast.orphaned_at IS NOT NULL AND ast.gc_completed_at IS NULL`);
+  } else if (usage === "unused") {
+    // giữ cho API cũ: 0 ref khác và không đang chờ xoá
+    const notOther = `NOT EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`;
+    listWhere.push(`${notOther} AND NOT (ast.orphaned_at IS NOT NULL AND ast.gc_completed_at IS NULL)`);
   }
 
   const listWhereSql = `WHERE ${listWhere.join(" AND ")}`;
 
-  const total =
-    tab === "map"
-      ? counts.map
-      : tab === "concept"
-        ? counts.concept
-        : tab === "featured"
-          ? counts.featured
+  // 4. Sort mà ảnh hưởng total: usage/selected làm lệch counts[tab] (bị "không chạy").
+  //    Tính COUNT đúng theo bộ lọc hiện tại; tab featured giữ counts.featured (DISTINCT ON).
+  let total =
+    tab === "featured"
+      ? counts.featured
+      : tab === "map"
+        ? counts.map
+        : tab === "concept"
+          ? counts.concept
           : tab === "unassigned"
             ? counts.unassigned
             : counts.all;
-  // 4. Sort
+  if (tab !== "featured" && (usage !== "all" || selectionKey !== undefined)) {
+    const countRow = await db
+      .prepare(
+        `SELECT COUNT(*) AS n
+           FROM product_images i
+           JOIN products p ON p.id = i.product_id
+           LEFT JOIN image_assets ast ON ast.storage_key = substring(i.path from '([^/]+)$')
+           ${listWhereSql}`,
+      )
+      .get<{ n: number }>(...listParams);
+    total = Number(countRow?.n) || 0;
+  }
+
+  // Sort
   let orderBySql = "i.id DESC";
   if (tab === "featured") {
     orderBySql = "p.featured_rank ASC, i.is_primary DESC, i.id ASC";

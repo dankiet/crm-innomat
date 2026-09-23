@@ -12,13 +12,13 @@ import {
 
 const FIXTURE_SHA = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-test("contentHashOf = sha256 hex của buffer", () => {
-  assert.equal(contentHashOf(Buffer.from("")), FIXTURE_SHA);
+test("contentHashOf = sha256 hex của buffer", async () => {
+  assert.equal(await contentHashOf(Buffer.from("")), FIXTURE_SHA);
   assert.equal(
-    contentHashOf(Buffer.from("abc")),
+    await contentHashOf(Buffer.from("abc")),
     createHash("sha256").update("abc").digest("hex"),
   );
-  assert.match(contentHashOf(Buffer.from("x")), /^[0-9a-f]{64}$/);
+  assert.match(await contentHashOf(Buffer.from("x")), /^[0-9a-f]{64}$/);
 });
 
 test("sha256FromRef: supabase URL công khai", () => {
@@ -56,7 +56,7 @@ test("round-trip: hash của buffer = sha trong ref do filenameFor tạo", async
   })
     .webp({ quality: 80 })
     .toBuffer();
-  const sha = contentHashOf(buffer);
+  const sha = await contentHashOf(buffer);
   const ref = `/images/${sha}.webp`;
   assert.equal(sha256FromRef(ref), sha);
   assert.equal(storageKeyForRef(ref), `${sha}.webp`);
@@ -69,7 +69,7 @@ test("nhiều ref khác nhau của CÙNG file → cùng sha (dedup theo nội du
   })
     .webp()
     .toBuffer();
-  const sha = contentHashOf(buffer);
+  const sha = await contentHashOf(buffer);
   assert.equal(
     sha256FromRef(`/images/${sha}.webp`),
     sha256FromRef(`https://p.supabase.co/storage/v1/object/public/bucket/crm/${sha}.webp`),

@@ -179,19 +179,16 @@ Card hiển thị chip: `Đang dùng · N` / `Sắp xóa · X giờ` (orphan + r
 
 Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + lifecycle.
 
-- **Phạm vi (primary tabs, ngắn)**: Tất cả · MAP · Concept · Chưa gán.
+- **Phạm vi (primary tabs)**: Tất cả · MAP · Concept · Tuyển chọn #1—#12 · Chưa phân loại.
 - **Sử dụng (secondary, URL `usage`)**: `in_use` (có ref khác), `unused` (0 ref khác,
-  không chờ xoá), `expiring` (0 ref + orphan trong retention) — dùng chung Reference
-  Resolver (7 nguồn), không nhân bản.
-- **Tuyển chọn Trang chủ (#1–#12)** là thuộc tính secondary (`selected` = `yes`/`no`)
-  chứ không phải tab; sort `priority` xếp #1→#12→chưa chọn; `tab=featured` còn nhận cho
-  deep-link cũ.
-- **Bộ lọc**: Nhóm (product taxonomy) → Sử dụng/Tuyển chọn/Sắp xếp → Màu, Bề mặt, Dáng,
-  Vân, BST.
+  không chờ xoá), `expiring` (0 ref + orphan trong retention `IMAGE_GC_RETENTION_HOURS`) — dùng chung Reference
+  Resolver (7 nguồn), không nhân bản. Có banner ngữ cảnh kèm đếm ngược giờ khi lọc ảnh chờ dọn dẹp.
+- **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
+- **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (5 kiểu gồm ưu tiên).
 - **Phân trang + bộ lọc lưu trong URL** (`validateSearch`, giá trị mặc định bị bỏ).
 - **Thao tác nhanh**: gán phòng (`product_image_room_tags`, consequence rõ), mô tả
   (AI-generated · edit), Lookbook visibility, hạ về thường, đặt hạng "Tuyển chọn",
-  bật/tắt Thư viện, gán hàng loạt.
+  bật/tắt Thư viện, gán hàng loạt, **xóa hàng loạt (Bulk Delete)** có hộp thoại xác nhận 2 bước an toàn (tuân thủ quy ước xóa) và chạy với giới hạn concurrency `mapLimit` (~5).
 - Nén ảnh WebP, xoá an toàn theo tham chiếu: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
 
 ## 13. Thư viện — `/thu-vien`

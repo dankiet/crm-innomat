@@ -5,16 +5,19 @@ import {
   ArrowUpAZ,
   Check,
   CheckSquare,
+  ChevronDown,
   Clock,
   EyeOff,
   Globe,
   Grid,
   Image as ImageIcon,
   Images,
+  Layers,
   Loader2,
   Maximize2,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Square,
   Tag,
@@ -63,7 +66,7 @@ import { AssetUsageDialog } from "@/components/AssetUsageDialog";
 import type { FlatMediaItem, FlatMediaSort, FlatMediaTab, FlatMediaUsage } from "@/db/media.server";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { ImageRoomTagPicker } from "@/components/ImageRoomTagPicker";
-import { cn } from "@/lib/utils";
+import { cn, mapLimit } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
@@ -153,9 +156,9 @@ export const Route = createFileRoute("/_app/luu-tru")({
 const TABS: Array<{ key: FlatMediaTab; label: string; countKey: "all" | "map" | "concept" | "featured" | "unassigned" }> = [
   { key: "all", label: "Tất cả ảnh", countKey: "all" },
   { key: "map", label: "Chỉ ảnh MAP", countKey: "map" },
-  { key: "concept", label: "Bối cảnh (Concept)", countKey: "concept" },
-  { key: "featured", label: "★ Tuyển chọn Trang chủ (#1—#12)", countKey: "featured" },
-  { key: "unassigned", label: "Chưa gán thẻ", countKey: "unassigned" },
+  { key: "concept", label: "Bối cảnh Concept", countKey: "concept" },
+  { key: "featured", label: "Tuyển chọn #1—#12", countKey: "featured" },
+  { key: "unassigned", label: "Chưa phân loại", countKey: "unassigned" },
 ];
 
 const SORT_OPTIONS: Array<{ key: FlatMediaSort; label: string; icon: typeof Clock }> = [
@@ -163,6 +166,7 @@ const SORT_OPTIONS: Array<{ key: FlatMediaSort; label: string; icon: typeof Cloc
   { key: "oldest", label: "Cũ nhất", icon: Clock },
   { key: "code_asc", label: "Mã SP (A-Z)", icon: ArrowDownAZ },
   { key: "code_desc", label: "Mã SP (Z-A)", icon: ArrowUpAZ },
+  { key: "priority", label: "Ưu tiên (#1—#12)", icon: Sparkles },
 ];
 
 const PAGE_SIZE_OPTIONS = [24, 48, 96] as const;
@@ -615,6 +619,30 @@ function MediaStoragePage() {
   function gotoPage(newPage: number) {
     navigate({ search: (prev) => ({ ...prev, page: newPage === 1 ? undefined : newPage }) });
   }
+  const currentSortOption = SORT_OPTIONS.find((s) => s.key === sort) ?? SORT_OPTIONS[0]!;
+  const statusFilterActiveCount =
+    (usage !== "all" ? 1 : 0) +
+    (tab !== "featured" && searchParams.selected != null ? 1 : 0);
+
+  const hasActiveFilters = Boolean(
+    searchParams.q ||
+    category !== "all" ||
+    roomSlug !== "all" ||
+    publicFilter !== "all" ||
+    selectedColors.length > 0 ||
+    selectedSurfaces.length > 0 ||
+    selectedShapes.length > 0 ||
+    selectedTextures.length > 0 ||
+    selectedCollections.length > 0 ||
+    usage !== "all" ||
+    (tab !== "all" && tab !== "featured") ||
+    (searchParams.selected != null)
+  );
+
+  function resetAllFilters() {
+    setSearch("");
+    navigate({ search: {} });
+  }
   const [colorOptions, setColorOptions] = useState<{ value: string; label: string }[]>([]);
   const [surfaceOptions, setSurfaceOptions] = useState<{ value: string; label: string }[]>([]);
   const [shapeOptions, setShapeOptions] = useState<{ value: string; label: string }[]>([]);
@@ -804,6 +832,9 @@ function MediaStoragePage() {
   const [busyBulk, setBusyBulk] = useState(false);
   const [bulkRoomPopoverOpen, setBulkRoomPopoverOpen] = useState(false);
   const [bulkPublicConfirmOpen, setBulkPublicConfirmOpen] = useState<null | { isPublic: number; count: number; productIds: number[] }>(null);
+  const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
   // Two-step inline delete confirmation
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -1046,6 +1077,37 @@ function MediaStoragePage() {
       setBusyBulk(false);
     }
   }
+  async function executeBulkDelete() {
+    if (selectedIds.size === 0 || busyBulk) return;
+    setBusyBulk(true);
+    const ids = Array.from(selectedIds);
+    let successCount = 0;
+    let failCount = 0;
+    try {
+      await mapLimit(ids, 5, async (imageId) => {
+        try {
+          await deleteProductImageFn({ data: { imageId } });
+          successCount++;
+        } catch {
+          failCount++;
+        }
+      });
+      if (successCount > 0) {
+        toast.success(`Đã xóa ${successCount} ảnh thành công!`);
+      }
+      if (failCount > 0) {
+        toast.error(`Có ${failCount} ảnh xóa không thành công`);
+      }
+      clearSelection();
+      setBulkDeleteConfirmOpen(false);
+      loadData();
+      syncCountsOnly();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi khi xóa hàng loạt");
+    } finally {
+      setBusyBulk(false);
+    }
+  }
 
   async function handleBulkSetKind(kind: ProductImageKind) {
     if (selectedIds.size === 0 || busyBulk) return;
@@ -1145,33 +1207,28 @@ function MediaStoragePage() {
 
   return (
     <div ref={gridTopRef} className="space-y-5 pb-28">
-      {/* Workspace header + mode switch */}
+      {/* Workspace header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">
-            Media Workspace
-          </p>
-          <PageHeader
-            eyebrow="Media Workspace"
-            title="Media"
-            description="Một nơi quản lý toàn bộ media: phân loại MAP/Concept, gán phòng, mô tả, Lookbook, Hero, Tuyển chọn — kèm nơi đang dùng và lifecycle storage."
-          />
-        </div>
+        <PageHeader
+          eyebrow="Media Workspace"
+          title="Media"
+          description="Quản lý toàn diện ảnh sản phẩm: phân loại MAP/Concept, bối cảnh phòng Lookbook, tuyển chọn trang chủ, nơi đang dùng và vòng đời Delayed GC."
+        />
       </div>
 
       {/* Filter toolbar — Cấu trúc 2 tầng chuẩn Advisor Astra 6 + Sub-strip bối cảnh ngữ cảnh */}
       <div className="mb-5 space-y-3">
         {/* HÀNG 1: Tìm kiếm + Nhóm sản phẩm (Pills) */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Search bar */}
-          <div className="relative flex-1 min-w-0 max-w-md">
+          {/* Search bar — 1 hàng full-width như tab Sản phẩm */}
+          <div className="relative w-full min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/60" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && patchFilters({ q: search.trim() || undefined })}
               placeholder="Tìm mã SP, tên gạch..."
-              className="h-9 w-full text-xs pl-9 pr-8 rounded-full bg-card border border-border/80 outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/15 text-foreground placeholder:text-muted-foreground/60 shadow-2xs"
+              className="h-10 w-full text-sm pl-10 pr-9 rounded-full bg-transparent border border-border/80 outline-none focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/15 text-foreground placeholder:text-muted-foreground/60"
             />
             {search ? (
               <button
@@ -1187,47 +1244,32 @@ function MediaStoragePage() {
               </button>
             ) : null}
           </div>
-
-          {/* Nhóm sản phẩm (Category Pills) */}
-          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-0.5">
-            <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Nhóm
-            </span>
-            <button
-              type="button"
-              onClick={() => patchFilters({ category: undefined, colors: undefined, surfaces: undefined, shapes: undefined, textures: undefined, collections: undefined })}
-              className={cn(
-                "h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer",
-                category === "all"
-                  ? "bg-foreground text-background font-semibold shadow-xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-              )}
-            >
-              Tất cả nhóm
-            </button>
-            {PRODUCT_GROUPS.filter((g) => g.slug !== "tat-ca").map((g) => {
-              const active = category === g.category;
-              return (
-                <button
-                  key={g.slug}
-                  type="button"
-                  onClick={() => patchFilters({ category: g.category, colors: undefined, surfaces: undefined, shapes: undefined, textures: undefined, collections: undefined })}
-                  className={cn(
-                    "h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer",
-                    active
-                      ? "bg-foreground text-background font-semibold shadow-xs"
-                      : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                  )}
-                >
-                  {g.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
-        {/* HÀNG 1.5: Facet Filters (Màu, Bề mặt, Kiểu dáng, Bộ sưu tập — tự động lọc theo danh mục) */}
+        {/* HÀNG 1.5: Facet Filters (Màu, Bề mặt, Dáng, Vân, BST — tự động lọc theo danh mục) */}
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-dashed border-border/50">
+          <FilterChip label="Nhóm" count={category !== "all" ? 1 : 0}>
+            <MultiSelectFilter
+              title="Chọn nhóm danh mục"
+              options={PRODUCT_GROUPS.filter((g) => g.slug !== "tat-ca").map((g) => ({
+                value: g.category,
+                label: g.label,
+              }))}
+              selected={category !== "all" ? [category] : []}
+              onChange={(next) => {
+                const picked = next[next.length - 1];
+                patchFilters({
+                  category: picked ?? undefined,
+                  colors: undefined,
+                  surfaces: undefined,
+                  shapes: undefined,
+                  textures: undefined,
+                  collections: undefined,
+                });
+              }}
+              searchable
+            />
+          </FilterChip>
           <FilterChip label="Màu" count={selectedColors.length}>
             <MultiSelectFilter
               title="Chọn màu"
@@ -1290,17 +1332,18 @@ function MediaStoragePage() {
         <div className="flex flex-wrap items-center justify-between gap-2.5 pt-0.5 border-t border-border/60 pt-2.5">
           {/* Segmented Control: KIND ảnh */}
           <div className="flex flex-wrap items-center bg-surface-strong/60 p-0.5 rounded-full border border-border/80 shrink-0">
-            {TABS.filter((t) => t.key !== "featured").map((t) => {
+            {TABS.map((t) => {
               const active = tab === t.key;
               const count = counts[t.countKey];
               const isMapTab = t.key === "map";
               const isConceptTab = t.key === "concept";
+              const isFeaturedTab = t.key === "featured";
               return (
                 <button
                   key={t.key}
                   type="button"
                   onClick={() => {
-                    patchFilters({ tab: t.key === "all" ? undefined : t.key, roomSlug: t.key !== "concept" ? undefined : roomSlug === "all" ? undefined : roomSlug });
+                    patchFilters({ tab: t.key === "all" ? undefined : t.key, roomSlug: t.key !== "concept" ? undefined : roomSlug === "all" ? undefined : roomSlug, selected: undefined });
                     clearSelection();
                   }}
                   className={cn(
@@ -1310,7 +1353,9 @@ function MediaStoragePage() {
                         ? "bg-indigo-600 text-white font-semibold shadow-xs"
                         : isConceptTab
                           ? "bg-amber-600 text-white font-semibold shadow-xs"
-                          : "bg-card text-foreground font-semibold shadow-xs ring-1 ring-black/5"
+                          : isFeaturedTab
+                            ? "bg-terracotta text-white font-semibold shadow-xs"
+                            : "bg-card text-foreground font-semibold shadow-xs ring-1 ring-black/5"
                       : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
                   )}
                 >
@@ -1329,7 +1374,8 @@ function MediaStoragePage() {
               );
             })}
           </div>
-          {/* Sắp xếp & Tiện ích phân trang */}
+
+          {/* Sắp xếp, Trạng thái & Tiện ích phân trang */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Bộ lọc trạng thái Thư viện Web — Chỉ hiển thị khi đang ở tab "Chỉ ảnh MAP" */}
             {tab === "map" ? (
@@ -1384,85 +1430,166 @@ function MediaStoragePage() {
                 </button>
               </div>
             ) : null}
-            {/* Sử dụng (usage / lifecycle) — secondary */}
-            <div
-              className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
-              title="Lọc theo nơi đang dùng (reference resolver) & lifecycle GC"
-            >
-              {USAGE_OPTIONS.map((u) => {
-                const activeU = usage === u;
-                return (
-                  <button
-                    key={u}
-                    type="button"
-                    onClick={() => patchFilters({ usage: u === "all" ? undefined : (u as "in_use" | "unused" | "expiring") })}
-                    className={cn(
-                      "rounded-full px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer",
-                      activeU
-                        ? "bg-card font-semibold text-foreground shadow-xs ring-1 ring-black/5"
-                        : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                    )}
-                  >
-                    {u === "all" ? "Sử dụng" : u === "in_use" ? "Đang dùng" : u === "unused" ? "Chưa dùng" : "Chờ xoá"}
-                  </button>
-                );
-              })}
-            </div>
 
-            {/* Tuyển chọn Trang chủ (#1–#12) — secondary */}
-            <div
-              className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
-              title="Lọc theo Vị trí Tuyển chọn Trang chủ (#1–#12)"
-            >
-              {[
-                { key: "all", label: "Tuyển chọn" },
-                { key: "yes", label: "Đã chọn" },
-                { key: "no", label: "Chưa chọn" },
-              ].map((opt) => {
-                const activeS = selectedVal === opt.key;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() =>
-                      patchFilters({ selected: opt.key === "all" ? undefined : (opt.key as "yes" | "no") })
-                    }
-                    className={cn(
-                      "rounded-full px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer",
-                      activeS
-                        ? "bg-card font-semibold text-foreground shadow-xs ring-1 ring-black/5"
-                        : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Bộ lọc Trạng thái / Vòng đời (Popover gộp thay cho 2 dải pill rời) */}
+            <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors cursor-pointer",
+                    statusFilterActiveCount > 0
+                      ? "border-terracotta/40 bg-terracotta/10 text-terracotta font-semibold shadow-2xs"
+                      : "border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                  )}
+                  title="Lọc theo tình trạng sử dụng và vị trí tuyển chọn"
+                >
+                  <SlidersHorizontal className="size-3" />
+                  <span>Trạng thái</span>
+                  {statusFilterActiveCount > 0 ? (
+                    <span className="grid size-4 place-items-center rounded-full bg-terracotta text-[9px] font-bold text-white tabular-nums">
+                      {statusFilterActiveCount}
+                    </span>
+                  ) : (
+                    <ChevronDown className="size-3 text-muted-foreground/60" />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3 text-foreground" align="end">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-1.5">
+                    <span className="text-xs font-bold flex items-center gap-1.5">
+                      <SlidersHorizontal className="size-3 text-terracotta" />
+                      <span>Bộ lọc trạng thái</span>
+                    </span>
+                    {statusFilterActiveCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => patchFilters({ usage: undefined, selected: undefined })}
+                        className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        Đặt lại
+                      </button>
+                    ) : null}
+                  </div>
 
-            {/* Sắp xếp */}
-            <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs">
-              {SORT_OPTIONS.map((opt) => {
-                const active = sort === opt.key;
-                const Icon = opt.icon;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => patchFilters({ sort: opt.key === "newest" ? undefined : opt.key })}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer",
-                      active
-                        ? "bg-card font-semibold text-foreground shadow-xs ring-1 ring-black/5"
-                        : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                    )}
-                  >
-                    <Icon className="size-3" />
-                    <span>{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+                  {/* Vòng đời sử dụng */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Sử dụng & Vòng đời GC
+                    </p>
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      {[
+                        { key: "all", label: "Tất cả" },
+                        { key: "in_use", label: "Đang dùng" },
+                        { key: "expiring", label: "Chờ xóa" },
+                      ].map((u) => {
+                        const activeU = (u.key === "all" && usage === "all") || usage === u.key;
+                        return (
+                          <button
+                            key={u.key}
+                            type="button"
+                            onClick={() => {
+                              patchFilters({ usage: u.key === "all" ? undefined : (u.key as FlatMediaUsage) });
+                              setStatusPopoverOpen(false);
+                            }}
+                            className={cn(
+                              "rounded-md px-2 py-1 text-left text-xs font-medium transition-colors cursor-pointer",
+                              activeU
+                                ? "bg-terracotta text-white font-semibold shadow-2xs"
+                                : "text-muted-foreground hover:bg-surface-strong hover:text-foreground",
+                            )}
+                          >
+                            {u.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Tuyển chọn Trang chủ — chỉ hợp lệ ở tab MAP */}
+                  {tab === "map" ? (
+                    <div className="border-t border-border/60 pt-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                        Tuyển chọn Trang chủ (#1—#12)
+                      </p>
+                      <div className="grid grid-cols-3 gap-1 text-xs">
+                        {[
+                          { key: "all", label: "Tất cả" },
+                          { key: "yes", label: "Đã chọn" },
+                          { key: "no", label: "Chưa chọn" },
+                        ].map((opt) => {
+                          const activeS = (opt.key === "all" && !searchParams.selected) || searchParams.selected === opt.key;
+                          return (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => {
+                                patchFilters({ selected: opt.key === "all" ? undefined : (opt.key as "yes" | "no") });
+                                setStatusPopoverOpen(false);
+                              }}
+                              className={cn(
+                                "rounded-md px-2 py-1 text-center text-xs font-medium transition-colors cursor-pointer",
+                                activeS
+                                  ? "bg-terracotta text-white font-semibold shadow-2xs"
+                                  : "text-muted-foreground hover:bg-surface-strong hover:text-foreground",
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Sắp xếp Popover gọn gàng */}
+            <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-border/80 bg-card text-foreground hover:bg-surface-strong/60 transition-colors cursor-pointer"
+                  title="Sắp xếp danh sách ảnh"
+                >
+                  <currentSortOption.icon className="size-3 text-muted-foreground" />
+                  <span>{currentSortOption.label}</span>
+                  <ChevronDown className="size-3 text-muted-foreground/60" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-52 p-1 text-foreground" align="end">
+                <div className="space-y-0.5">
+                  {SORT_OPTIONS.map((opt) => {
+                    const active = sort === opt.key;
+                    const Icon = opt.icon;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => {
+                          patchFilters({ sort: opt.key === "newest" ? undefined : opt.key });
+                          setSortPopoverOpen(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer",
+                          active
+                            ? "bg-terracotta/10 text-terracotta font-semibold"
+                            : "text-muted-foreground hover:bg-surface-strong hover:text-foreground",
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Icon className="size-3.5" />
+                          <span>{opt.label}</span>
+                        </span>
+                        {active ? <Check className="size-3 text-terracotta stroke-[2.5]" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
 
             {/* Chọn kích thước trang (Page Size Selector) */}
             <div className="flex items-center bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs">
@@ -1587,17 +1714,72 @@ function MediaStoragePage() {
         ) : null}
       </div>
 
+      {/* Banner thông báo ngữ cảnh khi lọc ảnh Chờ xoá (Expiring / Orphan) */}
+      {usage === "expiring" ? (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in-0 duration-150">
+          <div className="flex items-start gap-2.5">
+            <Clock className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <div>
+              <p className="font-semibold text-foreground">
+                Đang lọc ảnh chờ dọn dẹp (Delayed GC)
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Các ảnh này không còn được tham chiếu ở sản phẩm hay bộ sưu tập nào. Hệ thống giữ file trong {usageMap?.retentionHours ?? 24} giờ trước khi dọn dẹp vĩnh viễn khỏi storage. Bấm vào chip trên ảnh để xem chi tiết.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => patchFilters({ usage: undefined })}
+            className="shrink-0 rounded-lg border border-amber-500/30 bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
+          >
+            Xem tất cả ảnh
+          </button>
+        </div>
+      ) : null}
+
       {/* Main Flat Media Grid */}
       {loading && items.length === 0 ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <Loader2 className="size-6 animate-spin text-terracotta" />
-          <p className="text-xs">Đang tải Lưu trữ…</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5">
+          {Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xs animate-pulse"
+            >
+              <div className="aspect-4/3 w-full bg-muted/60" />
+              <div className="p-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="h-3 w-16 rounded bg-muted/60" />
+                  <div className="h-2.5 w-10 rounded bg-muted/40" />
+                </div>
+                <div className="h-2.5 w-3/4 rounded bg-muted/40" />
+                <div className="pt-2 flex items-center justify-between border-t border-border/40">
+                  <div className="h-4 w-14 rounded bg-muted/50" />
+                  <div className="h-4 w-5 rounded bg-muted/40" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center">
-          <ImageIcon className="mx-auto size-8 text-muted-foreground/50" />
-          <p className="mt-2 text-sm font-medium text-foreground">Không tìm thấy ảnh nào phù hợp</p>
-          <p className="text-xs text-muted-foreground">Thử đổi tab lọc hoặc từ khóa tìm kiếm</p>
+          <ImageIcon className="mx-auto size-10 text-muted-foreground/40" />
+          <p className="mt-3 text-sm font-semibold text-foreground">Không tìm thấy ảnh nào phù hợp</p>
+          <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+            {hasActiveFilters
+              ? "Hãy thử bỏ bớt bộ lọc màu, nhóm sản phẩm, hoặc từ khóa tìm kiếm để xem thêm kết quả."
+              : "Chưa có ảnh nào trong mục này."}
+          </p>
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-strong shadow-xs transition-colors cursor-pointer"
+            >
+              <RefreshCw className="size-3 text-muted-foreground" />
+              <span>Đặt lại tất cả bộ lọc</span>
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5">
@@ -1747,22 +1929,31 @@ function MediaStoragePage() {
                       const chipKey = storageKeyOf(img.path);
                       if (!chip) return null;
                       const active = (usageMap?.usage?.[chipKey]?.length ?? 0) > 0;
+                      const isExpiring = Boolean(usageMap?.life?.[chipKey]?.orphaned_at && !usageMap?.life?.[chipKey]?.gc_completed_at);
+                      const isCleaned = Boolean(usageMap?.life?.[chipKey]?.gc_completed_at);
                       return (
                         <button
                           type="button"
                           onClick={() => setUsageDialogKey(chipKey)}
-                          title="Xem nơi đang dùng & lifecycle"
-                          aria-label="Xem nơi đang dùng & lifecycle"
+                          title="Xem nơi đang dùng & vòng đời GC"
+                          aria-label="Xem nơi đang dùng & vòng đời GC"
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold border transition-colors cursor-pointer",
-                            usageMap?.life?.[chipKey]?.gc_completed_at
+                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold border transition-all cursor-pointer",
+                            isCleaned
                               ? "border-border/70 bg-surface-strong/60 text-muted-foreground/70"
                               : active
-                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                                : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                                : isExpiring
+                                  ? "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 animate-pulse"
+                                  : "border-border/80 bg-surface-strong/60 text-muted-foreground hover:bg-surface-strong",
                           )}
                         >
-                          {chip}
+                          {active ? (
+                            <Layers className="size-2.5 text-emerald-600 dark:text-emerald-400" />
+                          ) : isExpiring ? (
+                            <Clock className="size-2.5 text-amber-600 dark:text-amber-400" />
+                          ) : null}
+                          <span>{chip}</span>
                         </button>
                       );
                     })()}
@@ -2144,6 +2335,17 @@ function MediaStoragePage() {
             >
               <span>Bỏ gán thẻ</span>
             </button>
+            {/* Bulk Delete */}
+            <button
+              type="button"
+              disabled={busyBulk}
+              onClick={() => setBulkDeleteConfirmOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-red-600/90 hover:bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+              title="Xóa các ảnh đã chọn"
+            >
+              <Trash2 className="size-3.5" />
+              <span>Xóa ({selectedIds.size})</span>
+            </button>
 
             {/* Deselect All */}
             <button
@@ -2209,6 +2411,44 @@ function MediaStoragePage() {
               <span>
                 {bulkPublicConfirmOpen?.isPublic === 1 ? "Đồng ý Bật Thư viện" : "Đồng ý Ẩn Thư viện"}
               </span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog Xác nhận Xóa Hàng loạt ảnh */}
+      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={(o) => !o && !busyBulk && setBulkDeleteConfirmOpen(false)}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-red-600 dark:text-red-400">
+              <Trash2 className="size-5" />
+              <span>Xác nhận xóa vĩnh viễn {selectedIds.size} ảnh</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground mt-2 space-y-2">
+            <p>
+              Bạn có chắc chắn muốn xóa <b>{selectedIds.size} ảnh đã chọn</b>?
+            </p>
+            <p className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 p-2.5 rounded-lg">
+              Lưu ý: Ảnh sẽ bị gỡ khỏi sản phẩm. Nếu không còn sản phẩm hay bộ sưu tập nào khác sử dụng, file sẽ tự động vào chu trình dọn dẹp Delayed GC ({usageMap?.retentionHours ?? 24}h). Hành động này không thể hoàn tác.
+            </p>
+          </div>
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={busyBulk}
+              onClick={() => setBulkDeleteConfirmOpen(false)}
+              className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
+            >
+              Không xóa
+            </button>
+            <button
+              type="button"
+              disabled={busyBulk}
+              onClick={executeBulkDelete}
+              className="rounded-xl bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-opacity disabled:opacity-50 cursor-pointer inline-flex items-center gap-1.5"
+            >
+              {busyBulk ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              <span>Xóa vĩnh viễn {selectedIds.size} ảnh</span>
             </button>
           </div>
         </DialogContent>

@@ -6,13 +6,28 @@
  *  - parse ref → sha256 / storage_key (managed refs: /images/* hoặc supabase.co/*).
  *  - metadata qua sharp (header-only, không re-encode).
  */
-import { createHash } from "node:crypto";
+// `node:crypto` chỉ được nạp lazy (dynamic) — module này là isomorphic, client
+// bundle phải nạp được vì `gcEstimatedDeleteText` dùng ở /luu-tru; static import
+// `node:crypto` bị Vite externalize → crash browser. Static import không thể dùng
+// vì đây là builtin không tồn tại ở môi trường browser. `import type` bị erase nên
+// an toàn.
+import type { createHash } from "node:crypto";
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const MANAGED_FILE = /^([0-9a-f]{64})(\.[a-z0-9]+)?$/i;
 
-export function contentHashOf(buffer: Buffer): string {
-  return createHash("sha256").update(buffer).digest("hex");
+let createHashFn: typeof createHash | null = null;
+
+/**
+ * SHA-256 hex của buffer — async vì lazy-load crypto; chỉ dùng phía server
+ * (upload/registry), client không bao giờ gọi tới.
+ */
+export async function contentHashOf(buffer: Buffer): Promise<string> {
+  if (!createHashFn) {
+    const mod = await import("node:crypto");
+    createHashFn = mod.createHash;
+  }
+  return createHashFn!("sha256").update(buffer).digest("hex");
 }
 
 /** Ref hình ảnh do CRM quản lý: /images/<sha>.<ext> hoặc supabase.co/<prefix>/<sha>.<ext>. */
