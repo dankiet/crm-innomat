@@ -12,7 +12,7 @@
  *   - Trực quan hóa mẫu gạch swatch, nhãn phòng AI, lời bình thiết kế.
  *   - Cập nhật state trực tiếp không giật màn hình (no router.invalidate).
  */
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   Sparkles,
@@ -30,7 +30,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
-import { WorkspaceModeSwitch } from "@/components/image-workspace/WorkspaceModeSwitch";
 import {
   Dialog,
   DialogContent,
@@ -221,6 +220,19 @@ function parseConceptColor(v: unknown): string | undefined {
 }
 
 export const Route = createFileRoute("/_app/khong-gian")({
+  beforeLoad: ({ search }) => {
+    // /khong-gian không còn là workspace riêng — điều hướng về Media Workspace
+    // /luu-tru?tab=concept, giữ room/q/category (submit lỗi validation tự xử lý).
+    throw redirect({
+      to: "/luu-tru",
+      search: {
+        tab: "concept",
+        roomSlug: search.room as import("@/lib/types").ImageRoomTagSlug | undefined,
+        q: search.q,
+        category: search.category,
+      },
+    });
+  },
   validateSearch: (search: Record<string, unknown>): ConceptHubSearch => {
     const limit = Number(search.limit);
     return {
@@ -553,7 +565,7 @@ function ConceptHubPage() {
             description="Xem xét concept đã sẵn sàng cho Landing Page: mô tả, phòng, trạng thái xuất bản."
           />
         </div>
-        <WorkspaceModeSwitch mode="lookbook" />
+
       </div>
 
       {/* 2. Stats Bar (4 Stat Chips phong cách Innomat Arch Journal) */}

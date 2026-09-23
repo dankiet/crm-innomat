@@ -80,19 +80,8 @@ type ReferenceCountRow = { n: number };
 /** Đếm reference đang trỏ tới storage_key này (LIKE tail trên 5 cột path). */
 export async function countImageReferencesForKey(db: AsyncDb, storageKey: string): Promise<number> {
   if (!storageKey) return 0;
-  const pattern = `%/${storageKey}`;
-  const row = await db
-    .prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM product_images WHERE path LIKE ?) +
-         (SELECT COUNT(*) FROM products WHERE image_path LIKE ?) +
-         (SELECT COUNT(*) FROM customer_mapping_items WHERE image_path LIKE ?) +
-         (SELECT COUNT(*) FROM customer_mapping_items WHERE custom_product_image_path LIKE ?) +
-         (SELECT COUNT(*) FROM gallery_collection_items WHERE path LIKE ?)
-       AS n`,
-    )
-    .get<ReferenceCountRow>(pattern, pattern, pattern, pattern, pattern);
-  return row?.n ?? 0;
+  const { listImageReferencesForKey } = await import("@/db/image-references.server");
+  return (await listImageReferencesForKey(db, storageKey)).length;
 }
 
 /**

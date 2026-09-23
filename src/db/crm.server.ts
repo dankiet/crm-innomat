@@ -285,9 +285,11 @@ export async function isPublicImagePathReferenced(
          UNION ALL SELECT 1 FROM customer_mapping_items WHERE image_path = ?
          UNION ALL SELECT 1 FROM customer_mapping_items WHERE custom_product_image_path = ?
          UNION ALL SELECT 1 FROM gallery_collection_items WHERE path = ?
+         UNION ALL SELECT 1 FROM gallery_collections WHERE cover_path = ?
+         UNION ALL SELECT 1 FROM lp_settings WHERE key = 'hero_image' AND value = ?
          LIMIT 1`,
       )
-      .get(publicPath, publicPath, publicPath, publicPath, publicPath),
+      .get(publicPath, publicPath, publicPath, publicPath, publicPath, publicPath, publicPath),
   );
 }
 

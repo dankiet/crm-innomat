@@ -155,6 +155,32 @@ export const fetchLpLeadsFn = createServerFn({ method: "GET" })
     return await listLpLeads(data);
   });
 
+/** Usage + lifecycle cho các storage keys của một grid page (requireUser). */
+export const fetchMediaUsageFn = createServerFn({ method: "GET" })
+  .inputValidator((data?: { keys: string[] }) => ({
+    keys: (data?.keys ?? []).map(String).filter(Boolean).slice(0, 300),
+  }))
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { getDb } = await import("@/db/driver");
+    const {
+      listImageReferencesForKeys,
+      listAssetLifecycleForKeys,
+      retentionHours,
+    } = await import("@/db/image-references.server");
+    const db = getDb();
+    const [references, lifecycle] = await Promise.all([
+      listImageReferencesForKeys(db, data.keys),
+      listAssetLifecycleForKeys(db, data.keys),
+    ]);
+    return {
+      retentionHours: retentionHours(),
+      usage: Object.fromEntries(references),
+      lifecycle: Object.fromEntries(lifecycle),
+    };
+  });
+
 export const fetchNewLeadsCountFn = createServerFn({ method: "GET" }).handler(async () => {
   const { requireUser } = await import("@/db/auth.server");
   await requireUser();

@@ -5,6 +5,7 @@ import {
   gcRetentionHours,
   gcCutoffUtc,
   orphanAgeHours,
+  gcEstimatedDeleteText,
   GC_RETENTION_HOURS_DEFAULT,
 } from "./image-asset-refs.ts";
 
@@ -52,4 +53,27 @@ test("boundary: orphan đúng 24h cũ là candidate, dưới 24h thì không", (
   assert.ok("2026-09-20 12:00:00" <= cutoff);
   assert.ok("2026-09-20 11:59:59" <= cutoff);
   assert.ok("2026-09-20 12:00:01" > cutoff);
+});
+
+test("gcEstimatedDeleteText: countdown human-readable", () => {
+  const now = new Date("2026-09-21T12:00:00Z");
+  // orphan 6h trước, retention 24h → còn 18h
+  assert.equal(
+    gcEstimatedDeleteText("2026-09-21 06:00:00", 24, now),
+    "Xóa sau ~18 giờ",
+  );
+  // orphan 23h55 trước → còn ~5 phút
+  assert.equal(
+    gcEstimatedDeleteText("2026-09-20 12:05:00", 24, now),
+    "Xóa sau ~5 phút",
+  );
+  // quá hạn
+  assert.equal(
+    gcEstimatedDeleteText("2026-09-20 10:00:00", 24, now),
+    "Đã hết hạn, chờ GC xử lý",
+  );
+  // chuỗi rác → rỗng (không crash)
+  assert.equal(gcEstimatedDeleteText("nope", 24, now), "");
+  // retention âm clamp 0 → hết hạn ngay
+  assert.equal(gcEstimatedDeleteText("2026-09-21 11:00:00", -5, now), "Đã hết hạn, chờ GC xử lý");
 });

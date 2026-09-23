@@ -40,8 +40,14 @@ import {
   fetchFeaturedSlotsFn,
   toggleProductPublicFn,
   bulkSetProductsPublicFn,
+  demoteConceptImageFn,
+  setConceptImagePublicFn,
+  updateConceptDescriptionFn,
+  fetchMediaUsageFn,
 } from "@/api/lp";
 import type { FeaturedSlotInfo } from "@/db/lp.server";
+import type { ImageReference, ImageAssetLifecycleRow } from "@/db/image-references.server";
+import { gcEstimatedDeleteText } from "@/lib/image-asset-refs";
 import {
   IMAGE_ROOM_TAGS,
   PRODUCT_COLORS,
@@ -51,9 +57,9 @@ import {
   type ProductImageRow,
 } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
-import { WorkspaceModeSwitch } from "@/components/image-workspace/WorkspaceModeSwitch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ProductImage";
+import { AssetUsageDialog } from "@/components/AssetUsageDialog";
 import type { FlatMediaItem, FlatMediaSort, FlatMediaTab } from "@/db/media.server";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { ImageRoomTagPicker } from "@/components/ImageRoomTagPicker";
@@ -669,6 +675,115 @@ function MediaStoragePage() {
 
 
   const [items, setItems] = useState<FlatMediaItem[]>([]);
+
+  // ── Usage & lifecycle (Media Workspace) ──
+  const [usageMap, setUsageMap] = useState<{
+    retentionHours: number;
+    usage: Record<string, ImageReference[]>;
+    life: Record<string, ImageAssetLifecycleRow>;
+  } | null>(null);
+  const [usageDialogKey, setUsageDialogKey] = useState<string | null>(null);
+  const [busyLbPublicId, setBusyLbPublicId] = useState<number | null>(null);
+  const [editDescId, setEditDescId] = useState<number | null>(null);
+  const [descDraft, setDescDraft] = useState("");
+  const [savingDescId, setSavingDescId] = useState<number | null>(null);
+  const [demoteKhoConfirmId, setDemoteKhoConfirmId] = useState<number | null>(null);
+  const [busyDemoteKhoId, setBusyDemoteKhoId] = useState<number | null>(null);
+
+  const storageKeyOf = (path: string): string => {
+    const i = path.lastIndexOf("/");
+    return i >= 0 ? path.slice(i + 1) : path;
+  };
+
+  useEffect(() => {
+    const keys = [...new Set(items.map((it) => storageKeyOf(it.path)).filter(Boolean))];
+    if (keys.length === 0) {
+      setUsageMap(null);
+      return;
+    }
+    let cancelled = false;
+    fetchMediaUsageFn({ data: { keys } })
+      .then((res) => {
+        if (cancelled) return;
+        setUsageMap({
+          retentionHours: res.retentionHours,
+          usage: res.usage ?? {},
+          life: res.lifecycle ?? {},
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setUsageMap(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  function usageChipFor(img: FlatMediaItem): string | null {
+    const key = storageKeyOf(img.path);
+    const refs = usageMap?.usage?.[key] ?? [];
+    const life = usageMap?.life?.[key];
+    if (refs.length > 0) return `Đang dùng · ${refs.length}`;
+    if (life?.gc_completed_at) return "Đã dọn storage";
+    if (life?.orphaned_at) {
+      return gcEstimatedDeleteText(life.orphaned_at, usageMap?.retentionHours ?? 24);
+    }
+    return null;
+  }
+
+  async function handleToggleLookbookPublic(img: FlatMediaItem) {
+    setBusyLbPublicId(img.id);
+    try {
+      const next = img.image_is_public === 1 ? 0 : 1;
+      await setConceptImagePublicFn({ data: { id: img.id, is_public: next } });
+      setItems((prev) => prev.map((it) => (it.id === img.id ? { ...it, image_is_public: next } : it)));
+      toast.success(next === 1 ? "Đã hiển thị concept trên Landing Page Lookbook" : "Đã ẩn khỏi Landing Page Lookbook");
+    } catch (err) {
+      toast.error("Lỗi cập nhật Lookbook: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setBusyLbPublicId(null);
+    }
+  }
+
+  function openDescEditor(img: FlatMediaItem) {
+    setEditDescId(img.id);
+    setDescDraft(img.ai_description || "");
+  }
+
+  async function handleSaveDescription(img: FlatMediaItem) {
+    setSavingDescId(img.id);
+    try {
+      const text = descDraft.trim();
+      await updateConceptDescriptionFn({ data: { id: img.id, ai_description: text } });
+      setItems((prev) => prev.map((it) => (it.id === img.id ? { ...it, ai_description: text } : it)));
+      setEditDescId(null);
+      toast.success("Đã cập nhật mô tả");
+    } catch (err) {
+      toast.error("Lỗi lưu mô tả: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSavingDescId(null);
+    }
+  }
+
+  async function handleDemoteFromKhoAnh(img: FlatMediaItem) {
+    setBusyDemoteKhoId(img.id);
+    try {
+      await demoteConceptImageFn({ data: { id: img.id } });
+      setItems((prev) => {
+        let next = prev.map((it) => (it.id === img.id ? { ...it, kind: "normal" as const, image_is_public: 0, ai_description: "" } : it));
+        if (tab === "concept") next = next.filter((it) => it.id !== img.id);
+        return next;
+      });
+      setDemoteKhoConfirmId(null);
+      toast.success("Đã hạ về thường — ảnh rời khỏi Lookbook, về Kho ảnh");
+    } catch (err) {
+      toast.error("Lỗi hạ loại ảnh: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setBusyDemoteKhoId(null);
+    }
+  }
+
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ all: 0, map: 0, concept: 0, featured: 0, unassigned: 0 });
   const [publicCounts, setPublicCounts] = useState({ all: 0, public: 0, hidden: 0 });
@@ -1025,15 +1140,14 @@ function MediaStoragePage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">
-            Image Workspace
+            Media Workspace
           </p>
           <PageHeader
-            eyebrow="Landing Page"
-            title="Kho ảnh"
-            description="Quản lý toàn bộ tài nguyên ảnh sản phẩm: phân loại ảnh MAP, Concept, gán thẻ phòng Lookbook, chọn ảnh bìa Hero và 12 vị trí Tuyển chọn trang chủ."
+            eyebrow="Media Workspace"
+            title="Kho ảnh & Lookbook"
+            description="Một nơi quản lý toàn bộ media: phân loại MAP/Concept, gán phòng, mô tả, Lookbook, Hero, Tuyển chọn — kèm nơi đang dùng và lifecycle storage."
           />
         </div>
-        <WorkspaceModeSwitch mode="assets" />
       </div>
 
       {/* Filter toolbar — Cấu trúc 2 tầng chuẩn Advisor Astra 6 + Sub-strip bối cảnh ngữ cảnh */}
@@ -1557,20 +1671,127 @@ function MediaStoragePage() {
                           item={img}
                           onSave={(slugs) => handleQuickSetRoomTags(img, slugs)}
                         />
-                        {isConcept ? (
-                          <button
-                            type="button"
-                            onClick={() => navigate({ to: "/khong-gian", search: img.room_tags[0] ? { room: img.room_tags[0].room_slug } : {} })}
-                            className="inline-flex items-center gap-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 text-[9px] font-semibold transition-colors cursor-pointer"
-                            title="Xem trong Lookbook"
-                            aria-label="Xem trong Lookbook"
-                          >
-                            <span>Lookbook →</span>
-                          </button>
-                        ) : null}
                       </div>
                     ) : null}
                   </div>
+
+                  {/* Usage summary + Lookbook (Concept) controls */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {(() => {
+                      const chip = usageChipFor(img);
+                      const chipKey = storageKeyOf(img.path);
+                      if (!chip) return null;
+                      const active = (usageMap?.usage?.[chipKey]?.length ?? 0) > 0;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setUsageDialogKey(chipKey)}
+                          title="Xem nơi đang dùng & lifecycle"
+                          aria-label="Xem nơi đang dùng & lifecycle"
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold border transition-colors cursor-pointer",
+                            usageMap?.life?.[chipKey]?.gc_completed_at
+                              ? "border-border/70 bg-surface-strong/60 text-muted-foreground/70"
+                              : active
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                          )}
+                        >
+                          {chip}
+                        </button>
+                      );
+                    })()}
+                    {isConcept ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busyLbPublicId === img.id}
+                          onClick={() => void handleToggleLookbookPublic(img)}
+                          title={img.image_is_public === 1 ? "Đang hiển thị trên Landing Page Lookbook (Bấm để ẩn)" : "Đang ẩn trên Landing Page Lookbook (Bấm để hiển thị)"}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold border transition-all cursor-pointer disabled:opacity-50",
+                            img.image_is_public === 1
+                              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                              : "bg-surface-strong/60 border-border/80 text-muted-foreground/70 hover:text-emerald-600",
+                          )}
+                        >
+                          {img.image_is_public === 1 ? <Check className="size-2.5" /> : <EyeOff className="size-2.5" />}
+                          <span>{img.image_is_public === 1 ? "LD-page" : "Ẩn LD"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDescEditor(img)}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground border border-border/70 bg-surface-strong/60 hover:text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
+                          title="Mô tả concept"
+                          aria-label="Mô tả concept"
+                        >
+                          <Sparkles className="size-2.5" />
+                          <span>Mô tả</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDemoteKhoConfirmId(img.id)}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground border border-border/70 bg-surface-strong/60 hover:text-red-600 hover:border-red-500/30 transition-colors cursor-pointer"
+                          title="Hạ về thường (rời khỏi Lookbook)"
+                          aria-label="Hạ về thường"
+                        >
+                          <Tag className="size-2.5" />
+                          <span>Hạ về thường</span>
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+
+                  {isConcept && editDescId === img.id ? (
+                    <div className="mt-1.5 rounded-lg bg-surface-strong/70 p-1.5 text-[11px]">
+                      <textarea
+                        value={descDraft}
+                        onChange={(e) => setDescDraft(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground focus:outline-none focus:border-terracotta"
+                        placeholder="Mô tả concept (AI-generated, có thể chỉnh sửa)"
+                      />
+                      <div className="mt-1 flex items-center justify-end gap-1.5">
+                        <button type="button" onClick={() => setEditDescId(null)} className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer">
+                          Hủy
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingDescId === img.id}
+                          onClick={() => void handleSaveDescription(img)}
+                          className="rounded-md bg-terracotta px-2 py-1 text-[10px] font-bold text-white hover:bg-terracotta/90 disabled:opacity-50 cursor-pointer"
+                        >
+                          {savingDescId === img.id ? "Đang lưu…" : "Lưu mô tả"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {isConcept && demoteKhoConfirmId === img.id ? (
+                    <div className="mt-1.5 rounded-lg bg-red-500/10 p-1.5 text-[10px]">
+                      <span className="font-semibold text-red-600 dark:text-red-400">Hạ về thường?</span>
+                      <p className="mt-0.5 text-muted-foreground">
+                        Ảnh sẽ rời khỏi Concept/Lookbook và trở lại trạng thái ảnh thường.
+                      </p>
+                      <div className="mt-1 flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={busyDemoteKhoId === img.id}
+                          onClick={() => void handleDemoteFromKhoAnh(img)}
+                          className="flex-1 rounded bg-red-600 py-1 font-bold text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer"
+                        >
+                          {busyDemoteKhoId === img.id ? "Đang hạ…" : "Xác nhận hạ"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDemoteKhoConfirmId(null)}
+                          className="rounded border border-border bg-card px-2 py-1 font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {/* Action Toolbar Below Image */}
                   <div className="mt-2 flex flex-col gap-1.5 border-t border-border/60 pt-2 text-xs">
@@ -2093,6 +2314,18 @@ function MediaStoragePage() {
           setGalleryProduct(null);
         }}
       />
+
+      {/* Usage & lifecycle detail — ngay trong workspace */}
+      {usageDialogKey ? (
+        <AssetUsageDialog
+          open
+          onClose={() => setUsageDialogKey(null)}
+          item={items.find((it) => storageKeyOf(it.path) === usageDialogKey) ?? null}
+          references={usageMap?.usage?.[usageDialogKey] ?? []}
+          lifecycle={usageMap?.life?.[usageDialogKey]}
+          retentionHours={usageMap?.retentionHours ?? 24}
+        />
+      ) : null}
     </div>
   );
 }

@@ -258,6 +258,10 @@ export type FlatMediaItem = {
   is_primary: number;
   kind: ProductImageKind;
   room_tags: ProductImageRoomTag[];
+  /** Trạng thái Lookbook (product_images.is_public) — cách biệt với product_is_public. */
+  image_is_public: number;
+  /** Mô tả concept (AI-generated, có thể sửa) — chỉ có nghĩa với kind=concept. */
+  ai_description: string;
   created_at: string;
 };
 export async function listFlatMediaImages(opts?: {
@@ -503,7 +507,9 @@ export async function listFlatMediaImages(opts?: {
           i.path,
           i.caption,
           i.is_primary,
+          i.is_public AS image_is_public,
           CASE WHEN i.kind = 'map' THEN 'map' WHEN i.kind = 'concept' THEN 'concept' ELSE 'normal' END AS kind,
+          COALESCE(i.ai_description, '') AS ai_description,
           i.created_at
         FROM product_images i
         JOIN products p ON p.id = i.product_id
@@ -526,7 +532,9 @@ export async function listFlatMediaImages(opts?: {
           i.path,
           i.caption,
           i.is_primary,
+          i.is_public AS image_is_public,
           CASE WHEN i.kind = 'map' THEN 'map' WHEN i.kind = 'concept' THEN 'concept' ELSE 'normal' END AS kind,
+          COALESCE(i.ai_description, '') AS ai_description,
           i.created_at
         FROM product_images i
         JOIN products p ON p.id = i.product_id

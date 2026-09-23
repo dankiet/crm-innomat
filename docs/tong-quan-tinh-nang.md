@@ -146,21 +146,34 @@ UTM).
 - `convertLpLeadFn` — **chuyển lead thành khách hàng** trong CRM.
 - `deleteLpLeadFn` — xoá.
 
-## 11. Lookbook / Concept — `/khong-gian`
+## 11. Lookbook / Concept — `/khong-gian` (redirect)
 
-`/khong-gian` — ảnh bối cảnh (Concept) gắn theo không gian. Bộ lọc (không gian,
-nhóm, trạng thái LD-page, tông màu, tìm kiếm) + phân trang **lưu trong URL**
-(`validateSearch`, giá trị mặc định bị bỏ — link chia sẻ tái hiện đúng trạng thái).
+> `/khong-gian` **không còn là workspace riêng** — `beforeLoad` redirect về
+> `/luu-tru?tab=concept` (giữ `room`, `q`, `category`). Toàn bộ workflow Concept/Lookbook
+> sống trong **Media Workspace `/luu-tru`**: card Concept có mô tả (AI-generated), bật/ẩn
+> LD-page, hạ về thường (consequence rõ), và nút "nơi đang dùng".
 
-**Image Workspace**: `/khong-gian` (Lookbook mode) và `/luu-tru` (Kho ảnh mode) là
-hai mode của cùng một workspace — mode switch trên đầu trang, giữ `q` và ánh xạ
-`room` ↔ `roomSlug` khi chuyển. Lookbook có nút "Quản lý ảnh" (về Kho ảnh giữ
-context); card concept trong Kho ảnh có "Lookbook →" (sang Lookbook giữ room).
+### Lookbook (context của media)
 
 - `listCrmConceptImages` — danh sách cho CRM.
-- `setConceptImagePublic` — bật/tắt hiển thị công khai trên LP.
+- `setConceptImagePublic` — bật/tắt Lookbook visibility (per image).
 - `updateConceptDescription` — mô tả (AI description).
-- `demoteConceptImage` — bỏ khỏi LP (concept → ảnh thường, về Kho ảnh).
+- `demoteConceptImage` — hạ concept → ảnh thường (rời khỏi Lookbook).
+
+## 11b. Nơi đang dùng & lifecycle (Media Workspace)
+
+`/luu-tru` trả lời "Ảnh này dùng ở đâu?" qua **Reference Resolver**
+(`src/db/image-references.server.ts`) — 7 nguồn: `product_images.path`,
+`products.image_path`, `customer_mapping_items.image_path` + `custom_product_image_path`,
+`gallery_collection_items.path`, **`gallery_collections.cover_path`**, **`lp_settings.hero_image`**
+(`key='hero_image'`). Matching tail `%/<storage_key>` (chấp nhận cả `/images/…`, full URL,
+key trần). GC re-check `countImageReferencesForKey` **delegate về cùng resolver** — một
+"truth source"; `isPublicImagePathReferenced` (orphan-marking) cũng đếm cover + hero.
+
+Card hiển thị chip: `Đang dùng · N` / `Sắp xóa · X giờ` (orphan + retention
+`IMAGE_GC_RETENTION_HOURS`) / `Đã dọn storage`. Click chip → **AssetUsageDialog**
+(references theo role + lifecycle registry + href khi có route). Registry
+`image_assets` giữ vĩnh viễn (không purge).
 
 ## 12. Lưu trữ ảnh — `/luu-tru`
 

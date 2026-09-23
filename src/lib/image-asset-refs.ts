@@ -92,6 +92,22 @@ export function gcCutoffUtc(retentionHours: number, now: Date = new Date()): str
     .replace("T", " ");
 }
 
+/** Countdown human-readable: "Xóa sau ~18 giờ" (hoặc phút), rỗng nếu không parse được. */
+export function gcEstimatedDeleteText(
+  orphanedAt: string,
+  retentionHours: number,
+  now: Date = new Date(),
+): string {
+  const t = Date.parse(orphanedAt.replace(" ", "T") + "Z");
+  if (Number.isNaN(t)) return "";
+  const deleteAt = t + Math.max(0, retentionHours) * 3_600_000;
+  const remainingMs = deleteAt - now.getTime();
+  if (remainingMs <= 0) return "Đã hết hạn, chờ GC xử lý";
+  const hours = Math.floor(remainingMs / 3_600_000);
+  if (hours >= 1) return `Xóa sau ~${hours} giờ`;
+  return `Xóa sau ~${Math.max(1, Math.ceil(remainingMs / 60_000))} phút`;
+}
+
 /** Độ tuổi orphan (giờ) — cho báo cáo dry-run. */
 export function orphanAgeHours(orphanedAt: string, now: Date = new Date()): number {
   const t = Date.parse(orphanedAt.replace(" ", "T") + "Z");
