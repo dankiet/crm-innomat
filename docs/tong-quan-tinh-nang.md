@@ -175,16 +175,23 @@ Card hiển thị chip: `Đang dùng · N` / `Sắp xóa · X giờ` (orphan + r
 (references theo role + lifecycle registry + href khi có route). Registry
 `image_assets` giữ vĩnh viễn (không purge).
 
-## 12. Lưu trữ ảnh — `/luu-tru`
+## 12. Media — `/luu-tru`
 
-Kho ảnh vận hành: mọi ảnh sản phẩm + phân loại.
+Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + lifecycle.
 
-- **Tab**: Tất cả / Chỉ ảnh MAP / Bối cảnh (Concept) / Tuyển chọn Trang chủ / Chưa gán thẻ.
-- **Bộ lọc**: Màu, Bề mặt, Kiểu dáng, **Hiệu ứng vân**, Bộ sưu tập (lọc server-side).
-- **Phân trang + bộ lọc lưu trong URL** (`validateSearch`, giá trị mặc định bị bỏ —
-  link chia sẻ tái hiện đúng trạng thái).
-- **Thao tác nhanh**: gán thẻ phòng (`product_image_room_tags`), đặt hạng "Tuyển chọn",
-  bật/tắt hiển thị trên LP, gán hàng loạt.
+- **Phạm vi (primary tabs, ngắn)**: Tất cả · MAP · Concept · Chưa gán.
+- **Sử dụng (secondary, URL `usage`)**: `in_use` (có ref khác), `unused` (0 ref khác,
+  không chờ xoá), `expiring` (0 ref + orphan trong retention) — dùng chung Reference
+  Resolver (7 nguồn), không nhân bản.
+- **Tuyển chọn Trang chủ (#1–#12)** là thuộc tính secondary (`selected` = `yes`/`no`)
+  chứ không phải tab; sort `priority` xếp #1→#12→chưa chọn; `tab=featured` còn nhận cho
+  deep-link cũ.
+- **Bộ lọc**: Nhóm (product taxonomy) → Sử dụng/Tuyển chọn/Sắp xếp → Màu, Bề mặt, Dáng,
+  Vân, BST.
+- **Phân trang + bộ lọc lưu trong URL** (`validateSearch`, giá trị mặc định bị bỏ).
+- **Thao tác nhanh**: gán phòng (`product_image_room_tags`, consequence rõ), mô tả
+  (AI-generated · edit), Lookbook visibility, hạ về thường, đặt hạng "Tuyển chọn",
+  bật/tắt Thư viện, gán hàng loạt.
 - Nén ảnh WebP, xoá an toàn theo tham chiếu: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
 
 ## 13. Thư viện — `/thu-vien`

@@ -18,7 +18,7 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 | `/ghi-chu`                | `_app.ghi-chu.tsx`                                 | Ghi chú toàn hệ thống                                                    |
 | `/san-pham`               | `_app.san-pham.tsx`                                | Catalog sản phẩm, filter & tồn kho                                       |
 | `/thu-vien`               | `_app.thu-vien.tsx`                                | Thư viện hình                                                            |
-| `/luu-tru`                | `_app.luu-tru.tsx`                                 | **Lưu trữ** — kho ảnh: thẻ phòng, tuyển chọn, hiển thị LP                 |
+| `/luu-tru`                | `_app.luu-tru.tsx`                                 | **Media** — media workspace: kho ảnh, thẻ phòng, tuyển chọn, hiển thị LP       |
 | `/leads`                  | `_app.leads.tsx`                                   | **Hộp thư Lead** — lead từ landing, chuyển thành khách hàng               |
 | `/khong-gian`             | `_app.khong-gian.tsx`                              | **Lookbook** — ảnh Concept, bật/tắt công khai trên LP                     |
 | `/lp/$slug`               | `lp.$slug.tsx`                                     | **Công khai** — trang landing cho khách vãng lai (không qua cổng auth)    |
@@ -43,7 +43,7 @@ URL là nơi giữ trạng thái lọc — người dùng copy link là bạn th
 | `/thu-vien`   | `sort`, `cat`, `c`, `v`                                                                                                                                         | `c` = collection id, `v` = index viewer       |
 | `/san-pham`   | `nhom`, `q`, `colors`, `surfaces`, `sizes`, `shapes`, `textures`, `collections`, `supplier`, `hot`, `web`, `view`, `stockLocation`, `sort` | Các filter nhiều giá trị nhận cả array và CSV |
 | `/khong-gian` | `category`, `room`, `status`, `color`, `q`, `page`, `limit`                                                                               | `room` = tab không gian (`living_room`…), `status` = `"1"` \| `"0"` (mặc định `all`), `color` = id palette, `limit` ∈ {24, 48, 96} |
-| `/luu-tru`    | `tab`, `category`, `roomSlug`, `publicFilter`, `colors`, `surfaces`, `shapes`, `textures`, `collections`, `q`, `sort`, `page`, `pageSize` | `tab` = `map` \| `concept` \| `featured` \| `unassigned` (mặc định `all`), `roomSlug` = id thẻ phòng, `publicFilter` = `public` \| `hidden`, `sort` = `oldest` \| `code_asc` \| `code_desc`, `pageSize` ∈ {24, 48, 96} |
+| `/luu-tru`    | `tab`, `category`, `roomSlug`, `publicFilter`, `colors`, `surfaces`, `shapes`, `textures`, `collections`, `q`, `sort`, `usage`, `selected`, `page`, `pageSize` | `tab` = `map` \| `concept` \| `featured` \| `unassigned` (mặc định `all`; `featured` còn nhận cho deep-link cũ, không còn là tab UI), `roomSlug` = id thẻ phòng, `publicFilter` = `public` \| `hidden`, `sort` = `oldest` \| `code_asc` \| `code_desc` \| `priority` (Ưu tiên: #1→#12→chưa chọn), `usage` = `in_use` \| `unused` \| `expiring` (Sử dụng — dùng chung Reference Resolver), `selected` = `yes` \| `no` (Tuyển chọn Trang chủ), `pageSize` ∈ {24, 48, 96} |
 | `/leads`      | `status`                                                                                                                                   | `new` \| `contacted` \| `converted` \| `spam` \| `all` |
 
 Mọi route đều có `validateSearch` để chuẩn hoá — giá trị lạ bị bỏ (`undefined`), không throw. Nhờ vậy

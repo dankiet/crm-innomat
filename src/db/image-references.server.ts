@@ -207,6 +207,23 @@ export async function listImageReferencesForKeys(
   return result;
 }
 
+/** SQL predicate "có reference KHÁC (ngoài row đang list) trỏ tới file của row".
+ * Dùng cho Media Workspace usage filter — SAME 7 nguồn như resolver (không nhân bản).
+ * Trả body (không bọc EXISTS) để caller wrap. */
+export function otherReferencesExistSql(rowAlias: string, tailExpr: string): string {
+  const p = `'%/' || ${tailExpr}`;
+  return `(
+    SELECT 1 FROM product_images o1 WHERE o1.path LIKE ${p} AND o1.id <> ${rowAlias}.id
+    UNION ALL SELECT 1 FROM products o2 WHERE o2.image_path LIKE ${p}
+    UNION ALL SELECT 1 FROM customer_mapping_items o3 WHERE o3.image_path LIKE ${p}
+    UNION ALL SELECT 1 FROM customer_mapping_items o4 WHERE o4.custom_product_image_path LIKE ${p}
+    UNION ALL SELECT 1 FROM gallery_collection_items o5 WHERE o5.path LIKE ${p}
+    UNION ALL SELECT 1 FROM gallery_collections o6 WHERE o6.cover_path LIKE ${p}
+    UNION ALL SELECT 1 FROM lp_settings o7 WHERE o7.key = 'hero_image' AND o7.value LIKE ${p}
+    LIMIT 1
+  )`;
+}
+
 export { gcRetentionHours };
 /** Retention (giờ) cho countdown UI — cùng chính sách toàn cục, không per-asset. */
 export function retentionHours(): number {

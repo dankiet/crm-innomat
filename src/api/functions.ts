@@ -1758,6 +1758,8 @@ export const fetchFlatMediaImagesFn = createServerFn({ method: "GET" })
       sort?: FlatMediaSort;
       page?: number;
       pageSize?: number;
+      usage?: import("@/db/media.server").FlatMediaUsage;
+      selected?: "yes" | "no";
     }) => data,
   )
   .handler(async ({ data }) => {

@@ -6,6 +6,7 @@
  * (một chiều — KHÔNG tạo chu trình).
  */
 import { getDb, type SqlValue } from "./index.server";
+import { otherReferencesExistSql } from "@/db/image-references.server";
 import { getProduct, loadProductImageRoomTags, normalizeRoomSlugs } from "./crm.server";
 import { nowUtc } from "@/lib/format";
 import type { ImageRoomTagSlug, Product, ProductImageKind, ProductImageRoomTag } from "@/lib/types";
@@ -125,7 +126,9 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
       color: String(input.color ?? existing.color ?? "").trim(),
       area_per_tile_m2:
         input.area_per_tile_m2 !== undefined
-          ? (input.area_per_tile_m2 != null && !Number.isNaN(Number(input.area_per_tile_m2)) ? Number(input.area_per_tile_m2) : null)
+          ? input.area_per_tile_m2 != null && !Number.isNaN(Number(input.area_per_tile_m2))
+            ? Number(input.area_per_tile_m2)
+            : null
           : (existing.area_per_tile_m2 ?? null),
       retail_price: retail,
       trade_price: tradePrice,
@@ -243,7 +246,7 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
 }
 
 export type FlatMediaTab = "all" | "map" | "concept" | "featured" | "unassigned";
-export type FlatMediaSort = "newest" | "oldest" | "code_asc" | "code_desc";
+export type FlatMediaSort = "newest" | "oldest" | "code_asc" | "code_desc" | "priority";
 
 export type FlatMediaItem = {
   id: number;
@@ -264,6 +267,7 @@ export type FlatMediaItem = {
   ai_description: string;
   created_at: string;
 };
+export type FlatMediaUsage = "all" | "in_use" | "unused" | "expiring";
 export async function listFlatMediaImages(opts?: {
   tab?: FlatMediaTab;
   category?: string;
@@ -278,6 +282,8 @@ export async function listFlatMediaImages(opts?: {
   sort?: FlatMediaSort;
   page?: number;
   pageSize?: number;
+  usage?: FlatMediaUsage;
+  selected?: "yes" | "no";
 }): Promise<{
   items: FlatMediaItem[];
   total: number;
@@ -443,10 +449,11 @@ export async function listFlatMediaImages(opts?: {
     GROUP BY rt.room_slug
   `;
 
-  const roomCountRows = (await db.prepare(roomCountsSql).all<{
-    room_slug: string;
-    count: number | string;
-  }>(...baseParams)) ?? [];
+  const roomCountRows =
+    (await db.prepare(roomCountsSql).all<{
+      room_slug: string;
+      count: number | string;
+    }>(...baseParams)) ?? [];
 
   const roomCounts: Record<string, number> = {};
   for (const r of roomCountRows) {
@@ -464,6 +471,30 @@ export async function listFlatMediaImages(opts?: {
     listWhere.push("p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12");
   } else if (tab === "unassigned") {
     listWhere.push("(i.kind = 'normal' OR i.kind IS NULL OR i.kind = '')");
+  }
+
+  // Tuyển chọn Trang chủ — secondary filter (không phải tab chính)
+  if (opts?.selected === "yes") {
+    listWhere.push("p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12");
+  } else if (opts?.selected === "no") {
+    listWhere.push("p.featured_rank IS NULL");
+  }
+
+  // Sử dụng / lifecycle — reuse Reference Resolver (same 7 nguồn).
+  const usage = opts?.usage ?? "all";
+  if (usage !== "all") {
+    const otherRefs = otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')");
+    if (usage === "in_use") {
+      listWhere.push(`EXISTS ${otherRefs}`);
+    } else {
+      const notOther = `NOT EXISTS ${otherRefs}`;
+      const pending = "ast.orphaned_at IS NOT NULL AND ast.gc_completed_at IS NULL";
+      if (usage === "expiring") {
+        listWhere.push(`${notOther} AND ${pending}`);
+      } else {
+        listWhere.push(`${notOther} AND NOT (${pending})`);
+      }
+    }
   }
 
   const listWhereSql = `WHERE ${listWhere.join(" AND ")}`;
@@ -488,6 +519,8 @@ export async function listFlatMediaImages(opts?: {
     orderBySql = "p.code ASC, i.is_primary DESC, i.sort_order ASC, i.id ASC";
   } else if (sort === "code_desc") {
     orderBySql = "p.code DESC, i.is_primary DESC, i.sort_order ASC, i.id ASC";
+  } else if (sort === "priority") {
+    orderBySql = "p.featured_rank ASC NULLS LAST, i.is_primary DESC, i.id ASC";
   }
 
   // 5. Query danh sách ảnh phân trang theo Ảnh
@@ -513,6 +546,7 @@ export async function listFlatMediaImages(opts?: {
           i.created_at
         FROM product_images i
         JOIN products p ON p.id = i.product_id
+        LEFT JOIN image_assets ast ON ast.storage_key = substring(i.path from '([^/]+)$')
         ${listWhereSql}
         ORDER BY p.featured_rank ASC, (i.kind = 'map') DESC, i.is_primary DESC, i.id ASC
         LIMIT ? OFFSET ?`,
@@ -538,6 +572,7 @@ export async function listFlatMediaImages(opts?: {
           i.created_at
         FROM product_images i
         JOIN products p ON p.id = i.product_id
+        LEFT JOIN image_assets ast ON ast.storage_key = substring(i.path from '([^/]+)$')
         ${listWhereSql}
         ORDER BY ${orderBySql}
         LIMIT ? OFFSET ?`,
@@ -569,7 +604,9 @@ export async function bulkSetProductImageKind(
       // Lấy danh sách ảnh cùng product_id và path
       const placeholders = cleanIds.map(() => "?").join(", ");
       const rows = await tx
-        .prepare(`SELECT id, product_id, path FROM product_images WHERE id IN (${placeholders}) ORDER BY id ASC`)
+        .prepare(
+          `SELECT id, product_id, path FROM product_images WHERE id IN (${placeholders}) ORDER BY id ASC`,
+        )
         .all<{ id: number; product_id: number; path: string }>(...cleanIds);
 
       // Nếu cùng 1 SP có nhiều ảnh được chọn, lấy ảnh cuối cùng làm MAP
@@ -581,10 +618,14 @@ export async function bulkSetProductImageKind(
       for (const [productId, targetImg] of targetImageByProduct.entries()) {
         // Hạ các ảnh MAP cũ của SP này về normal
         await tx
-          .prepare("UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?")
+          .prepare(
+            "UPDATE product_images SET kind = 'normal' WHERE product_id = ? AND kind = 'map' AND id <> ?",
+          )
           .run(productId, targetImg.id);
         // Set ảnh được chọn thành MAP
-        const res = await tx.prepare("UPDATE product_images SET kind = 'map' WHERE id = ?").run(targetImg.id);
+        const res = await tx
+          .prepare("UPDATE product_images SET kind = 'map' WHERE id = ?")
+          .run(targetImg.id);
         // Đồng bộ products.image_path và is_primary
         await tx
           .prepare("UPDATE products SET image_path = ? WHERE id = ?")
@@ -592,9 +633,7 @@ export async function bulkSetProductImageKind(
         await tx
           .prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = ? AND id <> ?")
           .run(productId, targetImg.id);
-        await tx
-          .prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?")
-          .run(targetImg.id);
+        await tx.prepare("UPDATE product_images SET is_primary = 1 WHERE id = ?").run(targetImg.id);
         updated += Number(res.changes) || 0;
       }
     } else {
@@ -627,9 +666,9 @@ export async function setImageRoomTagsDirect(
   roomSlugs: ImageRoomTagSlug[],
 ): Promise<ProductImageRoomTag[]> {
   const db = getDb();
-  const row = (await db
+  const row = await db
     .prepare("SELECT id, kind, product_id FROM product_images WHERE id = ?")
-    .get<{ id: number; kind: ProductImageKind; product_id: number }>(imageId));
+    .get<{ id: number; kind: ProductImageKind; product_id: number }>(imageId);
   if (!row) throw new Error("Không tìm thấy ảnh này");
   const slugs = normalizeRoomSlugs(roomSlugs);
   const now = nowUtc();
@@ -637,9 +676,7 @@ export async function setImageRoomTagsDirect(
     if (slugs.length > 0 && row.kind !== "concept") {
       await tx.prepare("UPDATE product_images SET kind = 'concept' WHERE id = ?").run(imageId);
     }
-    await tx
-      .prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?")
-      .run(imageId);
+    await tx.prepare("DELETE FROM product_image_room_tags WHERE product_image_id = ?").run(imageId);
     for (const roomSlug of slugs) {
       await tx
         .prepare(
@@ -673,7 +710,9 @@ export async function bulkSetProductImageRoomTags(
     if (slugs.length > 0 && mode !== "remove") {
       const placeholders = cleanIds.map(() => "?").join(", ");
       await tx
-        .prepare(`UPDATE product_images SET kind = 'concept' WHERE id IN (${placeholders}) AND kind <> 'concept'`)
+        .prepare(
+          `UPDATE product_images SET kind = 'concept' WHERE id IN (${placeholders}) AND kind <> 'concept'`,
+        )
         .run(...cleanIds);
     }
 
@@ -727,4 +766,3 @@ export async function bulkSetProductImageRoomTags(
 
   return { updated };
 }
-

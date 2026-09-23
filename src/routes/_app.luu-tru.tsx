@@ -60,7 +60,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ProductImage";
 import { AssetUsageDialog } from "@/components/AssetUsageDialog";
-import type { FlatMediaItem, FlatMediaSort, FlatMediaTab } from "@/db/media.server";
+import type { FlatMediaItem, FlatMediaSort, FlatMediaTab, FlatMediaUsage } from "@/db/media.server";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { ImageRoomTagPicker } from "@/components/ImageRoomTagPicker";
 import { cn } from "@/lib/utils";
@@ -84,10 +84,13 @@ type MediaStorageSearch = {
   sort?: FlatMediaSort;
   page?: number;
   pageSize?: number;
+  usage?: "all" | "in_use" | "unused" | "expiring";
+  selected?: "yes" | "no";
 };
 
 const FLAT_MEDIA_TABS: readonly string[] = ["all", "map", "concept", "featured", "unassigned"];
-const FLAT_MEDIA_SORTS: readonly string[] = ["newest", "oldest", "code_asc", "code_desc"];
+const FLAT_MEDIA_SORTS: readonly string[] = ["newest", "oldest", "code_asc", "code_desc", "priority"];
+const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "in_use", "unused", "expiring"];
 const PUBLIC_FILTERS: readonly string[] = ["all", "public", "hidden"];
 
 function parseMediaTab(v: unknown): FlatMediaTab | undefined {
@@ -132,6 +135,10 @@ export const Route = createFileRoute("/_app/luu-tru")({
       sort: parseMediaSort(search.sort),
       page: parsePositiveInt(search.page),
       pageSize: (PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize) ? pageSize : undefined,
+      usage: USAGE_OPTIONS.includes(search.usage as FlatMediaUsage)
+        ? (search.usage as FlatMediaUsage)
+        : undefined,
+      selected: search.selected === "yes" || search.selected === "no" ? search.selected : undefined,
     };
   },
   errorComponent: ({ error }) => (
@@ -598,6 +605,8 @@ function MediaStoragePage() {
   const sort = searchParams.sort ?? "newest";
   const page = searchParams.page ?? 1;
   const pageSize = searchParams.pageSize ?? 24;
+  const usage = searchParams.usage ?? "all";
+  const selectedVal = tab === "featured" ? "yes" : (searchParams.selected ?? "all");
 
   /** Đổi filter: ghi URL và luôn reset về trang 1 (đúng hành vi cũ). */
   function patchFilters(patch: Partial<MediaStorageSearch>) {
@@ -1144,7 +1153,7 @@ function MediaStoragePage() {
           </p>
           <PageHeader
             eyebrow="Media Workspace"
-            title="Kho ảnh & Lookbook"
+            title="Media"
             description="Một nơi quản lý toàn bộ media: phân loại MAP/Concept, gán phòng, mô tả, Lookbook, Hero, Tuyển chọn — kèm nơi đang dùng và lifecycle storage."
           />
         </div>
@@ -1237,7 +1246,7 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          <FilterChip label="Kiểu dáng" count={selectedShapes.length}>
+          <FilterChip label="Dáng" count={selectedShapes.length}>
             <MultiSelectFilter
               title="Chọn kiểu dáng"
               options={shapeOptions}
@@ -1246,7 +1255,7 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          <FilterChip label="Hiệu ứng vân" count={selectedTextures.length}>
+          <FilterChip label="Vân" count={selectedTextures.length}>
             <MultiSelectFilter
               title="Chọn hiệu ứng vân"
               options={textureOptions}
@@ -1255,7 +1264,7 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          <FilterChip label="Bộ sưu tập" count={selectedCollections.length}>
+          <FilterChip label="BST" count={selectedCollections.length}>
             <MultiSelectFilter
               title="Chọn bộ sưu tập"
               options={collectionOptions}
@@ -1281,7 +1290,7 @@ function MediaStoragePage() {
         <div className="flex flex-wrap items-center justify-between gap-2.5 pt-0.5 border-t border-border/60 pt-2.5">
           {/* Segmented Control: KIND ảnh */}
           <div className="flex flex-wrap items-center bg-surface-strong/60 p-0.5 rounded-full border border-border/80 shrink-0">
-            {TABS.map((t) => {
+            {TABS.filter((t) => t.key !== "featured").map((t) => {
               const active = tab === t.key;
               const count = counts[t.countKey];
               const isMapTab = t.key === "map";
@@ -1375,6 +1384,62 @@ function MediaStoragePage() {
                 </button>
               </div>
             ) : null}
+            {/* Sử dụng (usage / lifecycle) — secondary */}
+            <div
+              className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
+              title="Lọc theo nơi đang dùng (reference resolver) & lifecycle GC"
+            >
+              {USAGE_OPTIONS.map((u) => {
+                const activeU = usage === u;
+                return (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => patchFilters({ usage: u === "all" ? undefined : (u as "in_use" | "unused" | "expiring") })}
+                    className={cn(
+                      "rounded-full px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+                      activeU
+                        ? "bg-card font-semibold text-foreground shadow-xs ring-1 ring-black/5"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                    )}
+                  >
+                    {u === "all" ? "Sử dụng" : u === "in_use" ? "Đang dùng" : u === "unused" ? "Chưa dùng" : "Chờ xoá"}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tuyển chọn Trang chủ (#1–#12) — secondary */}
+            <div
+              className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
+              title="Lọc theo Vị trí Tuyển chọn Trang chủ (#1–#12)"
+            >
+              {[
+                { key: "all", label: "Tuyển chọn" },
+                { key: "yes", label: "Đã chọn" },
+                { key: "no", label: "Chưa chọn" },
+              ].map((opt) => {
+                const activeS = selectedVal === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() =>
+                      patchFilters({ selected: opt.key === "all" ? undefined : (opt.key as "yes" | "no") })
+                    }
+                    className={cn(
+                      "rounded-full px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+                      activeS
+                        ? "bg-card font-semibold text-foreground shadow-xs ring-1 ring-black/5"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Sắp xếp */}
             <div className="flex bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs">
               {SORT_OPTIONS.map((opt) => {
