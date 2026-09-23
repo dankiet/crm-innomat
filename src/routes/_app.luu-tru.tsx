@@ -755,13 +755,19 @@ function MediaStoragePage() {
 
   function usageChipFor(img: FlatMediaItem): string | null {
     const key = storageKeyOf(img.path);
-    const refs = usageMap?.usage?.[key] ?? [];
+    // refs KHÔNG tính bản ghi self (row product_images của chính ảnh) — khớp
+    // định nghĩa To Delete server (`o1.id <> i.id`). Ngày trước đếm cả self
+    // → ảnh To Delete luôn hiện fake "Đang dùng · 1".
+    const refs = (usageMap?.usage?.[key] ?? []).filter(
+      (r) => !(r.role === "product_image" && String(r.id) === String(img.id)),
+    );
     const life = usageMap?.life?.[key];
     if (refs.length > 0) return `Đang dùng · ${refs.length}`;
     if (life?.gc_completed_at) return "Đã dọn storage";
     if (life?.orphaned_at) {
       return gcEstimatedDeleteText(life.orphaned_at, usageMap?.retentionHours ?? 24);
     }
+    if (usage === "expiring") return "Chỉ dùng ở đây · sẽ dọn khi gỡ";
     return null;
   }
 
@@ -1431,7 +1437,7 @@ function MediaStoragePage() {
             {/* Status — segmented: Active | To Delete (mặc định Active) */}
             <div
               className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
-              title="Lọc theo trạng thái sử dụng: Active = còn được dùng nơi khác; To Delete = không còn dùng ở nơi khác"
+              title="Lọc theo trạng thái: Active = toàn bộ ảnh đang có (mặc định); To Delete = chỉ ảnh KHÔNG còn dùng ở nơi khác (ứng viên dọn dẹp)"
             >
               <button
                 type="button"
@@ -1641,7 +1647,7 @@ function MediaStoragePage() {
                 Đang lọc ảnh chờ dọn dẹp (Delayed GC)
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Các ảnh này không còn được tham chiếu ở sản phẩm hay bộ sưu tập nào. Hệ thống giữ file trong {usageMap?.retentionHours ?? 24} giờ trước khi dọn dẹp vĩnh viễn khỏi storage. Bấm vào chip trên ảnh để xem chi tiết.
+                Toàn bộ ảnh ở đây KHÔNG còn được dùng ở nơi khác (sản phẩm, bộ sưu tập, landing…) — mỗi ảnh chỉ còn được giữ bởi bản ghi hiện tại. File sẽ tự vào hàng đợi dọn dẹp trong {usageMap?.retentionHours ?? 24} giờ ngay khi ảnh này được gỡ khỏi sản phẩm. Ảnh có đồng hồ đếm ngược = đã được xếp lịch dọn vĩnh viễn. Bấm chip trên ảnh để xem chi tiết nơi đang dùng.
               </p>
             </div>
           </div>
@@ -1845,9 +1851,13 @@ function MediaStoragePage() {
                       const chip = usageChipFor(img);
                       const chipKey = storageKeyOf(img.path);
                       if (!chip) return null;
-                      const active = (usageMap?.usage?.[chipKey]?.length ?? 0) > 0;
+                      const active =
+                        (usageMap?.usage?.[chipKey] ?? []).filter(
+                          (r) => !(r.role === "product_image" && String(r.id) === String(img.id)),
+                        ).length > 0;
                       const isExpiring = Boolean(usageMap?.life?.[chipKey]?.orphaned_at && !usageMap?.life?.[chipKey]?.gc_completed_at);
                       const isCleaned = Boolean(usageMap?.life?.[chipKey]?.gc_completed_at);
+                      const onlyHere = usage === "expiring" && !active && !isExpiring;
                       return (
                         <button
                           type="button"
@@ -1860,14 +1870,14 @@ function MediaStoragePage() {
                               ? "border-border/70 bg-surface-strong/60 text-muted-foreground/70"
                               : active
                                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                                : isExpiring
+                                : isExpiring || onlyHere
                                   ? "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 animate-pulse"
                                   : "border-border/80 bg-surface-strong/60 text-muted-foreground hover:bg-surface-strong",
                           )}
                         >
                           {active ? (
                             <Layers className="size-2.5 text-emerald-600 dark:text-emerald-400" />
-                          ) : isExpiring ? (
+                          ) : isExpiring || onlyHere ? (
                             <Clock className="size-2.5 text-amber-600 dark:text-amber-400" />
                           ) : null}
                           <span>{chip}</span>

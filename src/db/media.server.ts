@@ -6,7 +6,6 @@
  * (một chiều — KHÔNG tạo chu trình).
  */
 import { getDb, type SqlValue } from "./index.server";
-import { otherReferencesExistSql } from "@/db/image-references.server";
 import { getProduct, loadProductImageRoomTags, normalizeRoomSlugs } from "./crm.server";
 import { nowUtc } from "@/lib/format";
 import type { ImageRoomTagSlug, Product, ProductImageKind, ProductImageRoomTag } from "@/lib/types";
@@ -486,10 +485,24 @@ export async function listFlatMediaImages(opts?: {
   // Active = ảnh đang được dùng (bản ghi media của chính nó là ref) → không lọc.
   // To Delete = không còn ref NÀO KHÁC ngoài bản ghi hiện tại → vào GC sau.
   // Mặc định (không truyền) = "all" — tuyệt đối không làm trống tab khi mở.
+  //
+  // ⚠️ PERFORMANCE: predicate dùng precompute-set (UNCORRELATED) thay vì correlated
+  // NOT EXISTS per-row — correlated chạy 7-UNION + LIKE '%/tail' trên TỪNG row
+  // (107s/request → timeout browser). Set này PG evaluate 1 lần (hash anti-join).
+  // Cùng 7 nguồn như image-references resolver: product_images (khác row),
+  // products.image_path, mapping ×2, gallery ×2, lp_settings.hero_image.
   const usage = opts?.usage ?? "all";
   if (usage === "expiring" || usage === "unused") {
     listWhere.push(
-      `NOT EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`,
+      `substring(i.path from '([^/]+)$') NOT IN (
+        SELECT substring(path from '([^/]+)$') FROM product_images WHERE path IS NOT NULL AND path <> '' GROUP BY 1 HAVING COUNT(*) > 1
+        UNION SELECT substring(image_path from '([^/]+)$') FROM products WHERE image_path IS NOT NULL AND image_path <> ''
+        UNION SELECT substring(image_path from '([^/]+)$') FROM customer_mapping_items WHERE image_path IS NOT NULL AND image_path <> ''
+        UNION SELECT substring(custom_product_image_path from '([^/]+)$') FROM customer_mapping_items WHERE custom_product_image_path IS NOT NULL AND custom_product_image_path <> ''
+        UNION SELECT substring(path from '([^/]+)$') FROM gallery_collection_items WHERE path IS NOT NULL AND path <> ''
+        UNION SELECT substring(cover_path from '([^/]+)$') FROM gallery_collections WHERE cover_path IS NOT NULL AND cover_path <> ''
+        UNION SELECT substring(value from '([^/]+)$') FROM lp_settings WHERE key = 'hero_image' AND value IS NOT NULL AND value <> ''
+      )`,
     );
   }
 
