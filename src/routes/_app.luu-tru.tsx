@@ -609,8 +609,7 @@ function MediaStoragePage() {
   const sort = searchParams.sort ?? "newest";
   const page = searchParams.page ?? 1;
   const pageSize = searchParams.pageSize ?? 24;
-  const usage = searchParams.usage ?? "all";
-  const selectedVal = tab === "featured" ? "yes" : (searchParams.selected ?? "all");
+  const usage = searchParams.usage ?? "in_use";
 
   /** Đổi filter: ghi URL và luôn reset về trang 1 (đúng hành vi cũ). */
   function patchFilters(patch: Partial<MediaStorageSearch>) {
@@ -620,9 +619,6 @@ function MediaStoragePage() {
     navigate({ search: (prev) => ({ ...prev, page: newPage === 1 ? undefined : newPage }) });
   }
   const currentSortOption = SORT_OPTIONS.find((s) => s.key === sort) ?? SORT_OPTIONS[0]!;
-  const statusFilterActiveCount =
-    (usage !== "all" ? 1 : 0) +
-    (tab !== "featured" && searchParams.selected != null ? 1 : 0);
 
   const hasActiveFilters = Boolean(
     searchParams.q ||
@@ -634,7 +630,7 @@ function MediaStoragePage() {
     selectedShapes.length > 0 ||
     selectedTextures.length > 0 ||
     selectedCollections.length > 0 ||
-    usage !== "all" ||
+    usage !== "in_use" ||
     (tab !== "all" && tab !== "featured") ||
     (searchParams.selected != null)
   );
@@ -833,7 +829,6 @@ function MediaStoragePage() {
   const [bulkRoomPopoverOpen, setBulkRoomPopoverOpen] = useState(false);
   const [bulkPublicConfirmOpen, setBulkPublicConfirmOpen] = useState<null | { isPublic: number; count: number; productIds: number[] }>(null);
   const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
-  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
   // Two-step inline delete confirmation
@@ -884,6 +879,8 @@ function MediaStoragePage() {
         sort,
         page,
         pageSize,
+        usage,
+        selected: searchParams.selected ?? undefined,
       },
     })
       .then((res) => {
@@ -932,7 +929,7 @@ function MediaStoragePage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, category, roomSlug, publicFilter, searchParams.colors, searchParams.surfaces, searchParams.shapes, searchParams.textures, searchParams.collections, sort, searchParams.q, page, pageSize]);
+  }, [tab, category, roomSlug, publicFilter, searchParams.colors, searchParams.surfaces, searchParams.shapes, searchParams.textures, searchParams.collections, sort, searchParams.q, searchParams.usage, searchParams.selected, page, pageSize]);
 
   function handlePageChange(newPage: number) {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
@@ -1332,7 +1329,7 @@ function MediaStoragePage() {
         <div className="flex flex-wrap items-center justify-between gap-2.5 pt-0.5 border-t border-border/60 pt-2.5">
           {/* Segmented Control: KIND ảnh */}
           <div className="flex flex-wrap items-center bg-surface-strong/60 p-0.5 rounded-full border border-border/80 shrink-0">
-            {TABS.map((t) => {
+            {TABS.filter((t) => t.key !== "featured").map((t) => {
               const active = tab === t.key;
               const count = counts[t.countKey];
               const isMapTab = t.key === "map";
@@ -1347,7 +1344,7 @@ function MediaStoragePage() {
                     clearSelection();
                   }}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all cursor-pointer",
+                    "inline-flex items-center min-w-[76px] justify-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-all cursor-pointer",
                     active
                       ? isMapTab
                         ? "bg-indigo-600 text-white font-semibold shadow-xs"
@@ -1431,120 +1428,40 @@ function MediaStoragePage() {
               </div>
             ) : null}
 
-            {/* Bộ lọc Trạng thái / Vòng đời (Popover gộp thay cho 2 dải pill rời) */}
-            <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors cursor-pointer",
-                    statusFilterActiveCount > 0
-                      ? "border-terracotta/40 bg-terracotta/10 text-terracotta font-semibold shadow-2xs"
-                      : "border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                  )}
-                  title="Lọc theo tình trạng sử dụng và vị trí tuyển chọn"
-                >
-                  <SlidersHorizontal className="size-3" />
-                  <span>Trạng thái</span>
-                  {statusFilterActiveCount > 0 ? (
-                    <span className="grid size-4 place-items-center rounded-full bg-terracotta text-[9px] font-bold text-white tabular-nums">
-                      {statusFilterActiveCount}
-                    </span>
-                  ) : (
-                    <ChevronDown className="size-3 text-muted-foreground/60" />
-                  )}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-3 text-foreground" align="end">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-border/60 pb-1.5">
-                    <span className="text-xs font-bold flex items-center gap-1.5">
-                      <SlidersHorizontal className="size-3 text-terracotta" />
-                      <span>Bộ lọc trạng thái</span>
-                    </span>
-                    {statusFilterActiveCount > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => patchFilters({ usage: undefined, selected: undefined })}
-                        className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
-                      >
-                        Đặt lại
-                      </button>
-                    ) : null}
-                  </div>
+            {/* Status — segmented: Active | To Delete (mặc định Active) */}
+            <div
+              className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
+              title="Lọc theo trạng thái sử dụng: Active = còn được dùng nơi khác; To Delete = không còn dùng ở nơi khác"
+            >
+              <button
+                type="button"
+                onClick={() => patchFilters({ usage: undefined })}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
+                  usage === "in_use"
+                    ? "bg-card text-foreground shadow-xs ring-1 ring-black/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                )}
+                aria-pressed={usage === "in_use"}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => patchFilters({ usage: "expiring" })}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
+                  usage === "expiring"
+                    ? "bg-terracotta text-white shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                )}
+                aria-pressed={usage === "expiring"}
+              >
+                To Delete
+              </button>
+            </div>
 
-                  {/* Vòng đời sử dụng */}
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                      Sử dụng & Vòng đời GC
-                    </p>
-                    <div className="grid grid-cols-2 gap-1 text-xs">
-                      {[
-                        { key: "all", label: "Tất cả" },
-                        { key: "in_use", label: "Đang dùng" },
-                        { key: "expiring", label: "Chờ xóa" },
-                      ].map((u) => {
-                        const activeU = (u.key === "all" && usage === "all") || usage === u.key;
-                        return (
-                          <button
-                            key={u.key}
-                            type="button"
-                            onClick={() => {
-                              patchFilters({ usage: u.key === "all" ? undefined : (u.key as FlatMediaUsage) });
-                              setStatusPopoverOpen(false);
-                            }}
-                            className={cn(
-                              "rounded-md px-2 py-1 text-left text-xs font-medium transition-colors cursor-pointer",
-                              activeU
-                                ? "bg-terracotta text-white font-semibold shadow-2xs"
-                                : "text-muted-foreground hover:bg-surface-strong hover:text-foreground",
-                            )}
-                          >
-                            {u.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
 
-                  {/* Tuyển chọn Trang chủ — chỉ hợp lệ ở tab MAP */}
-                  {tab === "map" ? (
-                    <div className="border-t border-border/60 pt-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                        Tuyển chọn Trang chủ (#1—#12)
-                      </p>
-                      <div className="grid grid-cols-3 gap-1 text-xs">
-                        {[
-                          { key: "all", label: "Tất cả" },
-                          { key: "yes", label: "Đã chọn" },
-                          { key: "no", label: "Chưa chọn" },
-                        ].map((opt) => {
-                          const activeS = (opt.key === "all" && !searchParams.selected) || searchParams.selected === opt.key;
-                          return (
-                            <button
-                              key={opt.key}
-                              type="button"
-                              onClick={() => {
-                                patchFilters({ selected: opt.key === "all" ? undefined : (opt.key as "yes" | "no") });
-                                setStatusPopoverOpen(false);
-                              }}
-                              className={cn(
-                                "rounded-md px-2 py-1 text-center text-xs font-medium transition-colors cursor-pointer",
-                                activeS
-                                  ? "bg-terracotta text-white font-semibold shadow-2xs"
-                                  : "text-muted-foreground hover:bg-surface-strong hover:text-foreground",
-                              )}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </PopoverContent>
-            </Popover>
 
             {/* Sắp xếp Popover gọn gàng */}
             <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>

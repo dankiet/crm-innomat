@@ -483,18 +483,16 @@ export async function listFlatMediaImages(opts?: {
 
   // Sử dụng / lifecycle — reuse Reference Resolver (same 7 nguồn, không nhân bản).
   // UI expose 2 trạng thái: in_use (Đang dùng) và expiring (Chờ xóa).
-  const usage = opts?.usage ?? "all";
+  const usage = opts?.usage ?? "in_use";
   if (usage === "in_use") {
+    // Active: file còn được dùng Ở NƠI KHÁC (ngoài bản ghi media này).
+    listWhere.push(`EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`);
+  } else {
+    // To Delete / unused: không còn ref nào khác trỏ tới file — nếu bản ghi cuối
+    // bị xoá, file sẽ vào retention GC. (alias "expiring" và "unused" cùng nghĩa)
     listWhere.push(
-      `EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`,
+      `NOT EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`,
     );
-  } else if (usage === "expiring") {
-    const notOther = `NOT EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`;
-    listWhere.push(`${notOther} AND ast.orphaned_at IS NOT NULL AND ast.gc_completed_at IS NULL`);
-  } else if (usage === "unused") {
-    // giữ cho API cũ: 0 ref khác và không đang chờ xoá
-    const notOther = `NOT EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`;
-    listWhere.push(`${notOther} AND NOT (ast.orphaned_at IS NOT NULL AND ast.gc_completed_at IS NULL)`);
   }
 
   const listWhereSql = `WHERE ${listWhere.join(" AND ")}`;
