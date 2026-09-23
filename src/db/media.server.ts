@@ -483,13 +483,11 @@ export async function listFlatMediaImages(opts?: {
 
   // Sử dụng / lifecycle — reuse Reference Resolver (same 7 nguồn, không nhân bản).
   // UI expose 2 trạng thái: in_use (Đang dùng) và expiring (Chờ xóa).
-  const usage = opts?.usage ?? "in_use";
-  if (usage === "in_use") {
-    // Active: file còn được dùng Ở NƠI KHÁC (ngoài bản ghi media này).
-    listWhere.push(`EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`);
-  } else {
-    // To Delete / unused: không còn ref nào khác trỏ tới file — nếu bản ghi cuối
-    // bị xoá, file sẽ vào retention GC. (alias "expiring" và "unused" cùng nghĩa)
+  // Active = ảnh đang được dùng (bản ghi media của chính nó là ref) → không lọc.
+  // To Delete = không còn ref NÀO KHÁC ngoài bản ghi hiện tại → vào GC sau.
+  // Mặc định (không truyền) = "all" — tuyệt đối không làm trống tab khi mở.
+  const usage = opts?.usage ?? "all";
+  if (usage === "expiring" || usage === "unused") {
     listWhere.push(
       `NOT EXISTS ${otherReferencesExistSql("i", "substring(i.path from '([^/]+)$')")}`,
     );
