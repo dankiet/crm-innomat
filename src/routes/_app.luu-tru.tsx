@@ -154,11 +154,11 @@ export const Route = createFileRoute("/_app/luu-tru")({
 });
 
 const TABS: Array<{ key: FlatMediaTab; label: string; countKey: "all" | "map" | "concept" | "featured" | "unassigned" }> = [
-  { key: "all", label: "Tất cả ảnh", countKey: "all" },
-  { key: "map", label: "Chỉ ảnh MAP", countKey: "map" },
-  { key: "concept", label: "Bối cảnh Concept", countKey: "concept" },
-  { key: "featured", label: "Tuyển chọn #1—#12", countKey: "featured" },
-  { key: "unassigned", label: "Chưa phân loại", countKey: "unassigned" },
+  { key: "all", label: "All", countKey: "all" },
+  { key: "map", label: "MAP", countKey: "map" },
+  { key: "concept", label: "Lookbook", countKey: "concept" },
+  { key: "featured", label: "Tuyển chọn (ẩn)", countKey: "featured" },
+  { key: "unassigned", label: "Uncategorized", countKey: "unassigned" },
 ];
 
 const SORT_OPTIONS: Array<{ key: FlatMediaSort; label: string; icon: typeof Clock }> = [
