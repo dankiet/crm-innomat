@@ -195,7 +195,11 @@ export function EditProductImagesDialog({
       const res = await deleteProductImageFn({ data: { imageId } });
       setImages(res.images);
       setPendingDeleteId(null);
-      toast.success("Đã xoá ảnh");
+      toast.success(
+        res.file_deleted
+          ? "Đã xoá ảnh và file trong kho lưu trữ"
+          : "Đã gỡ ảnh khỏi sản phẩm — file vẫn còn vì nơi khác đang dùng",
+      );
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi xoá");

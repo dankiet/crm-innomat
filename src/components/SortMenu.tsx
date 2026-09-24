@@ -50,7 +50,7 @@ export function SortMenu<T extends string, F extends string>({
   const currentField =
     fields.find((f) => f.field === decoded.field) ?? fields[0];
   // Show ↑↓ whenever the current field supports two directions — including when
-  // the wire value is still the page default (e.g. gallery created_desc), so the
+  // the wire value is still the page default (e.g. created_desc), so the
   // user can flip to the other dir without picking another field first.
   const showDirToggle =
     currentField != null && currentField.bidirectional !== false;

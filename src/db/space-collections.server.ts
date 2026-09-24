@@ -1,7 +1,7 @@
 /**
  * Bộ sưu tập Không gian (Architectural Space Lookbooks) — Server logic.
  *
- * Phân lập hoàn toàn khỏi `gallery_collections` (bộ sưu tập sản phẩm/series).
+ * Không gian (Lookbook/Concept) — độc lập với thư viện cũ.
  * Quản lý bối cảnh kiến trúc thực tế (render 3D/ảnh thực) và các điểm ghim
  * vật liệu (hotspots) liên kết trực tiếp với bảng `products`.
  */

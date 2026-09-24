@@ -17,7 +17,6 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 | `/cong-no`                | `_app.cong-no.tsx`                                 | Công nợ                                                                  |
 | `/ghi-chu`                | `_app.ghi-chu.tsx`                                 | Ghi chú toàn hệ thống                                                    |
 | `/san-pham`               | `_app.san-pham.tsx`                                | Catalog sản phẩm, filter & tồn kho                                       |
-| `/thu-vien`               | `_app.thu-vien.tsx`                                | Thư viện hình                                                            |
 | `/luu-tru`                | `_app.luu-tru.tsx`                                 | **Media** — media workspace: kho ảnh, thẻ phòng, tuyển chọn, hiển thị LP       |
 | `/leads`                  | `_app.leads.tsx`                                   | **Hộp thư Lead** — lead từ landing, chuyển thành khách hàng               |
 | `/khong-gian`             | `_app.khong-gian.tsx`                              | **Lookbook** — ảnh Concept, bật/tắt công khai trên LP                     |
@@ -40,10 +39,9 @@ URL là nơi giữ trạng thái lọc — người dùng copy link là bạn th
 | `/khach-hang` | `q`                                                                                                                                                             | Tìm kiếm; rỗng thì bỏ khỏi URL                |
 | `/co-hoi`     | `q`                                                                                                                                                             |                                               |
 | `/bao-gia`    | `q`, `tab`                                                                                                                                                      | `tab` chỉ nhận `quotes` \| `orders`           |
-| `/thu-vien`   | `sort`, `cat`, `c`, `v`                                                                                                                                         | `c` = collection id, `v` = index viewer       |
 | `/san-pham`   | `nhom`, `q`, `colors`, `surfaces`, `sizes`, `shapes`, `textures`, `collections`, `supplier`, `hot`, `web`, `view`, `stockLocation`, `sort` | Các filter nhiều giá trị nhận cả array và CSV |
 | `/khong-gian` | `category`, `room`, `status`, `color`, `q`, `page`, `limit`                                                                               | `room` = tab không gian (`living_room`…), `status` = `"1"` \| `"0"` (mặc định `all`), `color` = id palette, `limit` ∈ {24, 48, 96} |
-| `/luu-tru`    | `tab`, `category`, `roomSlug`, `publicFilter`, `colors`, `surfaces`, `shapes`, `textures`, `collections`, `q`, `sort`, `usage`, `selected`, `page`, `pageSize` | `tab` = `map` \| `concept` \| `featured` \| `unassigned` (mặc định `all`; `featured` còn nhận cho deep-link cũ, không còn là tab UI). Tab UI hiện nhãn tiếng Anh `All` \| `MAP` \| `Lookbook` \| `Uncategorized`, cỡ segmented nhỏ ngang hàng `Active` \| `To Delete`. `roomSlug` = id thẻ phòng (nhãn EN từ `IMAGE_ROOM_TAGS`), `publicFilter` = `public` \| `hidden`, `sort` = `oldest` \| `code_asc` \| `code_desc` \| `priority` (Ưu tiên: #1→#12→chưa chọn), `usage` = `in_use` \| `expiring` (mặc định `in_use` = Active; `expiring` = To Delete — ảnh không còn dùng nơi khác; `unused` là alias cũ), `selected` = `yes` \| `no` (chỉ áp dụng tab MAP), `pageSize` ∈ {24, 48, 96}. Mọi bộ lọc đang áp dụng hiện thành dải chip `ActiveTag` + `Xoá tất cả (N)` (giống `/san-pham`); nút xoá gọi `resetAllFilters` nên gỡ được cả `category` |
+| `/luu-tru`    | `tab`, `category`, `roomSlug`, `publicFilter`, `colors`, `surfaces`, `shapes`, `textures`, `collections`, `q`, `sort`, `usage`, `selected`, `page`, `pageSize` | `tab` = `map` \| `concept` \| `featured` \| `unassigned` (mặc định `all`; `featured` còn nhận cho deep-link cũ, không còn là tab UI). Tab UI hiện nhãn tiếng Anh `All` \| `MAP` \| `Lookbook` \| `Uncategorized`, cỡ segmented nhỏ ngang hàng `Tất cả ảnh` \| `Không còn nơi dùng`. `roomSlug` = id thẻ phòng (nhãn EN từ `IMAGE_ROOM_TAGS`), `publicFilter` = `public` \| `hidden`, `sort` = `oldest` \| `code_asc` \| `code_desc` \| `priority` (Ưu tiên: #1→#12→chưa chọn), `usage` = `all` \| `unused` (mặc định `all` = mọi ảnh; `unused` = không bảng nào khác trỏ tới — nhãn UI "Không còn nơi dùng"), `selected` = `yes` \| `no` (chỉ áp dụng tab MAP), `pageSize` ∈ {24, 48, 96}. Mọi bộ lọc đang áp dụng hiện thành dải chip `ActiveTag` + `Xoá tất cả (N)` (giống `/san-pham`); nút xoá gọi `resetAllFilters` nên gỡ được cả `category` |
 | `/leads`      | `status`                                                                                                                                   | `new` \| `contacted` \| `converted` \| `spam` \| `all` |
 
 Mọi route đều có `validateSearch` để chuẩn hoá — giá trị lạ bị bỏ (`undefined`), không throw. Nhờ vậy
@@ -51,14 +49,7 @@ URL người dùng sửa tay không làm vỡ trang.
 
 ### Hai bất biến phải giữ
 
-**1. `/thu-vien`: `v` chỉ hợp lệ khi có `c`.**
-
-```ts
-// Viewer only valid while a collection is open
-v: c != null ? parseViewerIndex(search.v) : undefined,
-```
-
-**2. `/san-pham`: `nhom` luôn phải có và phải là nhóm đã biết.**
+**1. `/san-pham`: `nhom` luôn phải có và phải là nhóm đã biết.**
 
 `beforeLoad` redirect về `?nhom=tat-ca` khi `nhom` thiếu **hoặc** không khớp `PRODUCT_GROUPS`.
 Nhóm hiện có (`src/lib/product-categories.ts`):
@@ -71,8 +62,7 @@ Nhóm hiện có (`src/lib/product-categories.ts`):
 | `gach-bong`   | Gạch Bông                             |
 | `gach-op-lat` | Gạch Ốp Lát                           |
 
-**3. `/san-pham`: mặc định kho phải là `KHOBC` trong loader.**
-
+**2. `/san-pham`: mặc định kho phải là `KHOBC` trong loader.**
 ```ts
 // UI defaults the warehouse chip to Kho Bình Chánh when URL has no stockLocation.
 // Must mirror that here — otherwise listProducts sums Bình Chánh+VP (no JOIN filter).
@@ -91,7 +81,7 @@ Bỏ dòng này thì tồn kho hiện lên là tổng Bình Chánh + VP trong kh
 Workspace   → Tổng quan
 Bán hàng    → Khách hàng, Cơ hội, Báo giá & đơn hàng, Ghi chú
 Tài chính   → Công nợ
-Catalog     → Sản phẩm (+ 4 nhóm con theo ?nhom), Thư viện
+Catalog     → Sản phẩm (+ 4 nhóm con theo ?nhom)
 Quản trị    → Người dùng, Nhật ký          (chỉ admin)
 ```
 

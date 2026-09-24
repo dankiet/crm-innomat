@@ -13,7 +13,7 @@
 npm install
 cp .env.example .env
 # điền các biến ở phần dưới, tối thiểu: DATABASE_URL
-npm run db:migrate        # tạo schema (25 bảng) + bật RLS
+npm run db:migrate        # tạo schema (23 bảng) + bật RLS
 npm run db:seed-admin     # tạo user admin từ CRM_ADMIN_*
 npm run dev               # → http://localhost:8080
 ```
@@ -51,7 +51,6 @@ Khai báo trong `.env` (local) và trong **Vercel → Project → Environment Va
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role`. **Chỉ dùng phía server.** |
 | `SUPABASE_STORAGE_BUCKET`   | Tên bucket, mặc định `crm-images`                                  |
 | `SUPABASE_STORAGE_PREFIX`   | Tiền tố object, mặc định `crm`                                     |
-| `IMAGE_GC_RETENTION_HOURS`  | Retention Delayed GC, mặc định 24h — ảnh orphan giữ physical file tới khi GC hết hạn mới xoá |
 
 Thiếu `SUPABASE_URL` **hoặc** `SUPABASE_SERVICE_ROLE_KEY` → app tự chuyển sang chế độ
 lưu hình local vào `public/images/`. Xem [hinh-anh-va-thu-vien.md](hinh-anh-va-thu-vien.md).
@@ -90,7 +89,6 @@ lưu hình local vào `public/images/`. Xem [hinh-anh-va-thu-vien.md](hinh-anh-v
 | `npm run db:enable-rls`   | Bật RLS cho mọi bảng schema `public`                                                     |
 | `npm run db:seed-admin`   | Tạo/đặt lại admin, hash scrypt                                                           |
 | `npm run storage:backup`  | Mirror bucket Supabase → `public/images`                                                 |
-| `npm run images:gc`       | Delayed GC: xoá physical file của ảnh orphan quá `IMAGE_GC_RETENTION_HOURS` (mặc định 24). `--dry-run` để xem candidate; `--batch N` giới hạn mỗi lượt |
 | `npm run clean:generated` | Xoá output build/generated                                                               |
 
 `clean-generated.mjs` và `prune-deploy-backup.mjs` đều **từ chối xoá** đường dẫn nằm ngoài

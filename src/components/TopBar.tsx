@@ -17,7 +17,6 @@ const pageTitles: Record<string, { eyebrow: string; title: string }> = {
   "/bao-gia": { eyebrow: "Bán hàng", title: "Báo giá & đơn hàng" },
   "/cong-no": { eyebrow: "Tài chính", title: "Công nợ" },
   "/ghi-chu": { eyebrow: "Vận hành", title: "Ghi chú" },
-  "/thu-vien": { eyebrow: "Catalog", title: "Thư viện" },
   "/san-pham": { eyebrow: "Catalog", title: "Sản phẩm" },
   "/leads": { eyebrow: "Landing Page", title: "Hộp thư Lead" },
   "/khong-gian": { eyebrow: "Landing Page", title: "Lookbook Không gian" },

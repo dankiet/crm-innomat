@@ -20,7 +20,7 @@ type Props = {
   /**
    * Browser load strategy. `"lazy"` (default) defers off-screen images —
    * good for large catalogs. Use `"eager"` for small bounded grids/dialogs
-   * where images must appear immediately (e.g. gallery/library views).
+   * where images must appear immediately (e.g. library views).
    */
   loading?: "lazy" | "eager";
 };

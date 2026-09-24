@@ -2,31 +2,24 @@
  * Image Reference Resolver — nguồn SỰ THẬT duy nhất cho mọi câu hỏi
  * "ảnh này đang được dùng ở đâu?" trên physical image (theo storage_key).
  *
- * Semantics khớp:
- *  - Usage UI (concrete references)
- *  - Count (gọn)
- *  - Orphan marking (via isPublicImagePathReferenced trong crm.server — cập nhật cùng nguồn)
- *  - GC re-check (countImageReferencesForKey trong image-gc.server — delegate về đây)
+ * Semantics khớp: Usage UI (concrete references) + Count (gọn) + filter
+ * "Không còn nơi dùng" của grid (/luu-tru, xem `media.server.ts`).
  *
  * Matching: tail-LIKE `%/<storageKey>` — GIỮ contract hiện tại (DB chứa cả
  * `/images/<key>`, full Supabase URL, đôi khi storage key trần). KHÔNG đổi sang
- * exact `=` (safety: live reference không được vô hình với GC).
+ * exact `=` (safety: live reference không được vô hình).
  *
- * Sources (7):
+ * Sources (5):
  *  product_images.path, products.image_path, customer_mapping_items.image_path,
- *  customer_mapping_items.custom_product_image_path, gallery_collection_items.path,
- *  gallery_collections.cover_path, lp_settings.hero_image.
+ *  customer_mapping_items.custom_product_image_path, lp_settings.hero_image.
  */
 import { type AsyncDb } from "@/db/driver";
-import { gcRetentionHours } from "@/lib/image-asset-refs";
 
 export type ImageReferenceRole =
   | "product_image"
   | "product"
   | "mapping"
   | "custom_mapping_product"
-  | "gallery_item"
-  | "gallery_cover"
   | "lp_hero";
 
 export interface ImageReferenceSource {
@@ -42,7 +35,7 @@ export interface ImageReference {
   role: ImageReferenceRole;
   /** id bản ghi giữ reference. */
   id: string;
-  /** owner khi có (product / gallery collection / mapping). */
+  /** owner khi có (product / mapping). */
   owner?: { id: string; code?: string; name?: string };
   label?: string;
   ref: string;
@@ -86,21 +79,6 @@ const SOURCES: ImageReferenceSource[] = [
            WHERE m.custom_product_image_path LIKE ?`,
   },
   {
-    role: "gallery_item",
-    col: "i.path",
-    sql: `SELECT i.id, i.path, g.id AS owner_id, g.name AS owner_name
-            FROM gallery_collection_items i
-            JOIN gallery_collections g ON g.id = i.collection_id
-           WHERE i.path LIKE ?`,
-  },
-  {
-    role: "gallery_cover",
-    col: "g.cover_path",
-    sql: `SELECT g.id, g.cover_path AS path, g.name AS owner_name
-            FROM gallery_collections g
-           WHERE g.cover_path LIKE ?`,
-  },
-  {
     role: "lp_hero",
     col: "s.value",
     pre: "s.key = 'hero_image' AND ",
@@ -109,22 +87,17 @@ const SOURCES: ImageReferenceSource[] = [
            WHERE s.key = 'hero_image' AND s.value LIKE ?`,
   },
 ];
-
-/** href theo route canonical hiện có (không invent route). */
 function hrefFor(
   role: ImageReferenceRole,
   row: { id: number | string; owner_id?: string },
 ): string | null {
   switch (role) {
-    case "gallery_item":
-    case "gallery_cover":
-      return `/thu-vien?c=${row.id}`;
     case "mapping":
     case "custom_mapping_product":
       return row.owner_id ? `/khach-hang/${row.owner_id}` : null;
     case "product":
     case "product_image":
-      return null; // chưa có route product-detail độc lập (catalog /san-pham có nhom, không theo id)
+      return null;
     case "lp_hero":
       return null;
     default:
@@ -155,25 +128,6 @@ function mapRow(source: ImageReferenceSource, row: Record<string, unknown>): Ima
 }
 
 /**
- * Concrete references cho 1 storage key ("<sha256>.<ext>").
- * Empty array = không reference nào (hoặc key rác — không được dùng để khẳng định orphan
- * một mình; GC re-check chạy đúng pipeline claim).
- */
-export async function listImageReferencesForKey(
-  db: AsyncDb,
-  storageKey: string,
-): Promise<ImageReference[]> {
-  if (!storageKey) return [];
-  const pattern = `%/${storageKey}`;
-  const out: ImageReference[] = [];
-  for (const source of SOURCES) {
-    const rows = (await db.prepare(source.sql).all<Record<string, unknown>>(pattern)) ?? [];
-    for (const row of rows) out.push(mapRow(source, row));
-  }
-  return out;
-}
-
-/**
  * Batch cho một trang grid: Map<storageKey, references[]> — 1 query / nguồn.
  */
 export async function listImageReferencesForKeys(
@@ -183,7 +137,6 @@ export async function listImageReferencesForKeys(
   const result = new Map<string, ImageReference[]>();
   const unique = [...new Set(storageKeys.filter(Boolean))];
   if (unique.length === 0) return result;
-  const ors = unique.map(() => "path LIKE ?").join(" OR ");
   const patterns = unique.map((k) => `%/${k}`);
   for (const source of SOURCES) {
     const whereCol = source.col;
@@ -204,61 +157,5 @@ export async function listImageReferencesForKeys(
       }
     }
   }
-  return result;
-}
-
-/** SQL predicate "có reference KHÁC (ngoài row đang list) trỏ tới file của row".
- * Dùng cho Media Workspace usage filter — SAME 7 nguồn như resolver (không nhân bản).
- * Trả body (không bọc EXISTS) để caller wrap. */
-export function otherReferencesExistSql(rowAlias: string, tailExpr: string): string {
-  const p = `'%/' || ${tailExpr}`;
-  return `(
-    SELECT 1 FROM product_images o1 WHERE o1.path LIKE ${p} AND o1.id <> ${rowAlias}.id
-    UNION ALL SELECT 1 FROM products o2 WHERE o2.image_path LIKE ${p}
-    UNION ALL SELECT 1 FROM customer_mapping_items o3 WHERE o3.image_path LIKE ${p}
-    UNION ALL SELECT 1 FROM customer_mapping_items o4 WHERE o4.custom_product_image_path LIKE ${p}
-    UNION ALL SELECT 1 FROM gallery_collection_items o5 WHERE o5.path LIKE ${p}
-    UNION ALL SELECT 1 FROM gallery_collections o6 WHERE o6.cover_path LIKE ${p}
-    UNION ALL SELECT 1 FROM lp_settings o7 WHERE o7.key = 'hero_image' AND o7.value LIKE ${p}
-    LIMIT 1
-  )`;
-}
-
-export { gcRetentionHours };
-/** Retention (giờ) cho countdown UI — cùng chính sách toàn cục, không per-asset. */
-export function retentionHours(): number {
-  return gcRetentionHours();
-}
-
-export interface ImageAssetLifecycleRow {
-  id: number;
-  sha256: string;
-  storage_key: string;
-  orphaned_at: string | null;
-  gc_claimed_at: string | null;
-  gc_completed_at: string | null;
-  last_referenced_at: string;
-  created_at: string;
-}
-
-/** Thông tin lifecycle registry cho các key của một trang grid. */
-export async function listAssetLifecycleForKeys(
-  db: AsyncDb,
-  storageKeys: string[],
-): Promise<Map<string, ImageAssetLifecycleRow>> {
-  const result = new Map<string, ImageAssetLifecycleRow>();
-  const unique = [...new Set(storageKeys.filter(Boolean))];
-  if (unique.length === 0) return result;
-  const placeholders = unique.map(() => "?").join(", ");
-  const rows =
-    (await db
-      .prepare(
-        `SELECT id, sha256, storage_key, orphaned_at, gc_claimed_at, gc_completed_at,
-              last_referenced_at, created_at
-         FROM image_assets
-        WHERE storage_key IN (${placeholders})`,
-      )
-      .all<ImageAssetLifecycleRow>(...unique)) ?? [];
-  for (const r of rows) result.set(r.storage_key, r);
   return result;
 }

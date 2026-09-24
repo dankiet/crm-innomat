@@ -15,7 +15,7 @@ This repo is the source of truth:
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **crm-innomat** (2397 symbols, 6280 relationships, 203 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **crm-innomat** (2447 symbols, 7114 relationships, 190 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -116,7 +116,7 @@ gitignore**: gitnexus cứ sinh ở máy, nhưng nó không bao giờ vào repo.
 - **Một tính năng = một PR có docs.** Không tách: docs sửa ở commit sau sẽ không bao giờ được sửa.
 - **Số liệu đếm được thì đừng chép tay.** Dòng code, số bảng, số endpoint trôi rất nhanh —
   audit 2026-09-19 phát hiện `docs/` đã lệch tới +51% ở con số dòng code. Nếu buộc phải ghi,
-  ghi kèm **ngày đo** và con trỏ tới `docs/tong-quan-tinh-nang.md` §16 (nơi duy nhất giữ bảng quy mô).
+  ghi kèm **ngày đo** và con trỏ tới `docs/tong-quan-tinh-nang.md` §15 (nơi duy nhất giữ bảng quy mô).
 - **Tài liệu sai còn tệ hơn không có.** Khi phát hiện docs nói khác code, sửa docs **trong cùng
   commit** với thay đổi code, hoặc mở việc riêng — đừng để lại.
 - **Không viết lại luật đã có ở đây.** Docs trỏ về `AGENTS.md`, không sao chép.

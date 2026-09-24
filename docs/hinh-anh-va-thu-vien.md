@@ -1,4 +1,4 @@
-# Hình ảnh & Thư viện
+# Hình ảnh
 
 ## Lưu trữ hai chế độ
 
@@ -53,30 +53,24 @@ hơn giới hạn server (12 MB): ảnh 20 MB thường nén ở client xuống 
 
 ## Xoá ảnh an toàn
 
-Một ref có thể được **nhiều bảng** tham chiếu. `isPublicImagePathReferenced()`
-(`crm.server.ts`) kiểm tra 5 chỗ:
+Một ref có thể được **nhiều bảng** tham chiếu. Reference Resolver
+(`src/db/image-references.server.ts`, 5 nguồn: `product_images.path`, `products.image_path`,
+`customer_mapping_items.image_path`, `customer_mapping_items.custom_product_image_path`,
+`lp_settings.hero_image`) là nguồn sự thật duy nhất cho câu hỏi "ảnh này đang được dùng ở đâu?".
 
-```sql
-product_images.path
-products.image_path
-customer_mapping_items.image_path
-customer_mapping_items.custom_product_image_path
-gallery_collection_items.path
-```
+Không có tầng registry, không có tiến trình dọn dẹp tự động. Quy tắc:
 
-`deleteUnreferencedPaths()` trong `gallery.server.ts` chỉ xoá file khi ref **là ảnh do CRM quản lý**
-và **không còn bản ghi nào trỏ tới**:
+- **Gỡ ảnh khỏi bản ghi** (`deleteProduct`, `deleteCustomerMapping`, `deleteCustomer`,
+  `setHeroImageSetting`, `deleteProductImage`) **không** đụng tới file. File vẫn nằm nguyên trong
+  kho lưu trữ; ảnh chỉ rơi vào trạng thái "không còn nơi dùng" trên `/luu-tru`.
+- **Xoá file** chỉ xảy ra ở đúng một chỗ: người dùng xoá ảnh trên `/luu-tru`
+  (`deleteProductImage`). Lúc đó hàm kiểm tra lại Reference Resolver và chỉ gọi `deleteImageRef()`
+  khi **không còn nguồn nào** trỏ tới. Vì tên file là hash, hai sản phẩm dùng chung một tấm ảnh sẽ
+  chia sẻ đúng một file — xoá thẳng khi còn tham chiếu là làm hỏng bản ghi còn lại.
+- Endpoint trả `file_deleted` để UI phân biệt "đã xoá file" với "chỉ gỡ khỏi sản phẩm".
 
-```ts
-if (isManagedImageRef(path) && !(await isPublicImagePathReferenced(db, path))) {
-  await deleteImageRef(path);
-}
-```
-
-Đây là quy tắc bắt buộc: **đừng gọi `deleteImageRef()` trực tiếp** khi xoá bản ghi. Vì tên file là
-hash, hai sản phẩm khác nhau dùng chung một tấm ảnh sẽ chia sẻ đúng một file — xoá thẳng là làm hỏng
-bản ghi còn lại. Cùng cơ chế được dùng ở `deleteProduct`, `deleteProductImage` và
-`deleteOrphanMappingImages`.
+`isManagedImageRef` giới hạn phạm vi: chỉ file do CRM quản lý (`/images/...` hoặc host
+`*.supabase.co`) mới bị xoá, URL ngoài không đụng tới.
 
 ## Ảnh sản phẩm
 
@@ -89,58 +83,4 @@ Bảng `product_images`: `path`, `sort_order`, `is_primary`, `caption`.
 
 Endpoint: `fetchProductImages`, `uploadProductImageFn`, `addProductImageByPathFn`,
 `setPrimaryProductImageFn`, `deleteProductImageFn`.
-`addProductImageByPathFn` dùng để gắn một ảnh đã có trong storage (VD ảnh từ Thư viện) mà không
-upload lại.
 
-## Thư viện (`/thu-vien`)
-
-`src/db/gallery.server.ts` (~401 dòng). Hai bảng: `gallery_collections` và
-`gallery_collection_items`.
-
-Đặc điểm:
-
-- Item giữ **snapshot `product_code` / `product_name`** ngoài `product_id`
-  (`ON DELETE SET NULL`) — nên xoá sản phẩm thì ảnh trong bộ sưu tập vẫn còn nhãn để nhận biết.
-- `UNIQUE(collection_id, path)` — một ảnh chỉ vào bộ sưu tập một lần.
-- `sort_order` cho phép sắp xếp thủ công; `applyGalleryItemOrder()` **từ chối** item không thuộc bộ
-  sưu tập đang sắp — chống việc client gửi id lạ để dò dữ liệu.
-- `cover_path` là ảnh bìa, đặt bằng `setGalleryCoverFn`.
-
-Giới hạn bulk:
-
-| Hằng số              | Giá trị | Ý nghĩa                                           |
-| -------------------- | ------- | ------------------------------------------------- |
-| `MAX_BULK_IMAGE_IDS` | 5.000   | Mỗi lần thêm/sắp tối đa 5.000 ảnh, vượt thì throw |
-| `BULK_CHUNK_SIZE`    | 400     | Chia chunk khi ghi để không nổ số placeholder SQL |
-
-Endpoint: `fetchGalleryCollections`, `fetchGalleryCollection`, `fetchGalleryImageCandidates`,
-`createGalleryCollectionFn`, `updateGalleryCollectionFn`, `addGalleryProductImagesFn`,
-`uploadGalleryImageFn`, `setGalleryCoverFn`, `reorderGalleryItemsFn`, `removeGalleryItemFn`,
-`deleteGalleryCollectionFn`.
-
-Search param của route: `?c=<collectionId>`, `?v=<index>` cho viewer. **`v` chỉ có nghĩa khi `c` đã
-có** — mở `?v=3` mà không có `c` là trạng thái không hợp lệ.
-
-## Phục vụ file tĩnh
-
-`src/server.ts` tự serve `/public` cho các đường dẫn lồng nhau như `/images/<hash>.webp`, kèm MIME
-map và **guard chống path traversal**. Cần thiết vì TanStack Start SSR trả HTML 404 của SPA cho
-đường dẫn public lồng nhau.
-
-Ở chế độ Supabase, ảnh được trả trực tiếp từ CDN Supabase nên không đi qua đường này.
-
-## Nhúng ảnh khi xuất tài liệu
-
-`exportQuoteToHtml` và `exportMappingToHtml` nhúng ảnh thành **data URL** (`imageRefToDataUrl` →
-`readImageBytes` → base64) để file HTML mở được offline. Export báo giá nạp ảnh **song song có giới
-hạn** qua `mapLimit` — đừng bỏ giới hạn đó, báo giá vài chục dòng sẽ mở hàng chục fetch cùng lúc.
-
-## Sao lưu
-
-```bash
-npm run storage:backup      # mirror bucket Supabase → public/images
-```
-
-`public/images/` **không nằm trong git** (`.gitignore`: _"Runtime images — kept local only, not
-tracked in git"_). Nguồn thật của ảnh production là **Supabase Storage**, và git không phải bản
-backup cho ảnh. Chạy script này định kỳ nếu muốn có bản sao cục bộ.

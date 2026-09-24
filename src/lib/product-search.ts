@@ -5,7 +5,7 @@
  * trên toàn bộ chuỗi searchable (giữ chức năng tìm theo tên / mã cụt).
  *
  * Mỗi nơi gọi truyền hàm `normalize` và haystack giữ nguyên chuẩn của nơi đó
- * (ví dụ thu-vien bỏ dấu, trang SP/dialog chỉ lowercase) để không hồi quy.
+ * (trang SP bỏ dấu, dialog chỉ lowercase) để không hồi quy.
  */
 
 type SearchCodeRow = {

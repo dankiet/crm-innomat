@@ -155,7 +155,7 @@ export const fetchLpLeadsFn = createServerFn({ method: "GET" })
     return await listLpLeads(data);
   });
 
-/** Usage + lifecycle cho các storage keys của một grid page (requireUser). */
+/** Reference (ảnh đang dùng ở đâu) cho các storage keys của một grid page (requireUser). */
 export const fetchMediaUsageFn = createServerFn({ method: "GET" })
   .inputValidator((data?: { keys: string[] }) => ({
     keys: (data?.keys ?? []).map(String).filter(Boolean).slice(0, 300),
@@ -164,21 +164,9 @@ export const fetchMediaUsageFn = createServerFn({ method: "GET" })
     const { requireUser } = await import("@/db/auth.server");
     await requireUser();
     const { getDb } = await import("@/db/driver");
-    const {
-      listImageReferencesForKeys,
-      listAssetLifecycleForKeys,
-      retentionHours,
-    } = await import("@/db/image-references.server");
-    const db = getDb();
-    const [references, lifecycle] = await Promise.all([
-      listImageReferencesForKeys(db, data.keys),
-      listAssetLifecycleForKeys(db, data.keys),
-    ]);
-    return {
-      retentionHours: retentionHours(),
-      usage: Object.fromEntries(references),
-      lifecycle: Object.fromEntries(lifecycle),
-    };
+    const { listImageReferencesForKeys } = await import("@/db/image-references.server");
+    const references = await listImageReferencesForKeys(getDb(), data.keys);
+    return { usage: Object.fromEntries(references) };
   });
 
 export const fetchNewLeadsCountFn = createServerFn({ method: "GET" }).handler(async () => {

@@ -52,7 +52,7 @@ import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { IMAGE_ROOM_TAGS, SPACE_TYPES, type ImageRoomTagSlug } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PaginationBar } from "@/components/PaginationBar";
-import { parsePositiveInt } from "@/lib/gallery-sort";
+import { parsePositiveInt } from "@/lib/parse";
 
 const PAGE_LIMIT_OPTIONS = [24, 48, 96] as const;
 

@@ -1,13 +1,7 @@
-import fs from "node:fs";
-import { putImageBuffer, isManagedImageRef } from "@/lib/storage.server";
+import { deleteImageRef, isManagedImageRef, putImageBuffer } from "@/lib/storage.server";
 import { normalizeUploadImageBufferMeta } from "@/lib/image-upload.server";
-import {
-  ensureImageAssetForRef,
-  getOrCreateImageAsset,
-  markImageAssetOrphanedForPath,
-} from "@/lib/image-assets.server";
-import { sha256FromRef, storageKeyForRef } from "@/lib/image-asset-refs";
-import path from "node:path";
+import { storageKeyForRef } from "@/lib/image-asset-refs";
+import { listImageReferencesForKeys } from "@/db/image-references.server";
 import { getDb, type SqlValue } from "./index.server";
 import { unitPriceForProduct, effectiveDiscountPct } from "@/lib/pricing";
 import type {
@@ -251,59 +245,16 @@ export async function deleteProduct(id: number): Promise<{ ok: true; code: strin
     );
   }
 
-  const imagePaths = (
-    (await db
-      .prepare("SELECT path FROM product_images WHERE product_id = ?")
-      .all<{ path: string }>(id)) as Array<{ path: string }>
-  ).map((r) => r.path);
-  if (product.image_path) imagePaths.push(product.image_path);
-
   const runTx = getDb().transaction(async () => {
     await db.prepare("DELETE FROM product_images WHERE product_id = ?").run(id);
     await db.prepare("DELETE FROM products WHERE id = ?").run(id);
   });
   await runTx();
 
-  for (const web of new Set(imagePaths)) {
-    await orphanImageRefIfUnreferenced(web);
-  }
-
   return { ok: true, code: product.code };
 }
 
 // ─── Product images (nhiều ảnh / SP) ─────────────────────────
-
-export async function isPublicImagePathReferenced(
-  db: ReturnType<typeof getDb>,
-  publicPath: string,
-): Promise<boolean> {
-  return Boolean(
-    await db
-      .prepare(
-        `SELECT 1 FROM product_images WHERE path = ?
-         UNION ALL SELECT 1 FROM products WHERE image_path = ?
-         UNION ALL SELECT 1 FROM customer_mapping_items WHERE image_path = ?
-         UNION ALL SELECT 1 FROM customer_mapping_items WHERE custom_product_image_path = ?
-         UNION ALL SELECT 1 FROM gallery_collection_items WHERE path = ?
-         UNION ALL SELECT 1 FROM gallery_collections WHERE cover_path = ?
-         UNION ALL SELECT 1 FROM lp_settings WHERE key = 'hero_image' AND value = ?
-         LIMIT 1`,
-      )
-      .get(publicPath, publicPath, publicPath, publicPath, publicPath, publicPath, publicPath),
-  );
-}
-
-/**
- * Đánh dấu orphan trong registry khi ref là managed và KHÔNG còn bảng nào
- * trỏ tới. KHÔNG xoá physical file — delayed GC xoá sau retention period
- * (task 2). Dùng ở mọi điểm xoá (product/gallery).
- */
-export async function orphanImageRefIfUnreferenced(ref: string): Promise<void> {
-  if (!ref || !isManagedImageRef(ref)) return;
-  const db = getDb();
-  if (await isPublicImagePathReferenced(db, ref)) return;
-  await markImageAssetOrphanedForPath(db, ref);
-}
 
 async function syncPrimaryImagePath(productId: number) {
   const db = getDb();
@@ -471,39 +422,12 @@ export async function addProductImage(input: {
 
   const created = (await listProductImages(input.product_id)).find((image) => image.id === newId);
   if (!created) throw new Error("Không thể đọc ảnh vừa thêm");
-  // Flow add-by-path (kể cả addProductImageByPathFn): đăng ký best-effort theo ref.
-  await ensureImageAssetForRef(getDb(), pathStr);
   return created;
 }
 
-/** Chuẩn ảnh SP khi upload: cạnh dài tối đa (giữ tỉ lệ). */
-
-async function saveManagedImage(
-  buffer: Buffer,
-  ext: string,
-  meta?: { width: number; height: number; mimeType: string },
-): Promise<string> {
-  const ref = await putImageBuffer(buffer, ext);
-  if (meta) {
-    const sha256 = sha256FromRef(ref);
-    if (sha256) {
-      try {
-        await getOrCreateImageAsset(getDb(), {
-          sha256,
-          storageKey: storageKeyForRef(ref),
-          mimeType: meta.mimeType,
-          byteSize: Buffer.byteLength(buffer),
-          width: meta.width,
-          height: meta.height,
-        });
-      } catch (error) {
-        console.error(
-          `[image-assets] register_failed ${error instanceof Error ? error.message.slice(0, 120) : String(error)}`,
-        );
-      }
-    }
-  }
-  return ref;
+/** Lưu buffer ảnh đã chuẩn hoá vào storage, trả ref. */
+async function saveManagedImage(buffer: Buffer, ext: string): Promise<string> {
+  return await putImageBuffer(buffer, ext);
 }
 
 /** Lưu file upload vào public/images theo hash nội dung sau normalize. */
@@ -530,8 +454,8 @@ export async function uploadProductImageFile(input: {
     throw new Error("Ảnh quá lớn (tối đa 12MB)");
   }
 
-  const { buffer: normalized, width, height, mimeType } = await normalizeUploadImageBufferMeta(rawBuf);
-  const publicPath = await saveManagedImage(normalized, ".webp", { width, height, mimeType });
+  const { buffer: normalized } = await normalizeUploadImageBufferMeta(rawBuf);
+  const publicPath = await saveManagedImage(normalized, ".webp");
   return await addProductImage({
     product_id: input.product_id,
     path: publicPath,
@@ -609,6 +533,8 @@ export async function setProductImageKind(
 export async function deleteProductImage(imageId: number): Promise<{
   product_id: number;
   images: ProductImageRow[];
+  /** true khi physical file cũng bị xoá (không còn bảng nào trỏ tới). */
+  file_deleted: boolean;
 }> {
   const db = getDb();
   const row = (await db
@@ -616,46 +542,7 @@ export async function deleteProductImage(imageId: number): Promise<{
     .get<ProductImageRow>(imageId)) as ProductImageRow | undefined;
   if (!row) throw new Error("Không tìm thấy ảnh");
 
-  // Gallery FK is ON DELETE SET NULL — also drop collection tiles that pointed at
-  // this product photo so permanent delete from the library picker stays clean.
-  const galleryRows = (await db
-    .prepare(
-      `SELECT id, collection_id, path FROM gallery_collection_items
-       WHERE product_image_id = ? OR path = ?`,
-    )
-    .all<{ id: number; collection_id: number; path: string }>(imageId, row.path)) as Array<{
-    id: number;
-    collection_id: number;
-    path: string;
-  }>;
-  const touchedCollectionIds = [...new Set(galleryRows.map((g) => g.collection_id))];
-
   await db.transaction(async (tx) => {
-    if (galleryRows.length) {
-      const placeholders = galleryRows.map(() => "?").join(", ");
-      await tx
-        .prepare(
-          `DELETE FROM gallery_collection_items WHERE id IN (${placeholders})`,
-        )
-        .run(...galleryRows.map((g) => g.id));
-      for (const collectionId of touchedCollectionIds) {
-        const next = await tx
-          .prepare(
-            `SELECT path FROM gallery_collection_items
-             WHERE collection_id = ? ORDER BY sort_order, id LIMIT 1`,
-          )
-          .get<{ path: string }>(collectionId);
-        await tx
-          .prepare(
-            `UPDATE gallery_collections
-             SET cover_path = CASE WHEN cover_path = ? THEN ? ELSE cover_path END,
-                 updated_at = ?
-             WHERE id = ?`,
-          )
-          .run(row.path, next?.path ?? "", nowUtc(), collectionId);
-      }
-    }
-
     await tx.prepare("DELETE FROM product_images WHERE id = ?").run(imageId);
 
     // If deleted primary, promote first remaining
@@ -675,12 +562,24 @@ export async function deleteProductImage(imageId: number): Promise<{
 
   await syncPrimaryImagePath(row.product_id);
 
-  // Chỉ xóa file được CRM quản lý khi không còn bản ghi nào dùng chung path.
-  await orphanImageRefIfUnreferenced(row.path);
+  // Xoá file là thao tác THỦ CÔNG của người dùng trên /luu-tru — chỉ chạy khi
+  // không bảng nào khác còn trỏ tới physical này (file hash dùng chung).
+  // Không có bước tự động nào khác xoá file: gỡ ảnh khỏi sản phẩm/mapping/Hero
+  // chỉ làm ảnh rơi vào trạng thái "không còn nơi dùng".
+  const key = storageKeyForRef(row.path);
+  let fileDeleted = false;
+  if (key && isManagedImageRef(row.path)) {
+    const refs = await listImageReferencesForKeys(db, [key]);
+    if ((refs.get(key) ?? []).length === 0) {
+      await deleteImageRef(row.path);
+      fileDeleted = true;
+    }
+  }
 
   return {
     product_id: row.product_id,
     images: await listProductImages(row.product_id),
+    file_deleted: fileDeleted,
   };
 }
 
@@ -1258,39 +1157,6 @@ export async function createQuoteFromCustomerMapping(mappingId: number): Promise
   return quote;
 }
 
-function isMappingUploadPath(publicPath: string) {
-  return publicPath.startsWith("/images/");
-}
-
-/** Xóa file ảnh mapping không còn được item nào tham chiếu. */
-async function deleteOrphanMappingImages(oldPaths: string[]) {
-  if (!oldPaths.length) return;
-  const db = getDb();
-  const used = new Set(
-    (
-      (await db
-        .prepare(
-          `SELECT image_path FROM customer_mapping_items WHERE image_path != ''
-           UNION ALL
-           SELECT custom_product_image_path AS image_path FROM customer_mapping_items
-           WHERE custom_product_image_path != ''`,
-        )
-        .all<{ image_path: string }>()) as Array<{ image_path: string }>
-    ).map((r) => r.image_path),
-  );
-  for (const p of oldPaths) {
-    if (!isMappingUploadPath(p) || used.has(p)) continue;
-    if (await isPublicImagePathReferenced(db, p)) continue;
-    try {
-      const filePath = path.join(process.cwd(), "public", p.replace(/^\//, ""));
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        fs.unlinkSync(filePath);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-}
 
 /** Tạo mới hoặc cập nhật mapping (xóa + chèn lại items). */
 export async function saveCustomerMapping(input: {
@@ -1323,27 +1189,12 @@ export async function saveCustomerMapping(input: {
 
   const runTx = db.transaction(async () => {
     let mappingId = input.id ?? 0;
-    let oldPaths: string[] = [];
 
     if (mappingId) {
       const existing = (await db
         .prepare("SELECT id FROM customer_mappings WHERE id = ?")
         .get<{ id: number }>(mappingId)) as { id: number } | undefined;
       if (!existing) throw new Error("Không tìm thấy mapping");
-      oldPaths = (
-        (await db
-          .prepare(
-            `SELECT image_path, custom_product_image_path
-             FROM customer_mapping_items WHERE mapping_id = ?`,
-          )
-          .all<{
-            image_path: string;
-            custom_product_image_path: string;
-          }>(mappingId)) as Array<{
-          image_path: string;
-          custom_product_image_path: string;
-        }>
-      ).flatMap((r) => [r.image_path, r.custom_product_image_path]);
       await db
         .prepare(
           `UPDATE customer_mappings SET name = ?, version = ?, note = ?, price_basis = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
@@ -1416,7 +1267,6 @@ export async function saveCustomerMapping(input: {
       );
     }
 
-    await deleteOrphanMappingImages(oldPaths);
     return mappingId;
   });
 
@@ -1427,36 +1277,9 @@ export async function saveCustomerMapping(input: {
 
 export async function deleteCustomerMapping(mappingId: number): Promise<{ ok: true }> {
   const db = getDb();
-  const items = (await db
-    .prepare(
-      `SELECT image_path, custom_product_image_path
-       FROM customer_mapping_items WHERE mapping_id = ?`,
-    )
-    .all<{
-      image_path: string;
-      custom_product_image_path: string;
-    }>(mappingId)) as Array<{
-    image_path: string;
-    custom_product_image_path: string;
-  }>;
   const existing = await db.prepare("SELECT id FROM customer_mappings WHERE id = ?").get(mappingId);
   if (!existing) throw new Error("Không tìm thấy mapping");
   await db.prepare("DELETE FROM customer_mappings WHERE id = ?").run(mappingId);
-  for (const image_path of items.flatMap((item) => [
-    item.image_path,
-    item.custom_product_image_path,
-  ])) {
-    if (!isMappingUploadPath(image_path)) continue;
-    if (await isPublicImagePathReferenced(db, image_path)) continue;
-    try {
-      const filePath = path.join(process.cwd(), "public", image_path.replace(/^\//, ""));
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        fs.unlinkSync(filePath);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
   return { ok: true };
 }
 
@@ -1474,8 +1297,8 @@ export async function uploadMappingImageFile(input: {
     throw new Error("Ảnh quá lớn (tối đa 12MB)");
   }
 
-  const { buffer: normalized, width, height, mimeType } = await normalizeUploadImageBufferMeta(rawBuf);
-  return { path: await saveManagedImage(normalized, ".webp", { width, height, mimeType }) };
+  const { buffer: normalized } = await normalizeUploadImageBufferMeta(rawBuf);
+  return { path: await saveManagedImage(normalized, ".webp") };
 }
 
 /**

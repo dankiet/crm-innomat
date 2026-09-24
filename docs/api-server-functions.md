@@ -1,8 +1,8 @@
 # Bề mặt RPC (`createServerFn`)
 
-Tất cả nằm trong **`src/api/functions.ts`** (1.838 dòng, **82** endpoint) và
-**`src/api/lp.ts`** (332 dòng, **18** endpoint công khai cho landing, cộng 2 hàm auth
-re-export từ `functions.ts`). Đây là ranh giới
+Tất cả nằm trong **`src/api/functions.ts`** (1.670 dòng, **71** endpoint) và
+**`src/api/lp.ts`** (357 dòng, **21** endpoint — 6 công khai cho landing, 15 còn lại
+`requireUser`/`requireAdmin` cho CRM; cộng 2 hàm auth re-export từ `functions.ts`). Đây là ranh giới
 client ↔ server: client **chỉ** gọi các hàm export từ file này.
 
 Docblock đầu file là hợp đồng:
@@ -79,13 +79,6 @@ chuyển khách hàng giữa các sale.
 `fetchProductFieldValues` / `bulkUpdateProductFieldFn` / `clearProductFieldValueFn` nhận **tên cột**
 từ client, nên chỉ chấp nhận cột nằm trong **whitelist `PRODUCT_SUGGEST_FIELDS`** — đây là lá chắn
 SQL injection, đừng nới lỏng.
-
-### Gallery — Thư viện
-
-`fetchGalleryCollections`, `fetchGalleryCollection`, `fetchGalleryImageCandidates`,
-`createGalleryCollectionFn`, `updateGalleryCollectionFn`, `addGalleryProductImagesFn`,
-`uploadGalleryImageFn`, `setGalleryCoverFn`, `reorderGalleryItemsFn`, `removeGalleryItemFn`,
-`deleteGalleryCollectionFn`. Chi tiết: [hinh-anh-va-thu-vien.md](hinh-anh-va-thu-vien.md).
 
 ### Customers
 
@@ -175,8 +168,6 @@ product.create  product.update  product.delete  product.bulk_update
 product.import  product.export
 product.image.upload  product.image.add  product.image.delete
 mapping.save  mapping.delete  mapping.export  mapping.image.upload
-gallery.create  gallery.update  gallery.delete  gallery.cover.set
-gallery.items.add  gallery.items.reorder  gallery.item.remove  gallery.image.upload
 ```
 
 Thêm action mới thì giữ đúng quy ước tên này — UI `/nhat-ky` filter bằng `action LIKE`, nên

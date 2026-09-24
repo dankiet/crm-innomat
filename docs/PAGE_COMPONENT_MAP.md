@@ -2,7 +2,7 @@
 
 > Với **mỗi** URL: page, layout, component, hook, service, API và luồng dữ liệu.
 > Mọi dòng đều trace từ source (số dòng là số dòng import/render thật).
-> Đo ngày **2026-09-19**. Bản đồ này phản ánh trạng thái **SAU cleanup**.
+> Đo ngày **2026-09-24** (cập nhật sau khi gỡ `/thu-vien` + tầng registry/GC ảnh).
 
 Ký hiệu: `SF` = `createServerFn`; `DB` = module `src/db/*.server.ts` được nạp động.
 
@@ -25,8 +25,7 @@ Ký hiệu: `SF` = `createServerFn`; `DB` = module `src/db/*.server.ts` được
 | `/cong-no` | `_app` | `DebtPage` | `Stat` (local) | `PageHeader`, `PageFilterBar`, `ui/dialog` | `useHistoryLayer` | 5 SF (xem §11) | `crm.server` |
 | `/ghi-chu` | `_app` | `NotesPage` | — | `PageHeader`, `NewNoteDialog` | — | `fetchNotes` | `crm.server` |
 | `/san-pham` | `_app` | `ProductsPage` | `ImportExportProductsDialog`, `ImportStockDialog`, `EditProductDialog`, `EditProductImagesDialog`, `NewProductDialog`, `BulkEditFieldDialog`, `NewQuoteDialog`, `ProductCheck`, `FilterSection`, `ActiveTag` | `PageHeader`, `ProductImage`, `SortMenu`, `FilterChip`, `MultiSelectFilter`, `ui/popover`, `ui/dialog` | — | 6 SF | `crm.server`, `product-import-export.server` |
-| `/luu-tru` | `_app` | `MediaStoragePage` | `QuickRoomTagPopover`, `QuickFeaturedRankPopover`, `BulkRoomTagPopover`, `ProductGalleryDialog` | `PageHeader`, `ProductImage`, `ImageRoomTagPicker`, `FilterChip`, `MultiSelectFilter`, `ui/dialog`, `ui/popover` | — | 15 SF | `crm.server`, `gallery.server`, `lp.server` |
-| `/thu-vien` | `_app` | `GalleryPage` | `SortableGalleryCard` (DnD), `GalleryViewerDialog`, `CollectionFormDialog`, `ImagePickerDialog`, `QuickSelect`, `EmptyCollection` | `PageHeader`, `ProductImage`, `SortMenu`, `ui/dialog` | — | 14 SF | `gallery.server`, `crm.server` |
+| `/luu-tru` | `_app` | `MediaStoragePage` | `QuickRoomTagPopover`, `QuickFeaturedRankPopover`, `BulkRoomTagPopover`, `ProductGalleryDialog` | `PageHeader`, `ProductImage`, `ImageRoomTagPicker`, `AssetUsageDialog`, `FilterChip`, `MultiSelectFilter`, `PaginationBar`, `ui/dialog`, `ui/popover` | — | 19 SF | `crm.server`, `lp.server`, `media.server`, `image-references.server` |
 | `/khong-gian` | `_app` | `ConceptHubPage` | `QuickConceptRoomTagPopover` | `PageHeader`, `ui/dialog`, `ui/popover` | — | 5 SF | `space-collections.server`, `crm.server` |
 | `/leads` | `_app` | `LeadsPage` | `STATUS_TABS`, hai bước xoá inline | `PageHeader` | — | 4 SF | `lp.server` |
 | `/nguoi-dung` | `_app` | `UsersPage` | `Field` (local) | `PageHeader` | `useQuery` (react-query) | 4 SF | `users.server`, `audit.server` |
@@ -260,58 +259,45 @@ thêm trong cleanup này dùng đúng khuôn đó.
 ## 13. `/luu-tru`
 
 ```text
-/luu-tru (_app.luu-tru.tsx:61)                          2.4k dòng
+/luu-tru (_app.luu-tru.tsx:122)                         2.9k dòng
 │
-├── Không validateSearch — toàn bộ filter là state local (:507-…)
-├── errorComponent tuỳ biến (:62)
-├── Page: MediaStoragePage
+├── validateSearch (:123-147): tab, category, roomSlug, publicFilter, colors,
+│                              surfaces, shapes, textures, collections, q, sort,
+│                              page, pageSize, usage, selected
+│                              — toàn bộ filter lấy từ URL, không còn state local
+├── errorComponent tuỳ biến (:148)
+├── Page: MediaStoragePage (:597)
 │
-├── Feature: QuickRoomTagPopover(:109), QuickFeaturedRankPopover(:225),
-│            BulkRoomTagPopover(:422), ProductGalleryDialog(:2131)
-├── Shared: PageHeader, ProductImage, ImageRoomTagPicker, FilterChip,
-│           MultiSelectFilter, ui/dialog, ui/popover
+├── Feature: QuickRoomTagPopover(:175), QuickFeaturedRankPopover(:294),
+│            BulkRoomTagPopover(:486), ProductGalleryDialog(:2682)
+├── Shared: PageHeader, ProductImage, ImageRoomTagPicker, AssetUsageDialog,
+│           FilterChip, MultiSelectFilter, PaginationBar, ui/dialog, ui/popover
 │
-├── State: tab, category, roomSlug, publicFilter, selectedIds, page, pageSize,
-│          sort, 5 mảng filter, previewItem, galleryProduct, confirmDeleteId, deletingId
+├── State (local, không lên URL): items, counts, loading, selectedIds,
+│          usageMap, usageDialogKey, previewItem, confirmDeleteId, deletingId,
+│          busyBulk, bulkRoomPopoverOpen, bulkPublicConfirmOpen,
+│          bulkDeleteConfirmOpen, currentHeroImage, và các state dialog con
 │
-└── 15 serverFn
+└── 19 serverFn
       ├── Ảnh phẳng: fetchFlatMediaImagesFn, fetchProductImages
       ├── Thẻ phòng: setImageRoomTagsDirectFn, setProductImageRoomTagsFn,
       │              bulkSetProductImageRoomTagsFn, setProductImageKindFn,
       │              bulkSetProductImageKindFn, deleteProductImageFn
       ├── Landing: fetchLpHeroImageFn, setLpHeroImageFn, setFeaturedSlotFn,
       │            fetchFeaturedSlotsFn
-      └── Công khai: toggleProductPublicFn, bulkSetProductsPublicFn, fetchProductFieldValues
+      ├── Lookbook: demoteConceptImageFn, setConceptImagePublicFn,
+      │             updateConceptDescriptionFn
+      ├── Công khai: toggleProductPublicFn, bulkSetProductsPublicFn, fetchProductFieldValues
+      └── Reference: fetchMediaUsageFn (ảnh đang được dùng ở đâu)
 ```
+
+`?usage=unused` = tab "Không còn nơi dùng" (ảnh không bảng nào khác trỏ tới).
+Chip trên ảnh đọc `usageMap` (nạp bằng `fetchMediaUsageFn`) để hiện
+"Còn dùng ở N nơi" / "Chỉ ở sản phẩm này".
 
 ---
 
-## 14. `/thu-vien`
-
-```text
-/thu-vien (_app.thu-vien.tsx:253)                       2.7k dòng — file lớn nhất
-│
-├── validateSearch { sort, cat, q, c, v } (:254-265)
-├── beforeLoad: !context.user → /login (:266-268)
-├── loader: fetchGalleryCollections + fetchGalleryImageCandidates (:269-275)
-├── Page: GalleryPage
-├── Feature: Sortable* (DnD), CollectionCard, CollectionPicker (nội bộ file)
-├── Shared: PageHeader, ProductImage, SortMenu, ui/dialog
-└── 14 serverFn
-      ├── Bộ sưu tập: fetchGalleryCollections, fetchGalleryCollection,
-      │               createGalleryCollectionFn, updateGalleryCollectionFn,
-      │               deleteGalleryCollectionFn, setGalleryCoverFn
-      ├── Ảnh trong bộ: addGalleryProductImagesFn, removeGalleryItemFn,
-      │                 reorderGalleryItemsFn, uploadGalleryImageFn
-      └── Khác: fetchGalleryImageCandidates, fetchProducts, uploadProductImageFn,
-                deleteProductImageFn
-```
-
-`?c=` = id bộ sưu tập đang mở, `?v=` = index đang xem toàn màn hình.
-
----
-
-## 15. `/khong-gian`
+## 14. `/khong-gian`
 
 ```text
 /khong-gian (_app.khong-gian.tsx:224)                   1.4k dòng
@@ -330,7 +316,7 @@ thêm trong cleanup này dùng đúng khuôn đó.
 
 ---
 
-## 16. `/leads`
+## 15. `/leads`
 
 ```text
 /leads (_app.leads.tsx:28)
@@ -348,7 +334,7 @@ Nhãn `form_kind` lấy từ `LP_FORM_KIND_LABEL` (`src/lib/lp-types.ts`) — g�
 
 ---
 
-## 17. `/nguoi-dung` (admin)
+## 16. `/nguoi-dung` (admin)
 
 ```text
 /nguoi-dung (_app.nguoi-dung.tsx:19)
@@ -363,7 +349,7 @@ Nhãn `form_kind` lấy từ `LP_FORM_KIND_LABEL` (`src/lib/lp-types.ts`) — g�
 
 ---
 
-## 18. `/nhat-ky` (admin)
+## 17. `/nhat-ky` (admin)
 
 ```text
 /nhat-ky (_app.nhat-ky.tsx:7)
@@ -376,12 +362,12 @@ Nhãn `form_kind` lấy từ `LP_FORM_KIND_LABEL` (`src/lib/lp-types.ts`) — g�
 
 ---
 
-## 19. Component dùng chung — ai dùng ở đâu
+## 18. Component dùng chung — ai dùng ở đâu
 
 ```text
 PageHeader            ── 13 route (mọi trang _app)
 EmptyState            ── /ghi-chu, /leads, /cong-no (tầng text thuần; biến thể icon/CTA không gộp)
-ProductImage         ── /san-pham, /luu-tru, /thu-vien, /khach-hang/$id + 4 dialog
+ProductImage         ── /san-pham, /luu-tru, /khach-hang/$id + 4 dialog
 NewQuoteDialog       ── /bao-gia, /co-hoi, /khach-hang/, /khach-hang/$id, /san-pham, TopBar
 NewCustomerDialog    ── /co-hoi, /khach-hang/, /khach-hang/$id, TopBar
 PageFilterBar        ── /bao-gia, /co-hoi, /cong-no, /khach-hang/
@@ -389,7 +375,7 @@ CustomerMappingDialog── /khach-hang/$id, TopBar
 ExportQuoteDialog    ── /bao-gia, /khach-hang/$id
 FilterChip           ── /san-pham, /luu-tru, /bao-gia, landing/MaterialLibraryPage
 MultiSelectFilter    ── /san-pham, /luu-tru, /bao-gia, landing/MaterialLibraryPage
-SortMenu             ── /san-pham, /thu-vien
+SortMenu             ── /san-pham
 ImageRoomTagPicker   ── /luu-tru, EditProductImagesDialog
 ProductSuggestionField── NewProductDialog, EditProductDialog, BulkEditFieldDialog
 ui/dialog            ── 17 nơi

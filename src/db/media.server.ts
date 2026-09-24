@@ -266,7 +266,14 @@ export type FlatMediaItem = {
   ai_description: string;
   created_at: string;
 };
-export type FlatMediaUsage = "all" | "in_use" | "unused" | "expiring";
+/**
+ * Bộ lọc theo "nơi đang dùng" của ảnh — suy ra từ 5 bảng ref
+ * (`src/db/image-references.server.ts`), tính live mỗi lần đọc:
+ *  - `all`    → toàn bộ ảnh (mặc định).
+ *  - `unused` → ảnh KHÔNG còn bản ghi nào khác trỏ tới (chỉ còn chính nó giữ).
+ * Không còn khái niệm "expiring"/countdown — không có tiến trình xoá tự động.
+ */
+export type FlatMediaUsage = "all" | "unused";
 export async function listFlatMediaImages(opts?: {
   tab?: FlatMediaTab;
   category?: string;
@@ -480,27 +487,22 @@ export async function listFlatMediaImages(opts?: {
     listWhere.push("p.featured_rank IS NULL");
   }
 
-  // Sử dụng / lifecycle — reuse Reference Resolver (same 7 nguồn, không nhân bản).
-  // UI expose 2 trạng thái: in_use (Đang dùng) và expiring (Chờ xóa).
-  // Active = ảnh đang được dùng (bản ghi media của chính nó là ref) → không lọc.
-  // To Delete = không còn ref NÀO KHÁC ngoài bản ghi hiện tại → vào GC sau.
-  // Mặc định (không truyền) = "all" — tuyệt đối không làm trống tab khi mở.
-  //
+  // Segmented "Tất cả ảnh | Không còn nơi dùng":
+  //  - `all` (mặc định) không lọc — hiện toàn bộ ảnh kể cả đang dùng ở mapping/Hero.
+  //  - `unused` = không còn bản ghi nào KHÁC trỏ tới key này → ứng viên xoá thủ công.
   // ⚠️ PERFORMANCE: predicate dùng precompute-set (UNCORRELATED) thay vì correlated
-  // NOT EXISTS per-row — correlated chạy 7-UNION + LIKE '%/tail' trên TỪNG row
+  // NOT EXISTS per-row — correlated chạy 5-UNION + LIKE '%/tail' trên TỪNG row
   // (107s/request → timeout browser). Set này PG evaluate 1 lần (hash anti-join).
-  // Cùng 7 nguồn như image-references resolver: product_images (khác row),
-  // products.image_path, mapping ×2, gallery ×2, lp_settings.hero_image.
+  // Cùng 5 nguồn như image-references resolver: product_images (khác row),
+  // products.image_path, mapping ×2, lp_settings.hero_image.
   const usage = opts?.usage ?? "all";
-  if (usage === "expiring" || usage === "unused") {
+  if (usage === "unused") {
     listWhere.push(
       `substring(i.path from '([^/]+)$') NOT IN (
         SELECT substring(path from '([^/]+)$') FROM product_images WHERE path IS NOT NULL AND path <> '' GROUP BY 1 HAVING COUNT(*) > 1
         UNION SELECT substring(image_path from '([^/]+)$') FROM products WHERE image_path IS NOT NULL AND image_path <> ''
         UNION SELECT substring(image_path from '([^/]+)$') FROM customer_mapping_items WHERE image_path IS NOT NULL AND image_path <> ''
         UNION SELECT substring(custom_product_image_path from '([^/]+)$') FROM customer_mapping_items WHERE custom_product_image_path IS NOT NULL AND custom_product_image_path <> ''
-        UNION SELECT substring(path from '([^/]+)$') FROM gallery_collection_items WHERE path IS NOT NULL AND path <> ''
-        UNION SELECT substring(cover_path from '([^/]+)$') FROM gallery_collections WHERE cover_path IS NOT NULL AND cover_path <> ''
         UNION SELECT substring(value from '([^/]+)$') FROM lp_settings WHERE key = 'hero_image' AND value IS NOT NULL AND value <> ''
       )`,
     );
@@ -508,8 +510,8 @@ export async function listFlatMediaImages(opts?: {
 
   const listWhereSql = `WHERE ${listWhere.join(" AND ")}`;
 
-  // 4. Sort mà ảnh hưởng total: usage/selected làm lệch counts[tab] (bị "không chạy").
-  //    Tính COUNT đúng theo bộ lọc hiện tại; tab featured giữ counts.featured (DISTINCT ON).
+  // 4. usage/selected làm lệch counts[tab] → tính lại COUNT đúng theo bộ lọc hiện tại;
+  //    tab featured giữ counts.featured (DISTINCT ON).
   let total =
     tab === "featured"
       ? counts.featured
@@ -526,7 +528,6 @@ export async function listFlatMediaImages(opts?: {
         `SELECT COUNT(*) AS n
            FROM product_images i
            JOIN products p ON p.id = i.product_id
-           LEFT JOIN image_assets ast ON ast.storage_key = substring(i.path from '([^/]+)$')
            ${listWhereSql}`,
       )
       .get<{ n: number }>(...listParams);
@@ -570,7 +571,6 @@ export async function listFlatMediaImages(opts?: {
           i.created_at
         FROM product_images i
         JOIN products p ON p.id = i.product_id
-        LEFT JOIN image_assets ast ON ast.storage_key = substring(i.path from '([^/]+)$')
         ${listWhereSql}
         ORDER BY p.featured_rank ASC, (i.kind = 'map') DESC, i.is_primary DESC, i.id ASC
         LIMIT ? OFFSET ?`,
@@ -596,7 +596,6 @@ export async function listFlatMediaImages(opts?: {
           i.created_at
         FROM product_images i
         JOIN products p ON p.id = i.product_id
-        LEFT JOIN image_assets ast ON ast.storage_key = substring(i.path from '([^/]+)$')
         ${listWhereSql}
         ORDER BY ${orderBySql}
         LIMIT ? OFFSET ?`,

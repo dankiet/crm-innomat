@@ -3,11 +3,12 @@
 Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:migrate`
 (idempotent — mọi lệnh đều `IF NOT EXISTS` / `IF EXISTS`, chạy lại an toàn).
 
-## 26 bảng
+## 23 bảng
 
 > Số dòng thật của từng bảng: xem [audit-2026-09-19](audit-2026-09-19.md) §G0b — **không
 > chép lại ở đây** để tránh hai bản số liệu trôi lệch nhau. Mốc đó đo 25 bảng; từ 2026-09-21
-> có thêm `image_assets` (Image Asset Registry) → **26 bảng**.
+> có thêm `image_assets` → 26, đã gỡ 2 bảng gallery (2026-09-24) → 24, rồi gỡ luôn
+> `image_assets` (2026-09-24, bỏ tầng registry/GC) → **23 bảng**.
 
 ### Catalog sản phẩm
 
@@ -67,14 +68,6 @@ kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [n
 | `customer_mappings`            | `UNIQUE(code)`, `status`, `version` (mặc định `'01'`)                                                                                      |
 | `customer_mapping_items`       | Dòng đề xuất: trỏ `product_id` **hoặc** dùng bộ `custom_product_*` cho hàng ngoài catalog; nhóm theo `area_group_key` (`area_description` còn khai báo nhưng 0 code dùng, 0/151 dòng có giá trị — xem [audit](audit-2026-09-19.md) §G1) |
 | `customer_mapping_quote_links` | Liên kết N–N mapping ↔ quote. **PK ghép, không có cột `id`**. Hiện **0 dòng** — tính năng đã viết xong code (ghi ở `crm.server.ts`, đọc ở `crm.server.ts` + `api/functions.ts`) nhưng chưa từng chạy ở production; **không** phải bảng chết |
-
-### Thư viện hình
-
-| Bảng                       | Ghi chú                                                                                                                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `gallery_collections`      | Bộ sưu tập hình, có `cover_path`                                                                                                                       |
-| `gallery_collection_items` | `UNIQUE(collection_id, path)`, `sort_order`; giữ `product_code`/`product_name` để hiển thị kể cả khi sản phẩm bị xoá (`product_id ON DELETE SET NULL`) |
-| `image_assets`             | **Registry ảnh chuẩn** — 1 record / 1 physical image (content-addressed). `UNIQUE(sha256)`; `storage_key` = `<sha256>.<ext>`; metadata `mime_type`/`byte_size`/`width`/`height` lấy tại bước upload (sharp); `last_referenced_at` touch mỗi lần được trỏ tới; `orphaned_at` khi path cuối bị xoá; `gc_claimed_at`/`gc_completed_at` cho **Delayed GC** (physical file chỉ bị xoá sau retention `IMAGE_GC_RETENTION_HOURS`, xoá bởi `npm run images:gc` — không xoá ngay khi mất reference). Các bảng cũ vẫn giữ path — chưa chuyển FK, xem service `src/lib/image-assets.server.ts` + `src/lib/image-gc.server.ts` |
 
 ### Nhật ký
 

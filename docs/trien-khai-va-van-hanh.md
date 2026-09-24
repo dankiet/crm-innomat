@@ -158,22 +158,14 @@ npm run clean:generated    # xoá output build/generated
 
 Cả `clean-generated.mjs` và `prune-deploy-backup.mjs` đều **từ chối xoá** đường dẫn ngoài workspace.
 
-## Delayed GC ảnh orphan (vận hành)
+## Xoá ảnh (thủ công, không có cron)
 
-Physical image không bị xoá ngay khi mất reference — asset vào trạng thái `orphaned_at`,
-giữ file tới hết `IMAGE_GC_RETENTION_HOURS` (mặc định **24h**) rồi GC mới xoá:
+**Không có tiến trình dọn dẹp tự động.** Không có registry, không có cron, không có biến môi
+trường retention.
 
-```bash
-npm run images:gc           # chạy GC (batch mặc định 100)
-npm run images:gc -- --dry-run   # xem candidate mà không xoá (lần đầu production nên chạy trước)
-npm run images:gc -- --batch 500 # giới hạn candidate mỗi lượt
-```
-
-- **An toàn chạy lặp**: claim atomic (`gc_claimed_at`), re-check reference trước khi xoá,
-  lỗi storage → unclaim tự động để lần sau retry, idempotent.
-- **Yêu cầu Node ≥ 22.15** cho `images:gc` (dùng `registerHooks` của Node qua
-  `scripts/ts-alias.mjs` để import service TS thật — không nhân bản logic).
-- **Scheduler production (Vercel serverless = không có process nền)**: chạy bằng cron bên ngoài
-  (GitHub Actions / máy chạy `.env`) gọi lệnh trên, hoặc endpoint có secret — repo chưa khai
-  cron để tránh thêm hạ tầng. Mỗi lượt nên chạy nhiều lần (batch) cho tới khi `candidates=0`.
-- Không có metrics infra trong project → log có cấu trúc `[image-gc]` ở server log.
+- Gỡ ảnh khỏi sản phẩm / đề xuất vật liệu / Hero trang chủ **không** đụng tới file. Ảnh chỉ rơi
+  vào trạng thái "không còn nơi dùng", xem được ở `/luu-tru` (segmented **"Không còn nơi dùng"**).
+- File vật lý chỉ bị xoá khi người dùng xoá ảnh trên `/luu-tru`. Lúc đó server kiểm tra lại
+  Reference Resolver; chỉ xoá khi **không còn nguồn nào** trỏ tới (tên file là hash nên nhiều bản
+  ghi có thể chia sẻ chung một file). Endpoint trả `file_deleted` để UI phân biệt.
+- Không cần scheduler: Vercel serverless không có process nền, và cũng không còn gì để chạy nền.

@@ -179,7 +179,6 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
 
   const displayName = user.display_name || user.username;
   const isCatalogActive = pathname === "/san-pham";
-  const isLibraryActive = pathname === "/thu-vien";
   const currentNhom = search?.nhom;
   const [catalogExpanded, setCatalogExpanded] = useState(isCatalogActive);
   const [expandedSizeGroup, setExpandedSizeGroup] = useState<string | null>(() => {
@@ -414,11 +413,6 @@ export function AppSidebar({ user, mobileOpen = false, onMobileClose }: Props) {
                 })}
               </div>
             ) : null}
-            <NavLink
-              item={{ to: "/thu-vien", label: "Thư viện", icon: Images }}
-              active={isLibraryActive}
-              onClick={linkCloseHandler({ to: "/thu-vien" })}
-            />
           </div>
         </section>
 

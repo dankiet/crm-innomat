@@ -5,7 +5,6 @@
  * (metadata hiển thị cho menu sort) vẫn nằm ở route vì nó dùng type của
  * `@/components/SortMenu` — lib KHÔNG import components.
  *
- * Lưu ý: `SortDir` được khai cục bộ ở đây và ở `gallery-sort.ts` (cùng union).
  * Xem OUT OF SCOPE FINDINGS trong REFACTOR_REPORT — nơi ở đúng là `lib/types.ts`.
  */
 import type { Product } from "./types.ts";

@@ -126,7 +126,7 @@ export async function readImageBytes(ref: string): Promise<Buffer | null> {
   return null;
 }
 
-/** Xoá 1 file ảnh theo ref (chỉ xoá khi không còn bản ghi tham chiếu — caller tự kiểm tra). */
+/** Xoá 1 file ảnh theo ref. Caller phải tự kiểm tra còn tham chiếu hay không. */
 export async function deleteImageRef(ref: string): Promise<void> {
   if (!ref) return;
   const storage = await loadStorage();
@@ -153,20 +153,4 @@ export async function deleteImageRef(ref: string): Promise<void> {
       /* ignore */
     }
   }
-}
-
-/**
- * Xoá physical object theo storage_key ("<sha256>.<ext>") — dùng riêng cho
- * Delayed GC. Local mode: /images/<key>; Supabase: publicUrl(cfg, <prefix>/<key>).
- * Idempotent: ref/chưa tồn tại đều không throw (deleteImageRef bỏ qua lỗi).
- */
-export async function deleteImageObject(storageKey: string): Promise<void> {
-  if (!storageKey) return;
-  const storage = await loadStorage();
-  if (storage) {
-    const cfg = config()!;
-    await deleteImageRef(publicUrl(cfg, `${STORAGE_PREFIX}/${storageKey}`));
-    return;
-  }
-  await deleteImageRef(`/images/${storageKey}`);
 }

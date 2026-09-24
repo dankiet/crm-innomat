@@ -12,6 +12,7 @@ import {
   Grid,
   Image as ImageIcon,
   Images,
+  Info,
   Layers,
   Loader2,
   Maximize2,
@@ -49,8 +50,7 @@ import {
   fetchMediaUsageFn,
 } from "@/api/lp";
 import type { FeaturedSlotInfo } from "@/db/lp.server";
-import type { ImageReference, ImageAssetLifecycleRow } from "@/db/image-references.server";
-import { gcEstimatedDeleteText } from "@/lib/image-asset-refs";
+import type { ImageReference } from "@/db/image-references.server";
 import {
   IMAGE_ROOM_TAGS,
   PRODUCT_COLORS,
@@ -73,7 +73,7 @@ import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import { PaginationBar } from "@/components/PaginationBar";
 import { parseCsv } from "@/lib/product-facets";
-import { parsePositiveInt } from "@/lib/gallery-sort";
+import { parsePositiveInt } from "@/lib/parse";
 type MediaStorageSearch = {
   tab?: FlatMediaTab;
   category?: string;
@@ -88,13 +88,13 @@ type MediaStorageSearch = {
   sort?: FlatMediaSort;
   page?: number;
   pageSize?: number;
-  usage?: "all" | "in_use" | "unused" | "expiring";
+  usage?: FlatMediaUsage;
   selected?: "yes" | "no";
 };
 
 const FLAT_MEDIA_TABS: readonly string[] = ["all", "map", "concept", "featured", "unassigned"];
 const FLAT_MEDIA_SORTS: readonly string[] = ["newest", "oldest", "code_asc", "code_desc", "priority"];
-const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "in_use", "unused", "expiring"];
+const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "unused"];
 const PUBLIC_FILTERS: readonly string[] = ["all", "public", "hidden"];
 
 function parseMediaTab(v: unknown): FlatMediaTab | undefined {
@@ -610,7 +610,7 @@ function MediaStoragePage() {
   const sort = searchParams.sort ?? "newest";
   const page = searchParams.page ?? 1;
   const pageSize = searchParams.pageSize ?? 24;
-  const usage = searchParams.usage ?? "in_use";
+  const usage = searchParams.usage ?? "all";
 
   /** Đổi filter: ghi URL và luôn reset về trang 1 (đúng hành vi cũ). */
   function patchFilters(patch: Partial<MediaStorageSearch>) {
@@ -631,7 +631,7 @@ function MediaStoragePage() {
     selectedShapes.length > 0 ||
     selectedTextures.length > 0 ||
     selectedCollections.length > 0 ||
-    usage !== "in_use" ||
+    usage !== "all" ||
     (tab !== "all" && tab !== "featured") ||
     (searchParams.selected != null)
   );
@@ -723,11 +723,9 @@ function MediaStoragePage() {
 
   const [items, setItems] = useState<FlatMediaItem[]>([]);
 
-  // ── Usage & lifecycle (Media Workspace) ──
+  // ── Usage: mỗi storage key đang được tham chiếu ở đâu ──
   const [usageMap, setUsageMap] = useState<{
-    retentionHours: number;
     usage: Record<string, ImageReference[]>;
-    life: Record<string, ImageAssetLifecycleRow>;
   } | null>(null);
   const [usageDialogKey, setUsageDialogKey] = useState<string | null>(null);
   const [busyLbPublicId, setBusyLbPublicId] = useState<number | null>(null);
@@ -752,11 +750,7 @@ function MediaStoragePage() {
     fetchMediaUsageFn({ data: { keys } })
       .then((res) => {
         if (cancelled) return;
-        setUsageMap({
-          retentionHours: res.retentionHours,
-          usage: res.usage ?? {},
-          life: res.lifecycle ?? {},
-        });
+        setUsageMap({ usage: res.usage ?? {} });
       })
       .catch(() => {
         if (!cancelled) setUsageMap(null);
@@ -767,22 +761,29 @@ function MediaStoragePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
+  /**
+   * Nhãn trạng thái dùng của ảnh — đọc ngay trên card, không cần mở popup:
+   *  - "Còn dùng ở N nơi"  → ảnh còn được bảng khác trỏ tới.
+   *  - "Chỉ ở sản phẩm này" → không nơi nào khác dùng; file vẫn nằm trong kho.
+   * Trả null khi chưa tải xong usage (không đoán bừa).
+   */
   function usageChipFor(img: FlatMediaItem): string | null {
+    if (!usageMap) return null;
     const key = storageKeyOf(img.path);
-    // refs KHÔNG tính bản ghi self (row product_images của chính ảnh) — khớp
-    // định nghĩa To Delete server (`o1.id <> i.id`). Ngày trước đếm cả self
-    // → ảnh To Delete luôn hiện fake "Đang dùng · 1".
-    const refs = (usageMap?.usage?.[key] ?? []).filter(
+    // refs KHÔNG tính bản ghi self (row product_images của chính ảnh) — ảnh luôn
+    // tự giữ chính nó, nên chỉ ref KHÁC mới là "nơi đang dùng".
+    const refs = (usageMap.usage[key] ?? []).filter(
       (r) => !(r.role === "product_image" && String(r.id) === String(img.id)),
     );
-    const life = usageMap?.life?.[key];
-    if (refs.length > 0) return `Đang dùng · ${refs.length}`;
-    if (life?.gc_completed_at) return "Đã dọn storage";
-    if (life?.orphaned_at) {
-      return gcEstimatedDeleteText(life.orphaned_at, usageMap?.retentionHours ?? 24);
-    }
-    if (usage === "expiring") return "Chỉ dùng ở đây · sẽ dọn khi gỡ";
-    return null;
+    return refs.length > 0 ? `Còn dùng ở ${refs.length} nơi` : "Chỉ ở sản phẩm này";
+  }
+
+  /** Số nơi KHÁC đang dùng ảnh (không tính chính bản ghi product_images này). */
+  function otherUsageCount(img: FlatMediaItem): number {
+    const key = storageKeyOf(img.path);
+    return (usageMap?.usage?.[key] ?? []).filter(
+      (r) => !(r.role === "product_image" && String(r.id) === String(img.id)),
+    ).length;
   }
 
   async function handleToggleLookbookPublic(img: FlatMediaItem) {
@@ -1100,17 +1101,23 @@ function MediaStoragePage() {
     const ids = Array.from(selectedIds);
     let successCount = 0;
     let failCount = 0;
+    let fileCount = 0;
     try {
       await mapLimit(ids, 5, async (imageId) => {
         try {
-          await deleteProductImageFn({ data: { imageId } });
+          const res = await deleteProductImageFn({ data: { imageId } });
+          if (res.file_deleted) fileCount++;
           successCount++;
         } catch {
           failCount++;
         }
       });
       if (successCount > 0) {
-        toast.success(`Đã xóa ${successCount} ảnh thành công!`);
+        toast.success(
+          fileCount > 0
+            ? `Đã gỡ ${successCount} ảnh · xoá ${fileCount} file khỏi kho lưu trữ`
+            : `Đã gỡ ${successCount} ảnh khỏi sản phẩm — file vẫn còn vì nơi khác đang dùng`,
+        );
       }
       if (failCount > 0) {
         toast.error(`Có ${failCount} ảnh xóa không thành công`);
@@ -1195,8 +1202,12 @@ function MediaStoragePage() {
   async function handleDeleteImage(imageId: number) {
     setDeletingId(imageId);
     try {
-      await deleteProductImageFn({ data: { imageId } });
-      toast.success("Đã xóa ảnh thành công");
+      const res = await deleteProductImageFn({ data: { imageId } });
+      toast.success(
+        res.file_deleted
+          ? "Đã xoá ảnh và file trong kho lưu trữ"
+          : "Đã gỡ ảnh khỏi sản phẩm — file vẫn còn vì nơi khác đang dùng",
+      );
       setConfirmDeleteId(null);
 
       setItems((prev) => prev.filter((i) => i.id !== imageId));
@@ -1229,7 +1240,7 @@ function MediaStoragePage() {
         <PageHeader
           eyebrow="Media Workspace"
           title="Media"
-          description="Quản lý toàn diện ảnh sản phẩm: phân loại MAP/Concept, bối cảnh phòng Lookbook, tuyển chọn trang chủ, nơi đang dùng và vòng đời Delayed GC."
+          description="Quản lý toàn diện ảnh sản phẩm: phân loại MAP/Concept, bối cảnh phòng Lookbook, tuyển chọn trang chủ, và xem mỗi ảnh đang được dùng ở đâu."
         />
       </div>
 
@@ -1551,36 +1562,36 @@ function MediaStoragePage() {
               </div>
             ) : null}
 
-            {/* Status — segmented: Active | To Delete (mặc định Active) */}
+            {/* Status — segmented: Tất cả ảnh | Không còn nơi dùng */}
             <div
               className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
-              title="Lọc theo trạng thái: Active = toàn bộ ảnh đang có (mặc định); To Delete = chỉ ảnh KHÔNG còn dùng ở nơi khác (ứng viên dọn dẹp)"
+              title="Lọc theo trạng thái dùng: Tất cả ảnh = mọi ảnh đang có; Không còn nơi dùng = chỉ ảnh không bảng nào khác trỏ tới"
             >
               <button
                 type="button"
                 onClick={() => patchFilters({ usage: undefined })}
                 className={cn(
                   "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
-                  usage === "in_use"
+                  usage === "all"
                     ? "bg-card text-foreground shadow-xs ring-1 ring-black/5"
                     : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
                 )}
-                aria-pressed={usage === "in_use"}
+                aria-pressed={usage === "all"}
               >
-                Active
+                Tất cả ảnh
               </button>
               <button
                 type="button"
-                onClick={() => patchFilters({ usage: "expiring" })}
+                onClick={() => patchFilters({ usage: "unused" })}
                 className={cn(
                   "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
-                  usage === "expiring"
+                  usage === "unused"
                     ? "bg-terracotta text-white shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
                 )}
-                aria-pressed={usage === "expiring"}
+                aria-pressed={usage === "unused"}
               >
-                To Delete
+                Không còn nơi dùng
               </button>
             </div>
 
@@ -1750,17 +1761,18 @@ function MediaStoragePage() {
         ) : null}
       </div>
 
-      {/* Banner thông báo ngữ cảnh khi lọc ảnh Chờ xoá (Expiring / Orphan) */}
-      {usage === "expiring" ? (
+      {/* Banner ngữ cảnh khi lọc "Không còn nơi dùng" */}
+      {usage === "unused" ? (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in-0 duration-150">
           <div className="flex items-start gap-2.5">
-            <Clock className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <Info className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div>
-              <p className="font-semibold text-foreground">
-                Đang lọc ảnh chờ dọn dẹp (Delayed GC)
-              </p>
+              <p className="font-semibold text-foreground">Ảnh không còn nơi nào dùng</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Toàn bộ ảnh ở đây KHÔNG còn được dùng ở nơi khác (sản phẩm, bộ sưu tập, landing…) — mỗi ảnh chỉ còn được giữ bởi bản ghi hiện tại. File sẽ tự vào hàng đợi dọn dẹp trong {usageMap?.retentionHours ?? 24} giờ ngay khi ảnh này được gỡ khỏi sản phẩm. Ảnh có đồng hồ đếm ngược = đã được xếp lịch dọn vĩnh viễn. Bấm chip trên ảnh để xem chi tiết nơi đang dùng.
+                Không bảng nào khác (sản phẩm, đề xuất vật liệu, Hero trang chủ) trỏ tới những ảnh
+                này — mỗi ảnh chỉ còn được giữ bởi chính bản ghi của nó. File vẫn nằm nguyên trong
+                kho lưu trữ; xoá ở đây là xoá thật, không thể hoàn tác. Bấm chip trên ảnh để xem
+                chi tiết nơi đang dùng.
               </p>
             </div>
           </div>
@@ -1802,9 +1814,11 @@ function MediaStoragePage() {
           <ImageIcon className="mx-auto size-10 text-muted-foreground/40" />
           <p className="mt-3 text-sm font-semibold text-foreground">Không tìm thấy ảnh nào phù hợp</p>
           <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-            {hasActiveFilters
-              ? "Hãy thử bỏ bớt bộ lọc màu, nhóm sản phẩm, hoặc từ khóa tìm kiếm để xem thêm kết quả."
-              : "Chưa có ảnh nào trong mục này."}
+            {usage === "unused"
+              ? "Không có ảnh nào rơi vào trạng thái không còn nơi dùng — mọi ảnh đều đang được ít nhất một bảng khác trỏ tới. Gỡ ảnh khỏi sản phẩm/đề xuất vật liệu/Hero để ảnh xuất hiện ở đây."
+              : hasActiveFilters
+                ? "Hãy thử bỏ bớt bộ lọc màu, nhóm sản phẩm, hoặc từ khóa tìm kiếm để xem thêm kết quả."
+                : "Chưa có ảnh nào trong mục này."}
           </p>
           {hasActiveFilters ? (
             <button
@@ -1962,37 +1976,23 @@ function MediaStoragePage() {
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {(() => {
                       const chip = usageChipFor(img);
-                      const chipKey = storageKeyOf(img.path);
                       if (!chip) return null;
-                      const active =
-                        (usageMap?.usage?.[chipKey] ?? []).filter(
-                          (r) => !(r.role === "product_image" && String(r.id) === String(img.id)),
-                        ).length > 0;
-                      const isExpiring = Boolean(usageMap?.life?.[chipKey]?.orphaned_at && !usageMap?.life?.[chipKey]?.gc_completed_at);
-                      const isCleaned = Boolean(usageMap?.life?.[chipKey]?.gc_completed_at);
-                      const onlyHere = usage === "expiring" && !active && !isExpiring;
+                      const chipKey = storageKeyOf(img.path);
+                      const inUse = otherUsageCount(img) > 0;
                       return (
                         <button
                           type="button"
                           onClick={() => setUsageDialogKey(chipKey)}
-                          title="Xem nơi đang dùng & vòng đời GC"
-                          aria-label="Xem nơi đang dùng & vòng đời GC"
+                          title="Xem ảnh đang được dùng ở đâu"
+                          aria-label="Xem ảnh đang được dùng ở đâu"
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold border transition-all cursor-pointer",
-                            isCleaned
-                              ? "border-border/70 bg-surface-strong/60 text-muted-foreground/70"
-                              : active
-                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                                : isExpiring || onlyHere
-                                  ? "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 animate-pulse"
-                                  : "border-border/80 bg-surface-strong/60 text-muted-foreground hover:bg-surface-strong",
+                            inUse
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                              : "border-border/80 bg-surface-strong/60 text-muted-foreground hover:bg-surface-strong",
                           )}
                         >
-                          {active ? (
-                            <Layers className="size-2.5 text-emerald-600 dark:text-emerald-400" />
-                          ) : isExpiring || onlyHere ? (
-                            <Clock className="size-2.5 text-amber-600 dark:text-amber-400" />
-                          ) : null}
+                          {inUse ? <Layers className="size-2.5 text-emerald-600 dark:text-emerald-400" /> : null}
                           <span>{chip}</span>
                         </button>
                       );
@@ -2469,7 +2469,7 @@ function MediaStoragePage() {
               Bạn có chắc chắn muốn xóa <b>{selectedIds.size} ảnh đã chọn</b>?
             </p>
             <p className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 p-2.5 rounded-lg">
-              Lưu ý: Ảnh sẽ bị gỡ khỏi sản phẩm. Nếu không còn sản phẩm hay bộ sưu tập nào khác sử dụng, file sẽ tự động vào chu trình dọn dẹp Delayed GC ({usageMap?.retentionHours ?? 24}h). Hành động này không thể hoàn tác.
+              Lưu ý: Ảnh sẽ bị gỡ khỏi sản phẩm. File trong kho lưu trữ chỉ bị xoá khi không còn bảng nào khác (đề xuất vật liệu, Hero trang chủ, sản phẩm khác) trỏ tới. Hành động này không thể hoàn tác.
             </p>
           </div>
           <div className="mt-6 flex items-center justify-end gap-2.5">
@@ -2660,17 +2660,22 @@ function MediaStoragePage() {
         }}
       />
 
-      {/* Usage & lifecycle detail — ngay trong workspace */}
-      {usageDialogKey ? (
-        <AssetUsageDialog
-          open
-          onClose={() => setUsageDialogKey(null)}
-          item={items.find((it) => storageKeyOf(it.path) === usageDialogKey) ?? null}
-          references={usageMap?.usage?.[usageDialogKey] ?? []}
-          lifecycle={usageMap?.life?.[usageDialogKey]}
-          retentionHours={usageMap?.retentionHours ?? 24}
-        />
-      ) : null}
+      {/* Usage detail — ngay trong workspace */}
+      {(() => {
+        if (!usageDialogKey) return null;
+        const dialogItem = items.find((it) => storageKeyOf(it.path) === usageDialogKey) ?? null;
+        return (
+          <AssetUsageDialog
+            open
+            onClose={() => setUsageDialogKey(null)}
+            item={dialogItem}
+            references={(usageMap?.usage?.[usageDialogKey] ?? []).filter(
+              (r) =>
+                !(r.role === "product_image" && String(r.id) === String(dialogItem?.id ?? "")),
+            )}
+          />
+        );
+      })()}
     </div>
   );
 }

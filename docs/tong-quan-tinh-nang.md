@@ -18,12 +18,11 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
 | 7   | Bán hàng   | Ghi chú toàn hệ thống                              | `/ghi-chu`                   | Đang dùng     | —                                                                        |
 | 8   | Catalog    | Sản phẩm + tồn kho + import/export Excel           | `/san-pham`                  | Đang dùng     | [san-pham-ton-kho-import](san-pham-ton-kho-import.md)                    |
 | 9   | Ảnh        | Lưu trữ ảnh — kho ảnh, thẻ phòng, tuyển chọn       | `/luu-tru`                   | Đang dùng     | [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)                          |
-| 10  | Ảnh        | Thư viện — bộ sưu tập + picker                     | `/thu-vien`                  | Đang dùng     | [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)                          |
-| 11  | Landing    | Trang LP công khai (khách vãng lai)                | `/lp/$slug`                  | **Một phần**  | §9                                                                       |
-| 12  | Landing    | Hộp thư Lead                                       | `/leads`                     | Đang dùng     | §10                                                                      |
-| 13  | Landing    | Lookbook / Concept                                 | `/khong-gian`                | Đang dùng     | §11                                                                      |
-| 14  | Quản trị   | Người dùng (**admin**)                             | `/nguoi-dung`                | Đang dùng     | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
-| 15  | Quản trị   | Nhật ký thao tác (**admin**)                       | `/nhat-ky`                   | Đang dùng     | [co-so-du-lieu](co-so-du-lieu.md)                                        |
+| 10  | Landing    | Trang LP công khai (khách vãng lai)                | `/lp/$slug`                  | **Một phần**  | §9                                                                       |
+| 11  | Landing    | Hộp thư Lead                                       | `/leads`                     | Đang dùng     | §10                                                                      |
+| 12  | Landing    | Lookbook / Concept                                 | `/khong-gian`                | Đang dùng     | §11                                                                      |
+| 13  | Quản trị   | Người dùng (**admin**)                             | `/nguoi-dung`                | Đang dùng     | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
+| 14  | Quản trị   | Nhật ký thao tác (**admin**)                       | `/nhat-ky`                   | Đang dùng     | [co-so-du-lieu](co-so-du-lieu.md)                                        |
 
 **Cột "Trạng thái"** suy ra từ dữ liệu thật trong DB, không phải phỏng đoán:
 
@@ -39,9 +38,9 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
   chưa từng chạy ở production**, không phải code chết. Xem
   [audit-2026-09-19](audit-2026-09-19.md) §G3.
 
-**Toàn bộ 25 bảng đều đang dùng** — `public` có đúng 25 bảng, khớp 100% với `schema-pg.sql`,
-**0 bảng mồ côi** (bằng chứng: [audit-2026-09-19](audit-2026-09-19.md) §G0). Không có bảng nào
-nên xoá.
+**Toàn bộ 23 bảng đều đang dùng** — `public` có đúng 23 bảng, khớp 100% với `schema-pg.sql`,
+**0 bảng mồ côi** (bằng chứng: [audit-2026-09-19](audit-2026-09-19.md) §G0; đã gỡ 2 bảng gallery
+và `image_assets` ngày 2026-09-24). Không có bảng nào nên xoá.
 
 Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 4 route **công
 khai**: `/` (trang chủ landing — cũng render `ArchitectLanding`, xem §1 cột Trạng thái),
@@ -180,31 +179,33 @@ UTM).
 - `updateConceptDescription` — mô tả (AI description).
 - `demoteConceptImage` — hạ concept → ảnh thường (rời khỏi Lookbook).
 
-## 11b. Nơi đang dùng & lifecycle (Media Workspace)
+## 11b. Nơi đang dùng (Media Workspace)
 
 `/luu-tru` trả lời "Ảnh này dùng ở đâu?" qua **Reference Resolver**
-(`src/db/image-references.server.ts`) — 7 nguồn: `product_images.path`,
+(`src/db/image-references.server.ts`) — 5 nguồn: `product_images.path`,
 `products.image_path`, `customer_mapping_items.image_path` + `custom_product_image_path`,
-`gallery_collection_items.path`, **`gallery_collections.cover_path`**, **`lp_settings.hero_image`**
-(`key='hero_image'`). Matching tail `%/<storage_key>` (chấp nhận cả `/images/…`, full URL,
-key trần). GC re-check `countImageReferencesForKey` **delegate về cùng resolver** — một
-"truth source"; `isPublicImagePathReferenced` (orphan-marking) cũng đếm cover + hero.
+`lp_settings.hero_image` (`key='hero_image'`). Matching tail `%/<storage_key>` (chấp nhận cả `/images/…`, full URL,
+key trần). Đây là "truth source" duy nhất — không có tầng registry, không có GC.
 
-Card hiển thị chip: `Đang dùng · N` / `Sắp xóa · X giờ` (orphan + retention
-`IMAGE_GC_RETENTION_HOURS`) / `Đã dọn storage`. Click chip → **AssetUsageDialog**
-(references theo role + lifecycle registry + href khi có route). Registry
-`image_assets` giữ vĩnh viễn (không purge).
+Card hiển thị chip đọc ngay được trạng thái: **`Còn dùng ở N nơi`** (còn bảng khác trỏ tới)
+hoặc **`Chỉ ở sản phẩm này`** (không nơi nào khác dùng). Click chip → **AssetUsageDialog**
+(liệt kê references theo role + href khi có route).
+
+Không có tiến trình xoá tự động: gỡ ảnh khỏi sản phẩm/mapping/Hero **không** đụng tới file —
+ảnh chỉ rơi vào trạng thái "không còn nơi dùng". File chỉ bị xoá khi người dùng xoá ảnh trên
+`/luu-tru` và lúc đó không còn nguồn nào trỏ tới (xem
+[hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §"Xoá ảnh an toàn").
 
 ## 12. Media — `/luu-tru`
 
-Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + lifecycle.
+Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + trạng thái dùng.
 
 - **Phạm vi (primary tabs)**: `All` · `MAP` · `Lookbook` · `Uncategorized` (nhãn tiếng Anh trên
   UI; `featured` = Tuyển chọn #1—#12 vẫn nhận qua deep-link nhưng không còn là tab). Tab dùng
-  segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented `Active` / `To Delete`.
-- **Sử dụng (secondary, URL `usage`)**: `in_use` (có ref khác), `unused` (0 ref khác,
-  không chờ xoá), `expiring` (0 ref + orphan trong retention `IMAGE_GC_RETENTION_HOURS`) — dùng chung Reference
-  Resolver (7 nguồn), không nhân bản. Có banner ngữ cảnh kèm đếm ngược giờ khi lọc ảnh chờ dọn dẹp.
+  segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented `Tất cả ảnh` / `Không còn nơi dùng`.
+- **Sử dụng (secondary, URL `usage`)**: `all` (mặc định — mọi ảnh) / `unused` (không bảng nào
+  khác trỏ tới) — dùng chung Reference Resolver (5 nguồn), không nhân bản. Có banner ngữ cảnh khi
+  lọc "Không còn nơi dùng".
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
 - **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (5 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
   dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,
@@ -217,26 +218,17 @@ Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + lifecycle.
 - **Phân trang + bộ lọc lưu trong URL** (`validateSearch`, giá trị mặc định bị bỏ).
 - **Thao tác nhanh**: gán phòng (`product_image_room_tags`, consequence rõ), mô tả
   (AI-generated · edit), Lookbook visibility, hạ về thường, đặt hạng "Tuyển chọn",
-  bật/tắt Thư viện, gán hàng loạt, **xóa hàng loạt (Bulk Delete)** có hộp thoại xác nhận 2 bước an toàn (tuân thủ quy ước xóa) và chạy với giới hạn concurrency `mapLimit` (~5).
+  gán hàng loạt, **xóa hàng loạt (Bulk Delete)** có hộp thoại xác nhận 2 bước an toàn (tuân thủ quy ước xóa) và chạy với giới hạn concurrency `mapLimit` (~5).
 - Nén ảnh WebP, xoá an toàn theo tham chiếu: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
 
-## 13. Thư viện — `/thu-vien`
-
-Bộ sưu tập ảnh (`gallery_collections` + `gallery_collection_items`):
-
-- Tạo/sửa bộ sưu tập, gán ảnh sản phẩm hoặc upload ảnh riêng.
-- `ImagePickerDialog` — chọn ảnh theo 9 facet (Nhóm, Nhà cung cấp, Màu, Bề mặt, Kích thước,
-  Kiểu dáng, **Hiệu ứng vân**, Bộ sưu tập, Chất liệu).
-- Kéo thả sắp xếp, đặt ảnh bìa, viewer toàn màn hình.
-
-## 14. Quản trị (**admin**)
+## 13. Quản trị (**admin**)
 
 | Route          | Việc                                                          |
 | -------------- | ------------------------------------------------------------- |
 | `/nguoi-dung`  | Tạo/sửa user, đặt lại mật khẩu, gán owner cho khách hàng       |
 | `/nhat-ky`     | Nhật ký thao tác (`audit_logs`) — mọi thao tác ghi đều ghi lại |
 
-## 15. Bảng dữ liệu theo tính năng
+## 14. Bảng dữ liệu theo tính năng
 
 | Nhóm                  | Bảng                                                                                                |
 | --------------------- | --------------------------------------------------------------------------------------------------- |
@@ -245,33 +237,32 @@ Bộ sưu tập ảnh (`gallery_collections` + `gallery_collection_items`):
 | Ảnh sản phẩm          | `product_images`, `product_image_room_tags`                                                          |
 | Khách hàng & bán hàng | `customers`, `quotes`, `quote_items`, `orders`, `payments`, `notes`, `customer_product_samples`      |
 | Đề xuất vật liệu      | `customer_mappings`, `customer_mapping_items`, `customer_mapping_quote_links`                        |
-| Thư viện hình         | `gallery_collections`, `gallery_collection_items`                                                    |
 | Landing công khai     | `lp_settings`, `lp_leads`, `lp_rate_limits`, `public_users`, `public_sessions`                       |
 
-Tổng **25 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
+Tổng **23 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
-## 16. Quy mô code
+## 15. Quy mô code
 
 > Đo ngày **2026-09-24** (sau đợt dọn dead code + đợt tối ưu kiến trúc + đợt
-> refactor được duyệt + đợt media-workspace — xem [CLEANUP_REPORT](CLEANUP_REPORT.md),
+> refactor được duyệt + đợt media-workspace + gỡ Thư viện — xem [CLEANUP_REPORT](CLEANUP_REPORT.md),
 > [REFACTOR_REPORT](REFACTOR_REPORT.md)).
 
 | Vùng             | File | Dòng   |
 | ---------------- | ---: | -----: |
-| `src/routes`     |   22 | 14.596 |
-| `src/components` |   43 | 12.441 |
-| `src/db`         |   14 |  7.767 |
-| `src/lib`        |   35 |  3.924 |
-| `src/api`        |    2 |  2.210 |
+| `src/routes`     |   21 | 12.068 |
+| `src/components` |   43 | 12.375 |
+| `src/db`         |   13 |  7.026 |
+| `src/lib`        |   33 |  3.006 |
+| `src/api`        |    2 |  2.027 |
 | `src/render`     |    2 |    815 |
-| `src/*.ts` (gốc) |    4 |    666 |
+| `src/*.ts` (gốc) |    4 |    645 |
 | `src/data`       |    1 |    321 |
 | `src/hooks`      |    2 |     63 |
-| **Tổng `src/`**  |  125 | **42.803** |
-| `*.test.ts` (node --test) | 13 |  ~851 |
+| **Tổng `src/`**  |  121 | **38.346** |
+| `*.test.ts` (node --test) | 10 |  568 |
 
-RPC: **82** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/api/lp.ts` = **103**
+RPC: **71** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/api/lp.ts` = **92**
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
 
 `npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
-[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **92 test pass**.
+[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **67 test pass**.

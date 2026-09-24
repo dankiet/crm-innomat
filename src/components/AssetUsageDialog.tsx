@@ -1,6 +1,6 @@
 /**
- * Asset Usage Dialog — trả lời "Ảnh này đang được dùng ở đâu?" + lifecycle,
- * ngay trong Media Workspace (không rời /luu-tru).
+ * Asset Usage Dialog — trả lời "Ảnh này đang được dùng ở đâu?" ngay trong
+ * Media Workspace (không rời /luu-tru). Không còn phần lifecycle/GC.
  */
 import {
   Dialog,
@@ -9,69 +9,18 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Layers3, Eye, EyeOff, Clock, ShieldCheck, Link as LinkIcon } from "lucide-react";
+import { Layers3, Eye, EyeOff, Link as LinkIcon } from "lucide-react";
 import { memo } from "react";
 import type { FlatMediaItem } from "@/db/media.server";
-import type { ImageReference, ImageAssetLifecycleRow } from "@/db/image-references.server";
-import { gcEstimatedDeleteText } from "@/lib/image-asset-refs";
-import { cn } from "@/lib/utils";
+import type { ImageReference } from "@/db/image-references.server";
 
 const ROLE_LABEL: Record<ImageReference["role"], string> = {
   product_image: "Ảnh sản phẩm",
   product: "Ảnh đại diện sản phẩm",
   mapping: "Đề xuất vật liệu",
   custom_mapping_product: "Đề xuất vật liệu (sản phẩm riêng)",
-  gallery_item: "Bộ sưu tập",
-  gallery_cover: "Bộ sưu tập (ảnh bìa)",
   lp_hero: "Hero Landing Page",
 };
-
-function LifecycleSection({
-  life,
-  retentionHours,
-}: {
-  life?: ImageAssetLifecycleRow;
-  retentionHours: number;
-}) {
-  if (!life) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Chưa có record registry cho physical này (ảnh legacy). Không có countdown GC.
-      </p>
-    );
-  }
-  let state: { text: string; tone: string } = {
-    text: "Đang sử dụng",
-    tone: "text-emerald-700 dark:text-emerald-300",
-  };
-  if (life.gc_completed_at) {
-    state = { text: "Đã dọn khỏi storage", tone: "text-muted-foreground" };
-  } else if (life.orphaned_at) {
-    state = {
-      text: `Không còn sử dụng · ${gcEstimatedDeleteText(life.orphaned_at, retentionHours)}`,
-      tone: "text-amber-700 dark:text-amber-300",
-    };
-  }
-  return (
-    <div className="space-y-1.5">
-      <p className={cn("text-sm font-semibold", state.tone)}>{state.text}</p>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-        <dt>SHA-256</dt>
-        <dd className="truncate font-mono" title={life.sha256}>
-          {life.sha256.slice(0, 16)}…
-        </dd>
-        <dt>Storage key</dt>
-        <dd className="truncate font-mono">{life.storage_key}</dd>
-        <dt>Lần tham chiếu cuối</dt>
-        <dd>{life.last_referenced_at || "—"}</dd>
-        <dt>Orphaned</dt>
-        <dd>{life.orphaned_at ?? "—"}</dd>
-        <dt>GC completed</dt>
-        <dd>{life.gc_completed_at ?? "—"}</dd>
-      </dl>
-    </div>
-  );
-}
 
 function RefRow({ ref }: { ref: ImageReference }) {
   const owner = ref.owner?.name ?? ref.owner?.code;
@@ -105,15 +54,11 @@ export const AssetUsageDialog = memo(function AssetUsageDialog({
   onClose,
   item,
   references,
-  lifecycle,
-  retentionHours,
 }: {
   open: boolean;
   onClose: () => void;
   item: FlatMediaItem | null;
   references: ImageReference[];
-  lifecycle?: ImageAssetLifecycleRow;
-  retentionHours: number;
 }) {
   if (!item) return null;
   return (
@@ -169,7 +114,8 @@ export const AssetUsageDialog = memo(function AssetUsageDialog({
             </p>
             {references.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border/80 bg-card px-3 py-2 text-xs text-muted-foreground">
-                Không còn reference nào trỏ tới ảnh này.
+                Không còn nơi nào khác dùng ảnh này. File vẫn nằm trong kho lưu trữ cho tới khi
+                bạn xoá thủ công.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -179,19 +125,10 @@ export const AssetUsageDialog = memo(function AssetUsageDialog({
               </div>
             )}
             {references.length > 0 ? (
-              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                <ShieldCheck className="size-3.5" />
-                {references.length} nơi đang dùng — GC sẽ không xoá physical file.
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                {references.length} nơi đang dùng.
               </p>
             ) : null}
-          </div>
-
-          <div>
-            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              <Clock className="size-3.5" />
-              Storage / Lifecycle
-            </p>
-            <LifecycleSection life={lifecycle} retentionHours={retentionHours} />
           </div>
         </div>
       </DialogContent>

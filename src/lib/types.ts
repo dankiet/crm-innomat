@@ -86,7 +86,6 @@ export type ProductImageRoomTag = {
 export type ProductImageRow = {
   id: number;
   product_id: number;
-  gallery_collection_ids: number[];
   room_tags: ProductImageRoomTag[];
   path: string;
   sort_order: number;
@@ -119,58 +118,6 @@ export const PRODUCT_IMAGE_KIND_LABELS: Record<ProductImageKind, string> = {
   map: "Ảnh gạch (MAP)",
   concept: "Ảnh bối cảnh",
   normal: "Ảnh thường",
-};
-
-export type GalleryCollection = {
-  id: number;
-  name: string;
-  description: string;
-  cover_path: string;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-  item_count: number;
-};
-
-export type GalleryCollectionItem = {
-  id: number;
-  collection_id: number;
-  path: string;
-  product_image_id: number | null;
-  product_id: number | null;
-  product_code: string;
-  product_name: string;
-  caption: string;
-  sort_order: number;
-  created_at: string;
-  /** Giá lẻ (m²) — từ sản phẩm liên kết */
-  retail_price?: number | null;
-  /** Tồn kho kho Bình Chánh (m²) */
-  total_stock?: number | null;
-};
-
-export type GalleryImageCandidate = {
-  product_image_id: number;
-  product_id: number;
-  path: string;
-  caption: string;
-  kind?: ProductImageKind;
-  is_primary: number;
-  sort_order: number;
-  code: string;
-  name: string;
-  internal_codes: string;
-  category: string;
-  supplier: string;
-  color: string;
-  surface: string;
-  size: string;
-  shape: string;
-  texture: string;
-  collections: string;
-  material: string;
-  /** Bộ sưu tập đang gắn ảnh này (từ join) */
-  gallery_collection_ids: number[];
 };
 
 export type Product = {

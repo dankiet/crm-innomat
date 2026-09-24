@@ -68,7 +68,7 @@ Mọi route `_app.*` đều nằm sau cổng này.
 - **`src/api/functions.ts`** là _ranh giới_ client ↔ server. Client chỉ gọi các hàm ở đây.
 - **`src/db/*.server.ts`** giữ SQL và nghiệp vụ; **không** được import ở phía client.
 - Mỗi handler `createServerFn` dùng **dynamic `await import()`** để nạp module server. Nhờ vậy
-  code server không rơi vào bundle client. Đây là quy ước áp dụng nhất quán cho cả 100 endpoint.
+  code server không rơi vào bundle client. Đây là quy ước áp dụng nhất quán cho cả 92 endpoint.
 - Vite bật **import protection**: client import module `*.server.ts` (hoặc specifier
   `server-only`) là **lỗi build**, không phải cảnh báo —
   `importProtection: { behavior: "error", client: { files: ["**/*.server.*"] } }`.
@@ -92,17 +92,17 @@ dev server port **8080** với `host: true`.
 
 ## Kích thước để định hướng
 
-`src/` khoảng **39.400 dòng** TS/TSX trên 105 file (số liệu 2026-09-19, sau đợt dọn dead code
-— xem [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §16 để có bảng đầy đủ và cập nhật). Sáu file
-lớn nhất đáng biết:
+`src/` khoảng **38.346 dòng** TS/TSX trên 121 file (số liệu 2026-09-24, sau khi gỡ `/thu-vien`
+và tầng registry/GC ảnh — xem [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §15 để có bảng đầy đủ
+và cập nhật). Sáu file lớn nhất đáng biết:
 
 | File                                       | Dòng  | Vai trò                                                  |
 | ------------------------------------------ | ----- | -------------------------------------------------------- |
-| `src/db/crm.server.ts`                     | 3.200 | Lớp nghiệp vụ chính (khách hàng, báo giá, đơn, sản phẩm) |
-| `src/routes/_app.thu-vien.tsx`             | 2.699 | Thư viện: trang + 5 dialog con                           |
-| `src/routes/_app.luu-tru.tsx`              | 2.358 | Lưu trữ ảnh: trang + popover + dialog                    |
-| `src/routes/_app.san-pham.tsx`             | 2.251 | Catalog sản phẩm: trang + 6 dialog con                   |
-| `src/components/CustomerMappingDialog.tsx` | 1.995 | Đề xuất vật liệu (DXVL)                                  |
-| `src/api/functions.ts`                     | 1.838 | Toàn bộ RPC (82 endpoint)                                |
+| `src/routes/_app.luu-tru.tsx`              | 2.937 | Lưu trữ ảnh: trang + popover + dialog                    |
+| `src/db/crm.server.ts`                     | 2.358 | Lớp nghiệp vụ chính (khách hàng, báo giá, đơn, sản phẩm) |
+| `src/routes/_app.san-pham.tsx`             | 2.074 | Catalog sản phẩm: trang + 6 dialog con                   |
+| `src/components/CustomerMappingDialog.tsx` | 1.945 | Đề xuất vật liệu (DXVL)                                  |
+| `src/api/functions.ts`                     | 1.670 | Toàn bộ RPC (71 endpoint)                                |
+| `src/components/NewQuoteDialog.tsx`        | 1.650 | Tạo báo giá: chọn SP, chiết khấu, VAT                    |
 
 Việc tách các file này được bàn ở [audit-2026-09-19](audit-2026-09-19.md) §C.
