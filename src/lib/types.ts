@@ -53,12 +53,12 @@ export type CustomerMapping = {
 };
 
 export const SPACE_TYPES = [
-  { id: "living_room", label: "Phòng khách & Lounge" },
-  { id: "kitchen_dining", label: "Bếp & Dining" },
-  { id: "bathroom_spa", label: "Phòng tắm & Spa" },
-  { id: "bedroom", label: "Phòng ngủ & Suite" },
-  { id: "outdoor_balcony", label: "Ban công & Sân trong" },
-  { id: "fnb_hospitality", label: "F&B / Khách sạn / Resort" },
+  { id: "living_room", label: "Living Room & Lounge" },
+  { id: "kitchen_dining", label: "Kitchen & Dining" },
+  { id: "bathroom_spa", label: "Bathroom & Spa" },
+  { id: "bedroom", label: "Bedroom & Suite" },
+  { id: "outdoor_balcony", label: "Balcony & Courtyard" },
+  { id: "fnb_hospitality", label: "F&B / Hotel / Resort" },
 ] as const;
 
 export type SpaceType = (typeof SPACE_TYPES)[number]["id"];
@@ -67,9 +67,9 @@ type ImageRoomTagSource = "manual" | "vision";
 
 export const IMAGE_ROOM_TAGS = [
   ...SPACE_TYPES,
-  { id: "office_workspace", label: "Văn phòng / Workspace", imageOnly: true },
-  { id: "other", label: "Không gian khác", imageOnly: true },
-  { id: "unknown", label: "Chưa xác định", imageOnly: true },
+  { id: "office_workspace", label: "Office / Workspace", imageOnly: true },
+  { id: "other", label: "Other Space", imageOnly: true },
+  { id: "unknown", label: "Unknown", imageOnly: true },
 ] as const;
 
 export type ProductImageRoomTag = {

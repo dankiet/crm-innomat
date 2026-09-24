@@ -68,6 +68,7 @@ import { PRODUCT_GROUPS } from "@/lib/product-categories";
 import { ImageRoomTagPicker } from "@/components/ImageRoomTagPicker";
 import { cn, mapLimit } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ActiveTag } from "@/components/product-filter/ActiveTag";
 import { FilterChip } from "@/components/product-filter/FilterChip";
 import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter";
 import { PaginationBar } from "@/components/PaginationBar";
@@ -639,6 +640,19 @@ function MediaStoragePage() {
     setSearch("");
     navigate({ search: {} });
   }
+  /** Số filter đang áp dụng — hiện trên nút "Xoá tất cả". Không tính tab/usage
+   * vì hai thứ đó đã có segmented control riêng. */
+  const activeFilterCount =
+    (searchParams.q ? 1 : 0) +
+    (category !== "all" ? 1 : 0) +
+    (roomSlug !== "all" ? 1 : 0) +
+    (publicFilter !== "all" ? 1 : 0) +
+    selectedColors.length +
+    selectedSurfaces.length +
+    selectedShapes.length +
+    selectedTextures.length +
+    selectedCollections.length +
+    (searchParams.selected != null ? 1 : 0);
   const [colorOptions, setColorOptions] = useState<{ value: string; label: string }[]>([]);
   const [surfaceOptions, setSurfaceOptions] = useState<{ value: string; label: string }[]>([]);
   const [shapeOptions, setShapeOptions] = useState<{ value: string; label: string }[]>([]);
@@ -1318,18 +1332,121 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          {(selectedColors.length > 0 || selectedSurfaces.length > 0 || selectedShapes.length > 0 || selectedTextures.length > 0 || selectedCollections.length > 0) ? (
+        </div>
+
+        {/* HÀNG 1.6: Chip các bộ lọc đang áp dụng — bỏ riêng từng cái hoặc xoá hết (giống tab Sản phẩm) */}
+        {activeFilterCount > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-dashed border-border/50">
+            {searchParams.q ? (
+              <ActiveTag label="Xoá từ khoá tìm kiếm" onClear={() => patchFilters({ q: undefined })}>
+                “{searchParams.q}”
+              </ActiveTag>
+            ) : null}
+            {category !== "all" ? (
+              <ActiveTag label="Xoá lọc nhóm" onClear={() => patchFilters({ category: undefined })}>
+                Nhóm:{" "}
+                {PRODUCT_GROUPS.find((g) => g.category === category)?.label ?? category}
+              </ActiveTag>
+            ) : null}
+            {selectedColors.map((c) => (
+              <ActiveTag
+                key={`c-${c}`}
+                label={`Xoá lọc màu ${c}`}
+                onClear={() =>
+                  patchFilters({
+                    colors: selectedColors.filter((x) => x !== c),
+                  })
+                }
+              >
+                Màu: {c}
+              </ActiveTag>
+            ))}
+            {selectedSurfaces.map((s) => (
+              <ActiveTag
+                key={`s-${s}`}
+                label={`Xoá lọc bề mặt ${s}`}
+                onClear={() =>
+                  patchFilters({
+                    surfaces: selectedSurfaces.filter((x) => x !== s),
+                  })
+                }
+              >
+                Bề mặt: {s}
+              </ActiveTag>
+            ))}
+            {selectedShapes.map((s) => (
+              <ActiveTag
+                key={`shape-${s}`}
+                label={`Xoá lọc kiểu dáng ${s}`}
+                onClear={() =>
+                  patchFilters({
+                    shapes: selectedShapes.filter((x) => x !== s),
+                  })
+                }
+              >
+                Dáng: {s}
+              </ActiveTag>
+            ))}
+            {selectedTextures.map((t) => (
+              <ActiveTag
+                key={`texture-${t}`}
+                label={`Xoá lọc hiệu ứng vân ${t}`}
+                onClear={() =>
+                  patchFilters({
+                    textures: selectedTextures.filter((x) => x !== t),
+                  })
+                }
+              >
+                Vân: {t}
+              </ActiveTag>
+            ))}
+            {selectedCollections.map((e) => (
+              <ActiveTag
+                key={`collection-${e}`}
+                label={`Xoá lọc bộ sưu tập ${e}`}
+                onClear={() =>
+                  patchFilters({
+                    collections: selectedCollections.filter((x) => x !== e),
+                  })
+                }
+              >
+                BST: {e}
+              </ActiveTag>
+            ))}
+            {roomSlug !== "all" ? (
+              <ActiveTag
+                label="Xoá lọc bối cảnh phòng"
+                onClear={() => patchFilters({ roomSlug: undefined })}
+              >
+                Bối cảnh:{" "}
+                {IMAGE_ROOM_TAGS.find((t) => t.id === roomSlug)?.label ?? roomSlug}
+              </ActiveTag>
+            ) : null}
+            {publicFilter !== "all" ? (
+              <ActiveTag
+                label="Xoá lọc hiển thị web"
+                onClear={() => patchFilters({ publicFilter: undefined })}
+              >
+                Web: {publicFilter === "public" ? "Hiện" : "Ẩn"}
+              </ActiveTag>
+            ) : null}
+            {searchParams.selected != null ? (
+              <ActiveTag
+                label="Xoá lọc ảnh đã chọn"
+                onClear={() => patchFilters({ selected: undefined })}
+              >
+                {searchParams.selected === "yes" ? "Đã chọn" : "Chưa chọn"}
+              </ActiveTag>
+            ) : null}
             <button
               type="button"
-              onClick={() =>
-                patchFilters({ colors: undefined, surfaces: undefined, shapes: undefined, textures: undefined, collections: undefined })
-              }
-              className="h-8 px-3 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-strong/60 transition-colors cursor-pointer"
+              onClick={resetAllFilters}
+              className="text-xs text-muted-foreground hover:text-terracotta transition-colors ml-1 cursor-pointer"
             >
-              Xóa bộ lọc SP
+              Xoá tất cả ({activeFilterCount})
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         {/* HÀNG 2: Tabs Loại ảnh (KIND) bên trái + Sắp xếp, Size trang, Thao tác bên phải */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 pt-0.5 border-t border-border/60 pt-2.5">
@@ -1350,7 +1467,7 @@ function MediaStoragePage() {
                     clearSelection();
                   }}
                   className={cn(
-                    "inline-flex items-center min-w-[76px] justify-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-all cursor-pointer",
+                    "inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer",
                     active
                       ? isMapTab
                         ? "bg-indigo-600 text-white font-semibold shadow-xs"
@@ -1569,10 +1686,6 @@ function MediaStoragePage() {
         {/* HÀNG 3: Dải Bối cảnh Lookbook ngữ cảnh (Chỉ mở khi ở Tab Concept hoặc khi đang lọc roomSlug) */}
         {(tab === "concept" || roomSlug !== "all") ? (
           <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-dashed border-border/60 animate-in fade-in-0 slide-in-from-top-1 duration-150">
-            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1">
-              <Sparkles className="size-3 text-amber-600" />
-              Bối cảnh Lookbook
-            </span>
             <button
               type="button"
               onClick={() => patchFilters({ tab: "concept", roomSlug: undefined })}

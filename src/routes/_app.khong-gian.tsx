@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils";
 import { COLOR_PALETTES } from "@/lib/color-palette";
 import { setImageRoomTagsDirectFn } from "@/api/functions";
 import { PRODUCT_GROUPS } from "@/lib/product-categories";
-import { IMAGE_ROOM_TAGS, type ImageRoomTagSlug } from "@/lib/types";
+import { IMAGE_ROOM_TAGS, SPACE_TYPES, type ImageRoomTagSlug } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PaginationBar } from "@/components/PaginationBar";
 import { parsePositiveInt } from "@/lib/gallery-sort";
@@ -172,29 +172,17 @@ function QuickConceptRoomTagPopover({
   );
 }
 
-// Danh mục Tab không gian kiến trúc theo quy chuẩn Lookbook
-const ROOM_TABS = [
+// Danh mục Tab không gian kiến trúc — nhãn lấy từ nguồn duy nhất IMAGE_ROOM_TAGS
+// (src/lib/types.ts), không khai báo lại chuỗi tiếng Việt ở đây.
+const ROOM_TABS: Array<{ id: string; label: string }> = [
   { id: "all", label: "Tất cả không gian" },
-  { id: "living_room", label: "Phòng khách" },
-  { id: "kitchen_dining", label: "Bếp & Dining" },
-  { id: "bathroom_spa", label: "Phòng tắm & Spa" },
-  { id: "bedroom", label: "Phòng ngủ" },
-  { id: "outdoor_balcony", label: "Ban công & Sân trong" },
-  { id: "fnb_hospitality", label: "Thương mại & F&B" },
-] as const;
+  ...SPACE_TYPES.map((t) => ({ id: t.id as string, label: t.label })),
+];
 
-// Bản đồ tên hiển thị chi tiết cho từng loại phòng
-const ROOM_NAMES: Record<string, string> = {
-  living_room: "Phòng khách & Lounge",
-  kitchen_dining: "Bếp & Dining",
-  bathroom_spa: "Phòng tắm & Spa",
-  bedroom: "Phòng ngủ & Suite",
-  outdoor_balcony: "Ban công & Sân trong",
-  fnb_hospitality: "Thương mại & F&B",
-  office_workspace: "Văn phòng & Workspace",
-  other: "Không gian khác",
-  unknown: "Chưa xác định",
-};
+// Bản đồ tên hiển thị chi tiết cho từng loại phòng — cùng nguồn với Tab
+const ROOM_NAMES: Record<string, string> = Object.fromEntries(
+  IMAGE_ROOM_TAGS.map((t) => [t.id as string, t.label]),
+);
 
 type ConceptHubSearch = {
   category?: string;

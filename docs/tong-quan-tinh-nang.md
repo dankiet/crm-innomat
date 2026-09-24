@@ -179,12 +179,21 @@ Card hiển thị chip: `Đang dùng · N` / `Sắp xóa · X giờ` (orphan + r
 
 Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + lifecycle.
 
-- **Phạm vi (primary tabs)**: Tất cả · MAP · Concept · Tuyển chọn #1—#12 · Chưa phân loại.
+- **Phạm vi (primary tabs)**: `All` · `MAP` · `Lookbook` · `Uncategorized` (nhãn tiếng Anh trên
+  UI; `featured` = Tuyển chọn #1—#12 vẫn nhận qua deep-link nhưng không còn là tab). Tab dùng
+  segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented `Active` / `To Delete`.
 - **Sử dụng (secondary, URL `usage`)**: `in_use` (có ref khác), `unused` (0 ref khác,
   không chờ xoá), `expiring` (0 ref + orphan trong retention `IMAGE_GC_RETENTION_HOURS`) — dùng chung Reference
   Resolver (7 nguồn), không nhân bản. Có banner ngữ cảnh kèm đếm ngược giờ khi lọc ảnh chờ dọn dẹp.
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
-- **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (5 kiểu gồm ưu tiên).
+- **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (5 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
+  dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,
+  dùng chung với `/san-pham`) kèm nút **"Xoá tất cả (N)"** gọi `resetAllFilters`; nhờ đó bộ lọc
+  nào cũng gỡ được, kể cả `category` (Nhóm) — nút "Xóa bộ lọc SP" cũ bỏ sót `category`.
+- **Bối cảnh phòng (Lookbook)**: nhãn tiếng Anh lấy từ `IMAGE_ROOM_TAGS` / `SPACE_TYPES`
+  (`src/lib/types.ts`) — `Living Room & Lounge`, `Kitchen & Dining`, `Bathroom & Spa`,
+  `Bedroom & Suite`, `Balcony & Courtyard`, `F&B / Hotel / Resort`, `Office / Workspace`,
+  `Other Space`, `Unknown`. Không hardcode lại chuỗi phòng trong component.
 - **Phân trang + bộ lọc lưu trong URL** (`validateSearch`, giá trị mặc định bị bỏ).
 - **Thao tác nhanh**: gán phòng (`product_image_room_tags`, consequence rõ), mô tả
   (AI-generated · edit), Lookbook visibility, hạ về thường, đặt hạng "Tuyển chọn",
