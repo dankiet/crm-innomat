@@ -6,7 +6,7 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 
 | Route                     | File                                               | Vai trò                                                                  |
 | ------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
-| `/`                       | `index.tsx`                                        | Redirect → `/tong-quan` (có session) hoặc `/login`                       |
+| `/`                       | `index.tsx`                                        | **Công khai** — landing "Em bán gạch" (cùng `ArchitectLanding` với `/lp/$slug`) |
 | `/login`                  | `login.tsx`                                        | Đăng nhập; đã có session thì redirect vào app                            |
 | `/auth/callback`          | `auth.callback.tsx`                                | Callback sau đăng nhập ngoài (Supabase OAuth); hiện trạng thái rồi về app |
 | `/tong-quan`              | `_app.tong-quan.tsx`                               | KPI + thanh pipeline                                                     |

@@ -137,6 +137,26 @@ Trang public cho khách vãng lai (không cần đăng nhập), nội dung lấy
 Ảnh dùng cho LP được bật/tắt bằng `toggleProductPublicFn` / `bulkSetProductsPublicFn` /
 `setConceptImagePublicFn` — tức là từ CRM chứ không sửa trực tiếp trên LP.
 
+### Đồng thuận cookie & Google Tag Manager
+
+GTM (`GTM-P4SQ7HBB`) **chỉ hoạt động sau khi khách đồng ý**. Cổng chặn nằm ở **server**, ngay
+lúc dựng `<head>` — không phải chặn bằng JS phía client (chặn client vẫn kịp bắn request).
+
+- Cookie `ebg_gtm_consent` (`granted` | `denied`, `Max-Age` 1 năm, `SameSite=Lax`) là nguồn
+  sự thật. Giá trị lạ ⇒ coi như chưa chọn.
+- `lpHead()` (`src/routes/-lp-route.ts`) đọc cookie: chỉ khi `granted` mới phát snippet GTM
+  vào `<head>`. Thẻ `<noscript>` của GTM nằm ở `RootShell` (`src/routes/__root.tsx`), cũng chỉ
+  khi `granted` **và** đang ở phạm vi landing (`/` hoặc `/lp/*`) — route CRM không dính GTM.
+- `ConsentBanner` (`src/components/landing/ConsentBanner.tsx`) hiện khi cookie chưa có; nút
+  "Đổi lựa chọn cookie" ở footer xoá cookie để banner trở lại.
+- `trackEvent` (`src/lib/lp-tracking.ts`) tự chặn nếu chưa `granted`, nên bất biến không phụ
+  thuộc vào việc GTM có tình cờ định nghĩa `gtag`/`fbq` hay không.
+- Rút lại đồng thuận ⇒ `stopGtm()` **nạp lại trang**: gỡ thẻ `<script>` không dừng được
+  container đã nằm trong RAM, chỉ reload mới thật sự về trạng thái "chưa đồng ý".
+
+> Khác với `consent_marketing` trên form lead (`lp_leads`) — đó là đồng ý **nhận email
+> marketing**, không liên quan tới cookie theo dõi.
+
 ## 10. Hộp thư Lead — `/leads`
 
 `/leads` — lead đổ về từ form landing (`lp_leads`: tên, điện thoại, email, nhu cầu, shortlist mã,
@@ -232,25 +252,26 @@ Tổng **25 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 16. Quy mô code
 
-> Đo ngày **2026-09-19** (sau đợt dọn dead code + đợt tối ưu kiến trúc + đợt
-> refactor được duyệt — xem [CLEANUP_REPORT](CLEANUP_REPORT.md) và [REFACTOR_REPORT](REFACTOR_REPORT.md)).
+> Đo ngày **2026-09-24** (sau đợt dọn dead code + đợt tối ưu kiến trúc + đợt
+> refactor được duyệt + đợt media-workspace — xem [CLEANUP_REPORT](CLEANUP_REPORT.md),
+> [REFACTOR_REPORT](REFACTOR_REPORT.md)).
 
 | Vùng             | File | Dòng   |
 | ---------------- | ---: | -----: |
-| `src/routes`     |   22 | 13.819 |
-| `src/components` |   39 | 11.849 |
-| `src/db`         |   12 |  6.801 |
-| `src/lib`        |   30 |  3.024 |
-| `src/api`        |    2 |  2.171 |
+| `src/routes`     |   22 | 14.596 |
+| `src/components` |   43 | 12.441 |
+| `src/db`         |   14 |  7.767 |
+| `src/lib`        |   35 |  3.924 |
+| `src/api`        |    2 |  2.210 |
 | `src/render`     |    2 |    815 |
 | `src/*.ts` (gốc) |    4 |    666 |
 | `src/data`       |    1 |    321 |
 | `src/hooks`      |    2 |     63 |
-| **Tổng `src/`**  |  114 | **39.529** |
-| `*.test.ts` (node --test) | 10 |  ~516 |
+| **Tổng `src/`**  |  125 | **42.803** |
+| `*.test.ts` (node --test) | 13 |  ~851 |
 
-RPC: **82** `createServerFn` trong `src/api/functions.ts` + **18** trong `src/api/lp.ts` = **100**
+RPC: **82** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/api/lp.ts` = **103**
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
 
 `npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
-[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **67 test pass**.
+[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **92 test pass**.

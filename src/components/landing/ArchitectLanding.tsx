@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
+  ArrowUpRight,
   BookOpen,
   ChevronRight,
+  Facebook,
   Layers3,
+  MapPin,
   Menu,
   MoveUpRight,
+  Phone,
   Send,
   Sparkles,
   X,
@@ -16,11 +20,13 @@ import { MaterialCard } from "./MaterialCard";
 import { ProjectBriefForm } from "./ProjectBriefForm";
 import { BrandMark } from "./BrandMark";
 import { ChatWidget } from "./ChatWidget";
+import { ConsentBanner } from "./ConsentBanner";
 import { MoodboardDrawer } from "./MoodboardDrawer";
 import { MaterialModal } from "./MaterialModal";
 import { SpaceLookbookSection } from "./SpaceLookbookSection";
 import { MaterialLibraryPage } from "./MaterialLibraryPage";
 import { useShortlistStorage } from "./useShortlistStorage";
+import { clearConsent, stopGtm } from "@/lib/lp-consent";
 import { useShortlistedMaterials } from "./useShortlistedMaterials";
 import { trackEvent } from "@/lib/lp-tracking";
 import {
@@ -32,6 +38,22 @@ import {
   type TileLine,
 } from "@/data/mockData";
 import { fetchLpMaterialsFn } from "@/api/lp";
+
+/** TikTok không có trong lucide-react nên vẽ tay. */
+function TikTokIcon({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
+    </svg>
+  );
+}
 
 function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -104,6 +126,14 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
     if (isAdding) {
       trackEvent("AddToCart", { material_id: id });
     }
+  };
+
+  // Xoá lựa chọn cookie để banner hiện lại, khách đổi ý được bất cứ lúc nào.
+  // `stopGtm` nạp lại trang nếu GTM đang chạy — không reload thì container vẫn
+  // sống trong RAM và tiếp tục bắn dù đã rút đồng thuận.
+  const reopenConsent = () => {
+    clearConsent();
+    stopGtm();
   };
 
   // Shortlist = resolve theo canonical ID (KHÔNG filter trên 12 material của Home).
@@ -501,19 +531,62 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
               <BrandMark size={36} />
               <span>em bán gạch</span>
             </div>
-            <p>
-              Vật liệu cho concept kiến trúc.
+            <p className="footer-tagline">
+              Những viên gạch nhỏ cho những không gian
               <br />
-              Từ shortlist đến công trình thực tế.
+              có chuyện để kể...
             </p>
             <div className="footer-contact">
-              <span>Showroom &amp; Kho mẫu: TP. Hồ Chí Minh</span>
-              <a href="#brief">
-                Gửi brief ngay <Send size={14} />
+              <a
+                className="footer-contact-link"
+                href="https://maps.app.goo.gl/3Hqo3fNFhF2B3UrY8"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MapPin size={12} />
+                <span>Showroom &amp; Kho mẫu: TP. Hồ Chí Minh</span>
+                <ArrowUpRight size={11} className="footer-ext-arrow" />
+              </a>
+              <a className="footer-contact-link" href="tel:0909888951">
+                <Phone size={12} />
+                <span>0909 888 951</span>
+              </a>
+              <div className="footer-socials">
+                <a
+                  className="footer-social-link"
+                  href="https://fb.com/embangach"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook em bán gạch"
+                >
+                  <Facebook size={12} />
+                  <span>fb.com/embangach</span>
+                </a>
+                <span className="footer-divider" aria-hidden="true">
+                  /
+                </span>
+                <a
+                  className="footer-social-link"
+                  href="https://tiktok.com/embangach"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="TikTok em bán gạch"
+                >
+                  <TikTokIcon size={12} />
+                  <span>@embangach</span>
+                </a>
+              </div>
+              <a className="footer-cta" href="#brief">
+                Gửi brief ngay <Send size={13} />
               </a>
             </div>
             <div className="footer-copyright">
-              © 2026 em bán gạch · Material Journal for Architects
+              <span className="footer-copyright-line">
+                © 2026 em bán gạch · &ldquo;Material Journal for Architects&rdquo;
+              </span>
+              <button type="button" className="footer-consent-btn" onClick={reopenConsent}>
+                Đổi lựa chọn cookie
+              </button>
             </div>
           </footer>
         </div>
@@ -610,6 +683,9 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
 
       {/* Floating Chat / Consultation Widget */}
       <ChatWidget />
+
+      {/* Cookie consent cho GTM — chỉ hiện khi khách chưa chọn */}
+      <ConsentBanner raised={selectedIds.length > 0} />
     </div>
   );
 }

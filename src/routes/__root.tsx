@@ -4,11 +4,13 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 
+import { GTM_NOSCRIPT_HTML, readConsent } from "@/lib/lp-consent";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -125,12 +127,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  // Chỉ trang landing mới gắn GTM (khớp với snippet ở `head()`), và chỉ khi đã đồng ý.
+  // Đặt trong `shellComponent` vì đây là chỗ DUY NHẤT dựng thẻ `<body>`.
+  const showGtmNoscript =
+    (pathname === "/" || pathname.startsWith("/lp/")) && readConsent() === "granted";
+
   return (
     <html lang="vi">
       <head>
         <HeadContent />
       </head>
       <body>
+        {showGtmNoscript && (
+          <noscript dangerouslySetInnerHTML={{ __html: GTM_NOSCRIPT_HTML }} />
+        )}
         {children}
         <Scripts />
       </body>

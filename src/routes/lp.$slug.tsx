@@ -10,7 +10,7 @@ import { findLpVariant, DEFAULT_LP_SLUG } from "@/lib/lp-content";
 import { loadLpHeroImage, lpHead } from "./-lp-route";
 
 export const Route = createFileRoute("/lp/$slug")({
-  head: ({ params }) => lpHead(params.slug),
+  head: () => lpHead(),
   loader: async ({ params }) => {
     // Nếu vào đúng slug mặc định thì redirect hẳn về trang chủ "/" để chuẩn hóa URL (Canonical URL)
     if (params.slug === DEFAULT_LP_SLUG || !params.slug) {

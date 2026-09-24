@@ -10,6 +10,8 @@
  *   ViewContent → vào trang | AddToCart → lưu mã | Lead → gửi form
  */
 
+import { readConsent } from "@/lib/lp-consent";
+
 type Params = Record<string, string | number | boolean | string[] | undefined>;
 
 type FbqFn = (cmd: string, event: string, params?: Params) => void;
@@ -19,6 +21,14 @@ export type LpEvent = "ViewContent" | "AddToCart" | "Lead" | "UnlockLibrary";
 
 export function trackEvent(event: LpEvent, params: Params = {}): void {
   if (typeof window === "undefined") return;
+
+  // Chưa đồng ý thì không bắn gì. GTM cũng không được nạp (xem `lp-consent.ts`),
+  // nên `fbq`/`gtag` sẽ không tồn tại — nhưng chặn tường minh ở đây để bất biến
+  // không phụ thuộc vào việc GTM có tình cờ định nghĩa `gtag` hay không.
+  if (readConsent() !== "granted") {
+    if (import.meta.env.DEV) console.info(`[lp-track] (chưa đồng ý) ${event}`, params);
+    return;
+  }
 
   const w = window as unknown as { fbq?: FbqFn; gtag?: GtagFn };
 

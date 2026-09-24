@@ -6,22 +6,31 @@
  * (mặc định → redirect 301 về `/`; slug lạ → 404). Toàn bộ `head()` và phần nạp
  * ảnh hero là giống hệt nhau nên gom về đây để không trôi lệch.
  */
-import { findLpVariant } from "@/lib/lp-content";
 import { fetchLpHeroImageFn } from "@/api/lp";
+import { GTM_HEAD_SNIPPET, readConsent } from "@/lib/lp-consent";
 import lpCss from "../styles-lp.css?url";
 
 const LP_DESCRIPTION = "em bán gạch — vật liệu cho concept kiến trúc. Từ shortlist đến công trình.";
 
-/** Thẻ `<head>` cho trang landing: tiêu đề theo biến thể, CSS riêng, favicon, font. */
-export function lpHead(slug: string) {
-  const v = findLpVariant(slug);
-  const title = v ? `${v.eyebrow} · Em bán gạch` : "em bán gạch — vật liệu cho concept kiến trúc";
+const LP_TITLE = "Em bán gạch - Những viên gạch nhỏ cho những không gian có chuyện để kể...";
+
+/**
+ * Thẻ `<head>` cho trang landing: tiêu đề, CSS riêng, favicon, font, và GTM nếu đã đồng ý.
+ *
+ * GTM chỉ được chèn khi cookie đồng thuận là `granted`. Việc đọc cookie diễn ra ở
+ * SERVER trong lúc dựng `<head>`, nên khách chưa đồng ý thì snippet không hề có
+ * trong HTML — không phải chặn ở client (chặn ở client thì tag vẫn được chèn và
+ * vẫn bắn request).
+ */
+export function lpHead() {
+  const consent = readConsent();
+
   return {
     meta: [
-      { title },
+      { title: LP_TITLE },
       { name: "description", content: LP_DESCRIPTION },
       { name: "robots", content: "index, follow" },
-      { property: "og:title", content: title },
+      { property: "og:title", content: LP_TITLE },
       { property: "og:description", content: LP_DESCRIPTION },
       { property: "og:type", content: "website" },
       { property: "og:image", content: "/logo.png" },
@@ -35,6 +44,7 @@ export function lpHead(slug: string) {
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&display=swap",
       },
     ],
+    scripts: consent === "granted" ? [{ children: GTM_HEAD_SNIPPET }] : [],
   };
 }
 

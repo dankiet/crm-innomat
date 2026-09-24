@@ -288,7 +288,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .brief-section { display: grid; grid-template-columns: .77fr 1.23fr; gap: 8vw; padding: 123px 8vw 126px; background-color: #e7ddd0; background-image:linear-gradient(120deg, rgba(255,255,255,.16), transparent 35%),linear-gradient(90deg, rgba(80,67,54,.055) 1px, transparent 1px); background-size:auto, 44px 44px; }.brief-heading { padding-top: 4px; }.brief-heading .section-kicker { margin-top: 28px; }.brief-heading h2 { margin-top: 15px; }.brief-heading > p:not(.section-kicker) { max-width: 365px; margin: 26px 0 0; color: #566164; font-size: 14px; line-height: 1.66; }.brief-promise { display:flex; align-items:flex-start; gap:11px; margin-top:49px; color:#475556; font-size:12px; font-weight:600; line-height:1.55; }.brief-promise svg { color:var(--terracotta); }.brief-panel { border-top:1px solid #bfb6a7; padding-top:33px; }.brief-folder-label { display:flex; justify-content:space-between; margin-bottom:23px; color:#788075; font-size:9px; font-weight:700; letter-spacing:.14em; }
 
-.landing-footer { display:grid; grid-template-columns:1fr 1fr 1fr; align-items:end; gap:25px; padding:47px 8vw 92px; background:#1f2b33; color:#fffaf3; }.footer-brand { font-size:20px; }.footer-brand .brand-mark { width:42px; height:42px; }.landing-footer > p { margin:0; color:#c5cbc6; font-family:var(--serif); font-size:24px; font-weight:500; letter-spacing:-.03em; line-height:1.02; }.footer-contact { justify-self:end; display:flex; flex-direction:column; align-items:flex-end; gap:11px; color:#98a39f; font-size:10px; }.footer-contact a { display:inline-flex; gap:6px; align-items:center; color:#fffaf3; font-size:11px; font-weight:700; text-decoration:none; border-bottom:1px solid #c1b5a3; padding-bottom:5px; }
+.landing-footer { display:grid; grid-template-columns:1fr 1fr 1fr; align-items:end; gap:25px; padding:47px 8vw 92px; background:#1f2b33; color:#fffaf3; }.footer-brand { font-size:20px; }.footer-brand .brand-mark { width:42px; height:42px; }.landing-footer > p { margin:0; color:#c5cbc6; font-family:var(--serif); font-size:24px; font-weight:500; letter-spacing:-.03em; line-height:1.02; }.landing-footer > p.footer-tagline { font-style:italic; font-weight:400; color:#ddd7cb; letter-spacing:-.015em; line-height:1.18; text-shadow:0 0 26px rgba(221,215,203,.28); }.footer-contact { justify-self:end; display:flex; flex-direction:column; align-items:flex-end; gap:8px; color:#98a39f; font-size:11px; }.footer-contact-link, .footer-social-link { display:inline-flex; align-items:center; gap:6px; color:#98a39f; font-size:11px; font-weight:400; text-decoration:none; border-bottom:none; padding-bottom:0; transition:color 150ms ease; }.footer-contact-link:hover, .footer-social-link:hover { color:#fffaf3; }.footer-ext-arrow { opacity:.6; transition:transform 150ms ease, opacity 150ms ease; }.footer-contact-link:hover .footer-ext-arrow { opacity:1; transform:translate(1px,-1px); }.footer-socials { display:inline-flex; align-items:center; gap:8px; margin:2px 0; }.footer-divider { color:#606e68; font-size:10px; user-select:none; }.footer-cta { display:inline-flex; gap:6px; align-items:center; color:#fffaf3; font-size:11px; font-weight:700; text-decoration:none; border-bottom:1px solid #c1b5a3; padding-bottom:4px; margin-top:4px; transition:border-color 150ms ease, color 150ms ease; }.footer-cta:hover { color:var(--terracotta); border-bottom-color:var(--terracotta); }.footer-copyright { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:18px; padding-top:22px; border-top:1px solid rgba(193,181,163,.18); color:#98a39f; font-size:10px; letter-spacing:.02em; }.footer-copyright-line { font-family:var(--serif); font-style:italic; font-size:15px; letter-spacing:.005em; color:#b3bdb8; text-shadow:0 0 22px rgba(179,189,184,.22); }.footer-consent-btn { background:none; border:none; padding:0; color:#98a39f; font-size:10px; letter-spacing:.02em; text-decoration:underline; text-underline-offset:3px; cursor:pointer; transition:color 150ms ease; }.footer-consent-btn:hover { color:#fffaf3; }
+
+/* Banner xin đồng thuận cookie (GTM). Góc dưới-trái để chừa chỗ cho shortlist tray / chat widget ở bên phải. */
+.consent-banner { position:fixed; z-index:80; bottom:24px; left:24px; max-width:390px; padding:16px 18px; background:rgba(31,43,51,.96); color:#fffaf3; border:1px solid rgba(217,209,195,.22); box-shadow:0 18px 40px rgba(17,27,31,.35); backdrop-filter:blur(12px); animation:slip-in 220ms ease-out both; }.consent-body { display:flex; flex-direction:column; gap:5px; }.consent-kicker { margin:0; color:var(--terracotta); font-size:9px; font-weight:700; letter-spacing:.14em; }.consent-body > p:not(.consent-kicker) { margin:0; color:#c5cbc6; font-size:12px; line-height:1.5; }.consent-actions { display:flex; align-items:center; gap:8px; margin-top:13px; }.consent-btn { border-radius:0; font-size:11px; font-weight:700; letter-spacing:.02em; cursor:pointer; padding:6px 14px; transition:background 150ms ease, border-color 150ms ease, color 150ms ease; }.consent-accept { background:var(--terracotta); color:#fffaf3; border:1px solid var(--terracotta); }.consent-accept:hover { background:var(--terracotta-dark); border-color:var(--terracotta-dark); }.consent-decline { background:transparent; color:#98a39f; border:1px solid rgba(255,250,243,.25); }.consent-decline:hover { color:#fffaf3; border-color:rgba(255,250,243,.5); }
+/* Banner đang mở thì nút "Đổi lựa chọn cookie" ở footer là thừa — nó chỉ có nghĩa
+   SAU khi khách đã chọn. Ẩn đi để không có hai lối vào cùng một câu hỏi. */
+.architect-landing-wrapper:has(.consent-banner) .footer-consent-btn { display:none; }
+/* Banner là overlay cố định ở đáy-trái (cao ~150px, cách đáy 24px) nên khi khách
+   cuộn tới cuối trang nó sẽ che dòng bản quyền. Chừa chỗ ở đáy footer — CHỈ trong
+   lúc banner còn hiện; khách chọn xong thì footer trở lại nhịp bình thường. */
+.architect-landing-wrapper:has(.consent-banner) .landing-footer { padding-bottom:186px; }
+@keyframes slip-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 
 .shortlist-tray { position:fixed; z-index:30; right:20px; bottom:20px; display:flex; align-items:center; gap:14px; border:1px solid rgba(255,250,243,.35); padding:10px 10px 10px 13px; background:rgba(31,43,51,.94); color:#fffaf3; box-shadow:0 14px 35px rgba(17,27,31,.25); opacity:0; pointer-events:none; transform:translateY(16px); transition:opacity 200ms var(--ease-out), transform 200ms var(--ease-out); backdrop-filter:blur(12px); }.shortlist-tray.is-visible { opacity:1; pointer-events:auto; transform:translateY(0); }.tray-count { display:flex; align-items:center; gap:8px; font-size:11px; cursor:pointer; }.tray-count svg { color:#d6b398; }.tray-count b { color:#d6b398; }
 
@@ -390,6 +401,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .brief-panel { padding-top: 0; }
   .landing-footer { grid-template-columns: 1fr 1fr; padding: 45px 7vw 80px; }
   .footer-contact { grid-column: 1 / -1; justify-self: start; align-items: flex-start; margin-top: 10px; }
+  .footer-copyright { flex-direction: column; align-items: flex-start; gap: 8px; }
+  /* Dưới 980px, shortlist tray (cao ~56-58px, sát đáy phải) chạm banner góc trái.
+     Nâng banner lên trên tray khi tray đang hiện. Trên 980px hai bên đủ xa, không cần. */
+  .consent-banner.is-raised { bottom: 90px; }
+  /* Banner cao hơn ở dải này (chữ xuống dòng) — chừa nhiều hơn desktop. */
+  .architect-landing-wrapper:has(.consent-banner) .landing-footer { padding-bottom:252px; }
 }
 
 @media (max-width: 620px) {
@@ -423,7 +440,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .cases-grid { grid-template-columns: 1fr; gap: 18px; margin-top: 34px; }
   .brief-section { padding: 76px 6vw 84px; }
   .shortlist-tray { right: 0; bottom: 0; left: 0; justify-content: space-between; border-right: 0; border-bottom: 0; border-left: 0; padding: 12px 6vw; }
-  .landing-footer { grid-template-columns: 1fr; padding: 38px 6vw 74px; }
+  .landing-footer { grid-template-columns: 1fr; gap: 24px; padding: 38px 6vw 74px; }
+  .footer-contact { justify-self: start; align-items: flex-start; gap: 9px; }
+  .consent-banner { left: 0; right: 0; bottom: 0; max-width: 100%; border-right: none; border-bottom: none; border-left: none; padding: 14px 6vw calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 95; }
+  /* Shortlist tray cũng nằm sát đáy khi lên mobile — nâng banner lên để không đè.
+     Tray cao ~58px và cách đáy 24px (xem `.shortlist-tray` ở khối ≤620px phía trên). */
+  .consent-banner.is-raised { bottom: 90px; padding-bottom: 14px; }
+  /* Banner full-width ở đây, và khi nâng lên (is-raised) nó ăn sâu vào footer hơn. */
+  .architect-landing-wrapper:has(.consent-banner) .landing-footer { padding-bottom:256px; }
 }
 /* ==========================================================================
    ARCHITECTURAL JOURNAL & EM BAN GACH COMPONENTS EXTENSION STYLES
