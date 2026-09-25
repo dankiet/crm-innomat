@@ -233,7 +233,9 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
   dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,
   dùng chung với `/san-pham`) kèm nút **"Xoá tất cả (N)"** gọi `resetAllFilters`; nhờ đó bộ lọc
   nào cũng gỡ được, kể cả `category` (Nhóm) — nút "Xóa bộ lọc SP" cũ bỏ sót `category`.
-- **Bối cảnh phòng (Lookbook)**: nhãn tiếng Anh lấy từ `IMAGE_ROOM_TAGS` / `SPACE_TYPES`
+- **Bối cảnh phòng (Lookbook)**: chip **"Bối cảnh"** trong hàng facet (cạnh Nhóm/Màu/Bề mặt/
+  Dáng/Vân/BST), chỉ hiện khi ở tab Lookbook hoặc đang lọc bối cảnh. Chọn bối cảnh tự chuyển
+  tab Lookbook. Nhãn tiếng Anh lấy từ `IMAGE_ROOM_TAGS` / `SPACE_TYPES`
   (`src/lib/types.ts`) — `Living Room & Lounge`, `Kitchen & Dining`, `Bathroom & Spa`,
   `Bedroom & Suite`, `Balcony & Courtyard`, `F&B / Hotel / Resort`, `Office / Workspace`,
   `Other Space`, `Unknown`. Không hardcode lại chuỗi phòng trong component.

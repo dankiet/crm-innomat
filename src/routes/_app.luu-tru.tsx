@@ -1344,6 +1344,39 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
+
+          {/* Bối cảnh phòng (Lookbook) — chỉ hiện khi ở tab Lookbook hoặc đang lọc bối cảnh.
+              Gộp vào hàng facet thay vì dải pill riêng bên dưới. */}
+          {tab === "concept" || roomSlug !== "all" ? (
+            <FilterChip
+              label="Bối cảnh"
+              count={roomSlug !== "all" ? 1 : 0}
+              summary={
+                roomSlug !== "all"
+                  ? (IMAGE_ROOM_TAGS.find((t) => t.id === roomSlug)?.label ?? roomSlug)
+                  : null
+              }
+            >
+              <MultiSelectFilter
+                title="Chọn bối cảnh phòng"
+                options={IMAGE_ROOM_TAGS.map((tag) => ({
+                  value: tag.id,
+                  label: tag.label,
+                  count: roomCounts[tag.id] || 0,
+                }))}
+                selected={roomSlug !== "all" ? [roomSlug] : []}
+                onChange={(next) => {
+                  const picked = next[next.length - 1];
+                  // Bối cảnh phòng chỉ áp cho ảnh Concept → tự chuyển tab Lookbook.
+                  patchFilters({
+                    tab: picked ? "concept" : tab === "concept" ? undefined : (tab as FlatMediaTab),
+                    roomSlug: (picked ?? undefined) as ImageRoomTagSlug | undefined,
+                  });
+                }}
+                searchable
+              />
+            </FilterChip>
+          ) : null}
         </div>
 
         {/* HÀNG 1.6: Chip các bộ lọc đang áp dụng — bỏ riêng từng cái hoặc xoá hết (giống tab Sản phẩm) */}
@@ -1695,71 +1728,6 @@ function MediaStoragePage() {
           </div>
         </div>
 
-        {/* HÀNG 3: Dải Bối cảnh Lookbook ngữ cảnh (Chỉ mở khi ở Tab Concept hoặc khi đang lọc roomSlug) */}
-        {(tab === "concept" || roomSlug !== "all") ? (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-dashed border-border/60 animate-in fade-in-0 slide-in-from-top-1 duration-150">
-            <button
-              type="button"
-              onClick={() => patchFilters({ tab: "concept", roomSlug: undefined })}
-              className={cn(
-                "inline-flex items-center gap-1.5 h-7 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer",
-                tab === "concept" && roomSlug === "all"
-                  ? "bg-amber-600 text-white font-semibold shadow-xs"
-                  : "text-muted-foreground hover:bg-surface-strong/60 hover:text-foreground",
-              )}
-            >
-              <span>Tất cả bối cảnh</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.2 text-[10px] tabular-nums font-bold",
-                  tab === "concept" && roomSlug === "all"
-                    ? "bg-white/25 text-white"
-                    : "bg-surface-strong text-muted-foreground",
-                )}
-              >
-                {counts.concept}
-              </span>
-            </button>
-            {IMAGE_ROOM_TAGS.map((tag) => {
-              const active = tab === "concept" && roomSlug === tag.id;
-              const tagCount = roomCounts[tag.id] || 0;
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => patchFilters({ tab: "concept", roomSlug: tag.id })}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 h-7 rounded-full px-3 text-xs font-medium transition-colors cursor-pointer",
-                    active
-                      ? "bg-amber-600 text-white font-semibold shadow-xs"
-                      : "text-muted-foreground hover:bg-surface-strong/60 hover:text-foreground",
-                  )}
-                >
-                  <span>{tag.label}</span>
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.2 text-[10px] tabular-nums font-bold",
-                      active
-                        ? "bg-white/25 text-white"
-                        : "bg-surface-strong text-muted-foreground",
-                    )}
-                  >
-                    {tagCount}
-                  </span>
-                </button>
-              );
-            })}
-            {roomSlug !== "all" ? (
-              <button
-                type="button"
-                onClick={() => patchFilters({ roomSlug: undefined })}
-                className="h-7 px-2.5 rounded-full text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
-              >
-                Xóa lọc bối cảnh
-              </button>
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       {/* Banner ngữ cảnh khi lọc Not in use */}
