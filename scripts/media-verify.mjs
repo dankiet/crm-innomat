@@ -129,9 +129,9 @@ try {
 
   const [sharedLegacy] = [
     await scalar(`SELECT COUNT(*) n FROM (
-      SELECT substring(k.path from '([^/]+)$') key
-        FROM (SELECT DISTINCT i.path FROM product_images i) k
-       GROUP BY 1 HAVING COUNT(*) > 1
+      SELECT substring(path from '([^/]+)$') key
+        FROM product_images WHERE path IS NOT NULL AND path <> ''
+       GROUP BY 1 HAVING COUNT(DISTINCT product_id) > 1
     ) t`),
   ];
   const sharedNew = await scalar(`SELECT COUNT(*) n FROM (
