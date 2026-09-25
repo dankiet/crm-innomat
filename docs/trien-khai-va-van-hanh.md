@@ -158,14 +158,23 @@ npm run clean:generated    # xoá output build/generated
 
 Cả `clean-generated.mjs` và `prune-deploy-backup.mjs` đều **từ chối xoá** đường dẫn ngoài workspace.
 
-## Xoá ảnh (thủ công, không có cron)
+## Xoá ảnh / MediaAsset
 
-**Không có tiến trình dọn dẹp tự động.** Không có registry, không có cron, không có biến môi
-trường retention.
+**Không có tiến trình dọn dẹp tự động.** Không có cron, không có biến môi trường retention.
+Từ 2026-09-25 Kho ảnh đi theo **Option 2 (1 file = 1 MediaAsset)** — `media_assets` là tầng
+registry (không phải GC):
 
-- Gỡ ảnh khỏi sản phẩm / đề xuất vật liệu / Hero trang chủ **không** đụng tới file. Ảnh chỉ rơi
-  vào trạng thái "không còn nơi dùng", xem được ở `/luu-tru` (segmented **"Không còn nơi dùng"**).
-- File vật lý chỉ bị xoá khi người dùng xoá ảnh trên `/luu-tru`. Lúc đó server kiểm tra lại
-  Reference Resolver; chỉ xoá khi **không còn nguồn nào** trỏ tới (tên file là hash nên nhiều bản
-  ghi có thể chia sẻ chung một file). Endpoint trả `file_deleted` để UI phân biệt.
+- Gỡ ảnh khỏi sản phẩm / đề xuất vật liệu / Hero trang chủ **không** đụng tới asset hay file.
+  Ảnh chỉ rơi vào trạng thái `draft` / `orphan`, xem được ở `/luu-tru` (segmented **usage**).
+- **Xoá asset** (`deleteMediaAssetFn`) bỏ liên kết usage (`mapping_media_usages`,
+  `landing_page_media_usages`, `product_images.media_asset_id = NULL`) rồi xoá `media_assets`
+  row — **không xoá file storage** (xoá file là việc riêng, chỉ đụng `deleteImageRef` cẩn thận
+  theo tham chiếu còn sót).
 - Không cần scheduler: Vercel serverless không có process nền, và cũng không còn gì để chạy nền.
+
+### Backfill MediaAsset (cần duyệt)
+
+`npm run db:media-backfill` đọc 5 nguồn ref hiện có, tạo `media_assets` + usage tương ứng.
+**Idempotent** (chạy lại ra cùng kết quả; đã test trên fake SQLite) nhưng là DDL+dữ liệu thật nên
+**chưa chạy ở production — chờ duyệt**. Verify bằng `npm run db:media-verify`.
+Xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric.

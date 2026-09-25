@@ -167,3 +167,20 @@ trống (thu chung); xoá đơn hàng không xoá thanh toán (`ON DELETE SET NU
 
 `deleteCustomer()` xoá lan: báo giá + quote item, đơn hàng, thanh toán, ghi chú. Không hoàn tác
 được. UI dùng confirm 2 bước (`AGENTS.md`).
+
+## Vòng đời MediaAsset (1 file = 1 asset)
+
+Từ 2026-09-25, Kho ảnh theo **Option 2**: mỗi file vật lý (storage key) là một `media_assets`
+được Product / Lookbook / Tuyển chọn / Mapping / Hero **dùng chung**. Quy tắc nghiệp vụ:
+
+- **Một file duy nhất dù xuất hiện ở nhiều nơi** — cùng `storage_key` luôn về cùng asset
+  (`ensureMediaAsset` idempotent theo key).
+- **3 trạng thái**: `used` (có usage active: MAP / sản phẩm public / Concept public /
+  featured 1..12 / mapping / hero), `draft` (có usage nhưng không active), `orphan` (không còn
+  bảng nào trỏ tới). Chi tiết định nghĩa: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
+- **Gỡ khỏi bản ghi không xoá asset, xoá asset không xoá file** — ba tầng tách biệt:
+  bản ghi business (giữ `path`), asset registry (giữ usage), storage file (GC). Xoá asset chỉ
+  bỏ liên kết usage + set `NULL` `product_images.media_asset_id`.
+- **Backfill cần duyệt trước khi chạy ở production** (`npm run db:media-backfill`) — script
+  idempotent, đã test trên fake SQLite.
+- Copy UI tuân thủ AGENTS.md: xoá = confirm 2 bước inline, không `window.confirm`.

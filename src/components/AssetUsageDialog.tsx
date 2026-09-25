@@ -1,6 +1,7 @@
 /**
- * Asset Usage Dialog — trả lời "Ảnh này đang được dùng ở đâu?" ngay trong
- * Media Workspace (không rời /luu-tru). Không còn phần lifecycle/GC.
+ * Asset Usage Dialog — trả lời "MediaAsset này đang được dùng ở đâu?" ngay trong
+ * Media Workspace (không rời /luu-tru). Asset-centric: 1 file = 1 MediaAsset;
+ * các usage gom theo nhóm (product/lookbook/featured/hero/mapping).
  */
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Layers3, Eye, EyeOff, Link as LinkIcon } from "lucide-react";
 import { memo } from "react";
-import type { FlatMediaItem } from "@/db/media.server";
+import type { FlatMediaItem, FlatMediaUsage } from "@/db/media.server";
 import type { ImageReference } from "@/db/image-references.server";
 
 const ROLE_LABEL: Record<ImageReference["role"], string> = {
@@ -20,6 +21,21 @@ const ROLE_LABEL: Record<ImageReference["role"], string> = {
   mapping: "Đề xuất vật liệu",
   custom_mapping_product: "Đề xuất vật liệu (sản phẩm riêng)",
   lp_hero: "Hero Landing Page",
+};
+
+const STATUS_LABEL: Record<FlatMediaUsage, string> = {
+  all: "Tất cả",
+  used: "Used",
+  draft: "Draft",
+  orphan: "Orphan",
+};
+
+const GROUP_LABEL: Record<keyof FlatMediaItem["usage_groups"], string> = {
+  product: "Sản phẩm",
+  lookbook: "Lookbook",
+  featured: "Tuyển chọn",
+  hero: "Hero",
+  mapping: "Đề xuất vật liệu",
 };
 
 function RefRow({ ref }: { ref: ImageReference }) {
@@ -61,13 +77,17 @@ export const AssetUsageDialog = memo(function AssetUsageDialog({
   references: ImageReference[];
 }) {
   if (!item) return null;
+  const groupEntries = (Object.keys(GROUP_LABEL) as (keyof FlatMediaItem["usage_groups"])[])
+    .map((k) => ({ key: k, label: GROUP_LABEL[k], count: item.usage_groups[k] ?? 0 }))
+    .filter((g) => g.count > 0);
+  const hasProductUsage = item.id > 0;
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Ảnh đang được dùng ở đâu?</DialogTitle>
-          <DialogDescription>
-            #{item.id} · {item.product_code} · {item.product_name}
+          <DialogTitle>MediaAsset đang được dùng ở đâu?</DialogTitle>
+          <DialogDescription className="font-mono">
+            #{item.storage_key} · {item.status ? STATUS_LABEL[item.status] : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -75,21 +95,26 @@ export const AssetUsageDialog = memo(function AssetUsageDialog({
           <div className="flex items-start gap-3">
             <div className="size-20 shrink-0 overflow-hidden rounded-xl border border-border/80 bg-surface-strong">
               {item.path ? (
-                <img src={item.path} alt={item.product_name} className="size-full object-cover" />
+                <img src={item.path} alt={item.storage_key} className="size-full object-cover" />
               ) : null}
             </div>
             <div className="min-w-0 space-y-0.5 text-xs">
-              <p className="font-semibold text-foreground">{item.product_name}</p>
+              <p className="font-semibold text-foreground">
+                {hasProductUsage ? item.product_name : `MediaAsset #${item.asset_id}`}
+              </p>
               <p className="text-muted-foreground">
-                {item.product_code} · Phân loại:{" "}
-                {item.kind === "map" ? "MAP" : item.kind === "concept" ? "Concept" : "Ảnh thường"}
-                {item.kind === "map"
+                {hasProductUsage
+                  ? `${item.product_code} · Phân loại: ${
+                      item.kind === "map" ? "MAP" : item.kind === "concept" ? "Concept" : "Ảnh thường"
+                    }`
+                  : "Không thuộc sản phẩm cụ thể"}
+                {hasProductUsage && item.kind === "map"
                   ? item.product_is_public === 1
                     ? " · Hiện trên Thư viện"
                     : " · Ẩn Thư viện"
                   : ""}
               </p>
-              {item.kind === "concept" ? (
+              {hasProductUsage && item.kind === "concept" ? (
                 <p className="flex items-center gap-1 text-muted-foreground">
                   {item.image_is_public === 1 ? (
                     <Eye className="size-3.5 text-emerald-600" />
@@ -107,15 +132,39 @@ export const AssetUsageDialog = memo(function AssetUsageDialog({
             </div>
           </div>
 
+          {/* Tóm tắt usage theo nhóm */}
           <div>
             <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               <Layers3 className="size-3.5" />
-              Đang được dùng ở đâu
+              Usage theo nhóm
+            </p>
+            {groupEntries.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border/80 bg-card px-3 py-2 text-xs text-muted-foreground">
+                Không nơi nào dùng file này (Orphan). File vẫn nằm trong kho lưu trữ cho tới khi
+                bạn xoá thủ công.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {groupEntries.map((g) => (
+                  <span
+                    key={g.key}
+                    className="inline-flex items-center rounded-md border border-border/80 bg-surface-strong/60 px-2 py-0.5 text-[11px] font-semibold text-foreground"
+                  >
+                    {g.label}: {g.count}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <Layers3 className="size-3.5" />
+              Chi tiết nơi đang dùng
             </p>
             {references.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border/80 bg-card px-3 py-2 text-xs text-muted-foreground">
-                Không còn nơi nào khác dùng ảnh này. File vẫn nằm trong kho lưu trữ cho tới khi
-                bạn xoá thủ công.
+                Không có tham chiếu chi tiết (usage được gom theo bảng mới).
               </p>
             ) : (
               <div className="space-y-1.5">

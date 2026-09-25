@@ -38,9 +38,10 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
   chưa từng chạy ở production**, không phải code chết. Xem
   [audit-2026-09-19](audit-2026-09-19.md) §G3.
 
-**Toàn bộ 23 bảng đều đang dùng** — `public` có đúng 23 bảng, khớp 100% với `schema-pg.sql`,
+**Toàn bộ 26 bảng đều đang dùng** — `public` có đúng 26 bảng, khớp 100% với `schema-pg.sql`,
 **0 bảng mồ côi** (bằng chứng: [audit-2026-09-19](audit-2026-09-19.md) §G0; đã gỡ 2 bảng gallery
-và `image_assets` ngày 2026-09-24). Không có bảng nào nên xoá.
+và `image_assets` ngày 2026-09-24, rồi thêm lại `media_assets`, `mapping_media_usages`,
+`landing_page_media_usages` ngày 2026-09-25 theo Option 2). Không có bảng nào nên xoá.
 
 Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 4 route **công
 khai**: `/` (trang chủ landing — cũng render `ArchitectLanding`, xem §1 cột Trạng thái),
@@ -181,20 +182,19 @@ UTM).
 
 ## 11b. Nơi đang dùng (Media Workspace)
 
-`/luu-tru` trả lời "Ảnh này dùng ở đâu?" qua **Reference Resolver**
-(`src/db/image-references.server.ts`) — 5 nguồn: `product_images.path`,
-`products.image_path`, `customer_mapping_items.image_path` + `custom_product_image_path`,
-`lp_settings.hero_image` (`key='hero_image'`). Matching tail `%/<storage_key>` (chấp nhận cả `/images/…`, full URL,
-key trần). Đây là "truth source" duy nhất — không có tầng registry, không có GC.
+Từ 2026-09-25 theo **Option 2 (1 file = 1 MediaAsset)**:
+`/luu-tru` trả lời "MediaAsset này dùng ở đâu?" qua tầng registry
+(`media_assets` + `mapping_media_usages` + `landing_page_media_usages` +
+`product_images.media_asset_id`). Reference Resolver (`image-references.server.ts`) vẫn giữ vai
+trò detail cho dialog (5 nguồn `path`) nhưng **đọc chính là `listMediaAssets`**.
 
-Card hiển thị chip đọc ngay được trạng thái: **`Còn dùng ở N nơi`** (còn bảng khác trỏ tới)
-hoặc **`Chỉ ở sản phẩm này`** (không nơi nào khác dùng). Click chip → **AssetUsageDialog**
-(liệt kê references theo role + href khi có route).
+Card hiển thị chip tổng hợp trực tiếp từ `usage_groups` (Product/Lookbook/Tuyển chọn/Hero/
+Mapping) + `status` (`used`·`draft`·`orphan`). Click → **AssetUsageDialog** liệt kê nhóm usage
+và references chi tiết theo role + href khi có route.
 
-Không có tiến trình xoá tự động: gỡ ảnh khỏi sản phẩm/mapping/Hero **không** đụng tới file —
-ảnh chỉ rơi vào trạng thái "không còn nơi dùng". File chỉ bị xoá khi người dùng xoá ảnh trên
-`/luu-tru` và lúc đó không còn nguồn nào trỏ tới (xem
-[hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §"Xoá ảnh an toàn").
+Xoá asset (`deleteMediaAssetFn`) chỉ gỡ **liên kết usage** — nếu còn usage, dialog nhắc
+"Xem N nơi đang dùng trước khi xóa"; file storage **không** bị xoá (là việc riêng của GC, xem
+[hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §"Kho ảnh asset-centric").
 
 ## 12. Media — `/luu-tru`
 
@@ -202,10 +202,11 @@ Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + trạng th
 
 - **Phạm vi (primary tabs)**: `All` · `MAP` · `Lookbook` · `Uncategorized` (nhãn tiếng Anh trên
   UI; `featured` = Tuyển chọn #1—#12 vẫn nhận qua deep-link nhưng không còn là tab). Tab dùng
-  segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented `Tất cả ảnh` / `Không còn nơi dùng`.
-- **Sử dụng (secondary, URL `usage`)**: `all` (mặc định — mọi ảnh) / `unused` (không bảng nào
-  khác trỏ tới) — dùng chung Reference Resolver (5 nguồn), không nhân bản. Có banner ngữ cảnh khi
-  lọc "Không còn nơi dùng".
+  segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented trạng thái dùng.
+- **Sử dụng (secondary, URL `usage`)**: 4 trạng thái **`all` (mặc định) / `used` / `draft` /
+  `orphan`** — asset-level qua `listMediaAssets` (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)
+  §Kho ảnh asset-centric). Có banner ngữ cảnh khi lọc "Orphan"; chip trạng thái trên mỗi card
+  click để mở AssetUsageDialog.
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
 - **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (5 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
   dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,
@@ -234,18 +235,19 @@ Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + trạng th
 | --------------------- | --------------------------------------------------------------------------------------------------- |
 | Người dùng & session  | `users`, `sessions`, `audit_logs`                                                                   |
 | Catalog sản phẩm      | `products`, `product_internal_codes`, `inventory`                                                    |
-| Ảnh sản phẩm          | `product_images`, `product_image_room_tags`                                                          |
+| Ảnh sản phẩm          | `product_images`, `product_image_room_tags` + `media_assets`, `mapping_media_usages`, `landing_page_media_usages` |
 | Khách hàng & bán hàng | `customers`, `quotes`, `quote_items`, `orders`, `payments`, `notes`, `customer_product_samples`      |
 | Đề xuất vật liệu      | `customer_mappings`, `customer_mapping_items`, `customer_mapping_quote_links`                        |
 | Landing công khai     | `lp_settings`, `lp_leads`, `lp_rate_limits`, `public_users`, `public_sessions`                       |
 
-Tổng **23 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
+Tổng **26 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 15. Quy mô code
 
 > Đo ngày **2026-09-24** (sau đợt dọn dead code + đợt tối ưu kiến trúc + đợt
 > refactor được duyệt + đợt media-workspace + gỡ Thư viện — xem [CLEANUP_REPORT](CLEANUP_REPORT.md),
-> [REFACTOR_REPORT](REFACTOR_REPORT.md)).
+> [REFACTOR_REPORT](REFACTOR_REPORT.md)). **2026-09-25** bổ sung Option 2 MediaAsset:
+> `src/db/media-assets.server.ts` (+873 dòng) và `src/lib/media-assets.ts` (+189 dòng).
 
 | Vùng             | File | Dòng   |
 | ---------------- | ---: | -----: |
@@ -259,10 +261,11 @@ Tổng **23 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 | `src/data`       |    1 |    321 |
 | `src/hooks`      |    2 |     63 |
 | **Tổng `src/`**  |  121 | **38.346** |
-| `*.test.ts` (node --test) | 10 |  568 |
+| `*.test.ts` (node --test) | 11 | 1.067 |
 
-RPC: **71** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/api/lp.ts` = **92**
+RPC: **72** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/api/lp.ts` = **93**
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
 
 `npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
-[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **67 test pass**.
+[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **100 test pass** (67 cũ + 33 media-assets
+mới).

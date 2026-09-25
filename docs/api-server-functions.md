@@ -1,6 +1,6 @@
 # Bề mặt RPC (`createServerFn`)
 
-Tất cả nằm trong **`src/api/functions.ts`** (1.670 dòng, **71** endpoint) và
+Tất cả nằm trong **`src/api/functions.ts`** (1.670 dòng, **72** endpoint) và
 **`src/api/lp.ts`** (357 dòng, **21** endpoint — 6 công khai cho landing, 15 còn lại
 `requireUser`/`requireAdmin` cho CRM; cộng 2 hàm auth re-export từ `functions.ts`). Đây là ranh giới
 client ↔ server: client **chỉ** gọi các hàm export từ file này.
@@ -75,6 +75,9 @@ chuyển khách hàng giữa các sale.
 `updateProductFn`, `createProductFn`, `deleteProductFn`.
 Ảnh sản phẩm: `fetchProductImages`, `uploadProductImageFn`, `addProductImageByPathFn`,
 `setPrimaryProductImageFn`, `deleteProductImageFn`.
+Kho ảnh (asset-centric): `fetchFlatMediaImages` (đọc theo MediaAsset — xem
+[hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric),
+`deleteMediaAssetFn` (xoá 1 MediaAsset + mọi usage của nó; trả `{ deleted, usages_removed }`).
 
 `fetchProductFieldValues` / `bulkUpdateProductFieldFn` / `clearProductFieldValueFn` nhận **tên cột**
 từ client, nên chỉ chấp nhận cột nằm trong **whitelist `PRODUCT_SUGGEST_FIELDS`** — đây là lá chắn
@@ -167,6 +170,7 @@ note.create
 product.create  product.update  product.delete  product.bulk_update
 product.import  product.export
 product.image.upload  product.image.add  product.image.delete
+media_asset.delete
 mapping.save  mapping.delete  mapping.export  mapping.image.upload
 ```
 

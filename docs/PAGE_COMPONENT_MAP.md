@@ -291,9 +291,10 @@ thêm trong cleanup này dùng đúng khuôn đó.
       └── Reference: fetchMediaUsageFn (ảnh đang được dùng ở đâu)
 ```
 
-`?usage=unused` = tab "Không còn nơi dùng" (ảnh không bảng nào khác trỏ tới).
-Chip trên ảnh đọc `usageMap` (nạp bằng `fetchMediaUsageFn`) để hiện
-"Còn dùng ở N nơi" / "Chỉ ở sản phẩm này".
+`?usage=all|used|draft|orphan` — status asset-level (used/draft/orphan, mặc định all).
+Chip trên card đọc `usage_groups` (trả từ `fetchFlatMediaImages`) để hiện
+"Used · N SP · M Lookbook" v.v.; chip click → `AssetUsageDialog` (references nạp bằng
+`fetchMediaUsageFn` cho phần detail).
 
 ---
 

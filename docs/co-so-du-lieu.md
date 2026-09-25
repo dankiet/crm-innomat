@@ -3,12 +3,14 @@
 Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:migrate`
 (idempotent — mọi lệnh đều `IF NOT EXISTS` / `IF EXISTS`, chạy lại an toàn).
 
-## 23 bảng
+## 26 bảng
 
 > Số dòng thật của từng bảng: xem [audit-2026-09-19](audit-2026-09-19.md) §G0b — **không
 > chép lại ở đây** để tránh hai bản số liệu trôi lệch nhau. Mốc đó đo 25 bảng; từ 2026-09-21
-> có thêm `image_assets` → 26, đã gỡ 2 bảng gallery (2026-09-24) → 24, rồi gỡ luôn
-> `image_assets` (2026-09-24, bỏ tầng registry/GC) → **23 bảng**.
+> có thêm `image_assets` → 26, đã gỡ 2 bảng gallery (2026-09-24) → 24, gỡ luôn
+> `image_assets` (2026-09-24, bỏ tầng registry/GC) → 23, rồi thêm lại đúng 3 bảng
+> registry theo **Option 2 (1 file ảnh = 1 MediaAsset): `media_assets`,
+> `mapping_media_usages`, `landing_page_media_usages`** (2026-09-25) → **26 bảng**.
 
 ### Catalog sản phẩm
 
@@ -17,7 +19,7 @@ Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:mi
 | `products`               | Sản phẩm theo **mã báo giá** (`code`)                | `UNIQUE(code)`; index cả `category` và `LOWER(category)`                               |
 | `product_internal_codes` | Mã nội bộ (MISA) → sản phẩm, **1 sản phẩm nhiều mã** | `UNIQUE(internal_code)` toàn cục                                                       |
 | `inventory`              | Tồn kho theo từng mã nội bộ × kho                    | `UNIQUE(internal_code, stock_location)`; FK về `product_internal_codes(internal_code)` |
-| `product_images`         | Ảnh của sản phẩm                                     | `UNIQUE(product_id, path)` + partial unique cho `path LIKE '/products/imported/%'`     |
+| `product_images`         | Ảnh của sản phẩm                                     | `UNIQUE(product_id, path)` + partial unique cho `path LIKE '/products/imported/%'`; `media_asset_id → media_assets(id) ON DELETE SET NULL` (Option 2: 1 file = 1 MediaAsset)                                             |
 | `product_image_room_tags`| Thẻ phòng gán cho ảnh (`room_slug`), kèm `source`, `confidence`, `model`, `model_version` | PK ghép `(product_image_id, room_slug)`; dùng bởi tab thẻ phòng ở `/luu-tru`. **Bộ review đã bỏ** — `review_status`/`reviewed_by`/`reviewed_at` chưa từng được dùng (1435/1435 dòng = `'accepted'`, 0 dòng có `reviewed_by`/`reviewed_at`), xem [audit](audit-2026-09-19.md) §G2 |
 
 Cột `products` gắn với nhãn UI như sau:
@@ -41,6 +43,20 @@ Cột `products` gắn với nhãn UI như sau:
 
 Giá: `retail_price` (giá lẻ), `trade_price` (cột A – CTYXD/TKE), `b2b_price` (cột C – cân đối),
 kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [nghiep-vu.md](nghiep-vu.md).
+
+### Kho Media — 1 file = 1 MediaAsset (Option 2)
+
+Ở Kho ảnh (luu-tru) giờ duyệt **theo file vật lý**, không theo dòng `product_images`. Bảng registry:
+
+| Bảng                        | Vai trò                                                        | Ràng buộc đáng chú ý                                                         |
+| --------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `media_assets`              | 1 file ảnh (storage key) = 1 dòng                              | `storage_key UNIQUE` (tail `<sha256>.<ext>`); index `path`                    |
+| `mapping_media_usages`      | Đề xuất vật liệu đang dùng asset ở cột nào                     | `media_asset_id → media_assets ON DELETE CASCADE`; `mapping_item_id ON DELETE CASCADE`; `UNIQUE(mapping_item_id, col)`; `col CHECK IN ('image_path','custom_product_image_path')` |
+| `landing_page_media_usages` | Landing/Hero đang dùng asset                                   | `media_asset_id → media_assets ON DELETE CASCADE`; `setting_key UNIQUE`       |
+
+`product_images.media_asset_id` là "usage product" của asset. Write-path giữ hành vi cũ
+(`product_images.path`, `customer_mapping_items.*`, `lp_settings.hero_image` vẫn là nguồn sự
+thật), bảng usage mới được đồng bộ kèm theo (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)).
 
 ### Người dùng & session
 

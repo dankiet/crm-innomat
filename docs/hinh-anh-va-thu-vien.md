@@ -56,18 +56,22 @@ hơn giới hạn server (12 MB): ảnh 20 MB thường nén ở client xuống 
 Một ref có thể được **nhiều bảng** tham chiếu. Reference Resolver
 (`src/db/image-references.server.ts`, 5 nguồn: `product_images.path`, `products.image_path`,
 `customer_mapping_items.image_path`, `customer_mapping_items.custom_product_image_path`,
-`lp_settings.hero_image`) là nguồn sự thật duy nhất cho câu hỏi "ảnh này đang được dùng ở đâu?".
+`lp_settings.hero_image`) vẫn là nguồn sự thật cho câu hỏi "path này phục vụ bản ghi nào?"
+— tầng **path → bản ghi**. Từ 2026-09-25 có thêm tầng **file → asset** (`media_assets` + usage,
+xem §Kho ảnh asset-centric bên dưới).
 
-Không có tầng registry, không có tiến trình dọn dẹp tự động. Quy tắc:
+Quy tắc (đã tách theo từng phạm vi xoá):
 
 - **Gỡ ảnh khỏi bản ghi** (`deleteProduct`, `deleteCustomerMapping`, `deleteCustomer`,
-  `setHeroImageSetting`, `deleteProductImage`) **không** đụng tới file. File vẫn nằm nguyên trong
-  kho lưu trữ; ảnh chỉ rơi vào trạng thái "không còn nơi dùng" trên `/luu-tru`.
-- **Xoá file** chỉ xảy ra ở đúng một chỗ: người dùng xoá ảnh trên `/luu-tru`
-  (`deleteProductImage`). Lúc đó hàm kiểm tra lại Reference Resolver và chỉ gọi `deleteImageRef()`
-  khi **không còn nguồn nào** trỏ tới. Vì tên file là hash, hai sản phẩm dùng chung một tấm ảnh sẽ
-  chia sẻ đúng một file — xoá thẳng khi còn tham chiếu là làm hỏng bản ghi còn lại.
-- Endpoint trả `file_deleted` để UI phân biệt "đã xoá file" với "chỉ gỡ khỏi sản phẩm".
+  `setHeroImageSetting`) **không** đụng tới file hay asset. Ảnh chỉ rơi vào trạng thái
+  `draft` / `orphan` trên `/luu-tru`.
+- **Xoá ảnh trong phạm vi sản phẩm** (`deleteProductImage` — từ màn hình sản phẩm): kiểm tra
+  Reference Resolver và **có thể gọi `deleteImageRef()`** khi **không còn nguồn nào** trỏ tới path.
+  Vì tên file là hash, hai bản ghi dùng chung một tấm ảnh sẽ chia sẻ đúng một file — xoá thẳng khi
+  còn tham chiếu là làm hỏng bản ghi còn lại. Endpoint trả `file_deleted` để UI phân biệt "đã xoá
+  file" với "chỉ gỡ khỏi sản phẩm".
+- **Xoá asset trên `/luu-tru`** (`deleteMediaAssetFn`): bỏ liên kết usage + `media_assets` row,
+  **không xoá file** (xem §Kho ảnh asset-centric).
 
 `isManagedImageRef` giới hạn phạm vi: chỉ file do CRM quản lý (`/images/...` hoặc host
 `*.supabase.co`) mới bị xoá, URL ngoài không đụng tới.
@@ -83,4 +87,52 @@ Bảng `product_images`: `path`, `sort_order`, `is_primary`, `caption`.
 
 Endpoint: `fetchProductImages`, `uploadProductImageFn`, `addProductImageByPathFn`,
 `setPrimaryProductImageFn`, `deleteProductImageFn`.
+
+## Kho ảnh asset-centric (Option 2 — 1 file = 1 MediaAsset)
+
+Từ 2026-09-25, `/luu-tru` duyệt theo **file vật lý** thay vì theo dòng `product_images`.
+Mỗi `media_assets` row (storage key content-addressed) là **một thẻ card**. Product, Lookbook,
+Tuyển chọn, Mapping, Hero là **usage** của asset đó.
+
+### Đọc
+
+`src/db/media-assets.server.ts` → `listMediaAssets(db, opts)`, qua `listFlatMediaImages` giữ
+signature cũ. Kết quả `FlatMediaItem`:
+
+- `asset_id` — key card, selection, delete asset.
+- `id` / `product_id` — representative product usage (`product_images.id`/`product_id`);
+  **0-sentinel** khi asset không có usage product (sản phẩm bị xoá hoặc file chỉ nằm ở
+  mapping/hero). UI guard bằng `> 0`.
+- `storage_key` (tail hash), `path`, `created_at`.
+- `kind` (map/concept/normal) + `room_tags` — lấy từ representative product usage.
+- `usage_count` (tổng 5 nhóm), `usage_groups` (product/lookbook/featured/hero/mapping),
+  `status` (`used`/`draft`/`orphan`).
+
+**Status 3 trạng thái** (thay cho "Active/To Delete" cũ):
+
+| Status  | Điều kiện                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------ |
+| `used`  | Có ≥1 usage **active**: image MAP, sản phẩm public, Concept public (Lookbook), featured 1..12, mapping, hoặc hero |
+| `draft` | Có usage nhưng **không active** (vd ảnh thường của sản phẩm ẩn)                            |
+| `orphan`| Không còn bảng nào (product/mapping/hero) trỏ tới asset                                    |
+
+Filter `usage=all|used|draft|orphan` → 4 nút segmented trên UI.
+
+### Xoá theo asset
+
+`deleteMediaAsset(db, assetId)` (`deleteMediaAssetFn` API):
+
+- Đếm + xoá `mapping_media_usages`, `landing_page_media_usages`.
+- Set `NULL` `product_images.media_asset_id` (không xoá dòng `product_images` — legacy giữ nguyên).
+- Xoá `media_assets` row; trả `{ deleted, usages_removed }` cho UI hiện "đang dùng ở N nơi".
+- **Không xoá file storage** — xoá file vẫn là việc riêng (GC); copy UI ghi rõ "xoá khỏi kho".
+
+Khi asset còn usage, UI nhắc "Xem N nơi đang dùng trước khi xóa" mở `AssetUsageDialog`.
+Xoá luôn theo quy tắc 2 bước inline (AGENTS.md) — không `window.confirm`.
+
+### Backfill
+
+`applyMediaBackfill(db, sources)` trong `src/db/media-assets.server.ts` + scripts
+`db:media-backfill` / `db:media-verify` (idempotent — chạy lại ra cùng kết quả).
+**Chưa chạy ở production — cần duyệt trước** (ghi ở [trien-khai-va-van-hanh](trien-khai-va-van-hanh.md)).
 

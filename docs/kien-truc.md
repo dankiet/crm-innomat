@@ -68,7 +68,8 @@ Mọi route `_app.*` đều nằm sau cổng này.
 - **`src/api/functions.ts`** là _ranh giới_ client ↔ server. Client chỉ gọi các hàm ở đây.
 - **`src/db/*.server.ts`** giữ SQL và nghiệp vụ; **không** được import ở phía client.
 - Mỗi handler `createServerFn` dùng **dynamic `await import()`** để nạp module server. Nhờ vậy
-  code server không rơi vào bundle client. Đây là quy ước áp dụng nhất quán cho cả 92 endpoint.
+  code server không rơi vào bundle client. Đây là quy ước áp dụng nhất quán cho mọi endpoint
+  (con số hiện tại: xem [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §15).
 - Vite bật **import protection**: client import module `*.server.ts` (hoặc specifier
   `server-only`) là **lỗi build**, không phải cảnh báo —
   `importProtection: { behavior: "error", client: { files: ["**/*.server.*"] } }`.
@@ -102,7 +103,7 @@ và cập nhật). Sáu file lớn nhất đáng biết:
 | `src/db/crm.server.ts`                     | 2.358 | Lớp nghiệp vụ chính (khách hàng, báo giá, đơn, sản phẩm) |
 | `src/routes/_app.san-pham.tsx`             | 2.074 | Catalog sản phẩm: trang + 6 dialog con                   |
 | `src/components/CustomerMappingDialog.tsx` | 1.945 | Đề xuất vật liệu (DXVL)                                  |
-| `src/api/functions.ts`                     | 1.670 | Toàn bộ RPC (71 endpoint)                                |
+| `src/api/functions.ts`                     | 1.670 | Toàn bộ RPC (con số hiện tại: [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §15) |
 | `src/components/NewQuoteDialog.tsx`        | 1.650 | Tạo báo giá: chọn SP, chiết khấu, VAT                    |
 
 Việc tách các file này được bàn ở [audit-2026-09-19](audit-2026-09-19.md) §C.

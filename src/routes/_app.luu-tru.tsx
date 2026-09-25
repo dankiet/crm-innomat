@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import {
   bulkSetProductImageKindFn,
   bulkSetProductImageRoomTagsFn,
+  deleteMediaAssetFn,
   deleteProductImageFn,
   fetchFlatMediaImagesFn,
   fetchProductFieldValues,
@@ -94,7 +95,7 @@ type MediaStorageSearch = {
 
 const FLAT_MEDIA_TABS: readonly string[] = ["all", "map", "concept", "featured", "unassigned"];
 const FLAT_MEDIA_SORTS: readonly string[] = ["newest", "oldest", "code_asc", "code_desc", "priority"];
-const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "unused"];
+const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "used", "draft", "orphan"];
 const PUBLIC_FILTERS: readonly string[] = ["all", "public", "hidden"];
 
 function parseMediaTab(v: unknown): FlatMediaTab | undefined {
@@ -761,31 +762,6 @@ function MediaStoragePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  /**
-   * Nhãn trạng thái dùng của ảnh — đọc ngay trên card, không cần mở popup:
-   *  - "Còn dùng ở N nơi"  → ảnh còn được bảng khác trỏ tới.
-   *  - "Chỉ ở sản phẩm này" → không nơi nào khác dùng; file vẫn nằm trong kho.
-   * Trả null khi chưa tải xong usage (không đoán bừa).
-   */
-  function usageChipFor(img: FlatMediaItem): string | null {
-    if (!usageMap) return null;
-    const key = storageKeyOf(img.path);
-    // refs KHÔNG tính bản ghi self (row product_images của chính ảnh) — ảnh luôn
-    // tự giữ chính nó, nên chỉ ref KHÁC mới là "nơi đang dùng".
-    const refs = (usageMap.usage[key] ?? []).filter(
-      (r) => !(r.role === "product_image" && String(r.id) === String(img.id)),
-    );
-    return refs.length > 0 ? `Còn dùng ở ${refs.length} nơi` : "Chỉ ở sản phẩm này";
-  }
-
-  /** Số nơi KHÁC đang dùng ảnh (không tính chính bản ghi product_images này). */
-  function otherUsageCount(img: FlatMediaItem): number {
-    const key = storageKeyOf(img.path);
-    return (usageMap?.usage?.[key] ?? []).filter(
-      (r) => !(r.role === "product_image" && String(r.id) === String(img.id)),
-    ).length;
-  }
-
   async function handleToggleLookbookPublic(img: FlatMediaItem) {
     setBusyLbPublicId(img.id);
     try {
@@ -991,7 +967,11 @@ function MediaStoragePage() {
 
   async function handleBulkSetRoomTags(slugs: ImageRoomTagSlug[]) {
     if (selectedIds.size === 0 || slugs.length === 0 || busyBulk) return;
-    const ids = Array.from(selectedIds);
+    const ids = items.filter((i) => selectedIds.has(i.asset_id) && i.id > 0).map((i) => i.id);
+    if (!ids.length) {
+      toast.error("Không có ảnh sản phẩm nào được chọn");
+      return;
+    }
     setBusyBulk(true);
     try {
       const res = await bulkSetProductImageRoomTagsFn({
@@ -1024,7 +1004,7 @@ function MediaStoragePage() {
   }
 
   function selectAllCurrentPage() {
-    const pageIds = items.map((i) => i.id);
+    const pageIds = items.map((i) => i.asset_id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -1044,7 +1024,7 @@ function MediaStoragePage() {
   function getSelectedProductIds() {
     const pIds = new Set<number>();
     for (const item of items) {
-      if (selectedIds.has(item.id)) {
+      if (selectedIds.has(item.asset_id) && item.product_id > 0) {
         pIds.add(item.product_id);
       }
     }
@@ -1083,7 +1063,9 @@ function MediaStoragePage() {
       );
       setItems((prev) =>
         prev.map((i) =>
-          productIds.includes(i.product_id) ? { ...i, product_is_public: isPublic } : i,
+          i.product_id != null && productIds.includes(i.product_id)
+            ? { ...i, product_is_public: isPublic }
+            : i,
         ),
       );
       clearSelection();
@@ -1098,15 +1080,15 @@ function MediaStoragePage() {
   async function executeBulkDelete() {
     if (selectedIds.size === 0 || busyBulk) return;
     setBusyBulk(true);
-    const ids = Array.from(selectedIds);
+    const assetIds = Array.from(selectedIds);
     let successCount = 0;
     let failCount = 0;
-    let fileCount = 0;
+    let usageCount = 0;
     try {
-      await mapLimit(ids, 5, async (imageId) => {
+      await mapLimit(assetIds, 5, async (assetId) => {
         try {
-          const res = await deleteProductImageFn({ data: { imageId } });
-          if (res.file_deleted) fileCount++;
+          const res = await deleteMediaAssetFn({ data: { assetId } });
+          if (res.deleted) usageCount += res.usages_removed;
           successCount++;
         } catch {
           failCount++;
@@ -1114,13 +1096,13 @@ function MediaStoragePage() {
       });
       if (successCount > 0) {
         toast.success(
-          fileCount > 0
-            ? `Đã gỡ ${successCount} ảnh · xoá ${fileCount} file khỏi kho lưu trữ`
-            : `Đã gỡ ${successCount} ảnh khỏi sản phẩm — file vẫn còn vì nơi khác đang dùng`,
+          usageCount > 0
+            ? `Đã xoá ${successCount} MediaAsset khỏi kho lưu trữ · gỡ ${usageCount} usage`
+            : `Đã xoá ${successCount} MediaAsset khỏi kho lưu trữ`,
         );
       }
       if (failCount > 0) {
-        toast.error(`Có ${failCount} ảnh xóa không thành công`);
+        toast.error(`Có ${failCount} media xóa không thành công`);
       }
       clearSelection();
       setBulkDeleteConfirmOpen(false);
@@ -1135,7 +1117,14 @@ function MediaStoragePage() {
 
   async function handleBulkSetKind(kind: ProductImageKind) {
     if (selectedIds.size === 0 || busyBulk) return;
-    const ids = Array.from(selectedIds);
+    // Chỉ ảnh có usage product mới có id row product_images tương ứng.
+    const ids = items
+      .filter((i) => selectedIds.has(i.asset_id) && i.id > 0)
+      .map((i) => i.id);
+    if (!ids.length) {
+      toast.error("Không có ảnh sản phẩm nào được chọn");
+      return;
+    }
     setBusyBulk(true);
     try {
       const res = await bulkSetProductImageKindFn({
@@ -1147,7 +1136,7 @@ function MediaStoragePage() {
       const label = kind === "map" ? "ảnh MAP" : kind === "concept" ? "ảnh Concept" : "chưa gán";
       toast.success(`Đã cập nhật ${res.updated} ảnh thành ${label}`);
       setItems((prev) =>
-        prev.map((i) => (selectedIds.has(i.id) ? { ...i, kind } : i)),
+        prev.map((i) => (selectedIds.has(i.asset_id) ? { ...i, kind } : i)),
       );
       clearSelection();
       syncCountsOnly();
@@ -1199,31 +1188,32 @@ function MediaStoragePage() {
     });
   }
 
-  async function handleDeleteImage(imageId: number) {
-    setDeletingId(imageId);
+  async function handleDeleteImage(img: FlatMediaItem) {
+    const assetId = img.asset_id;
+    setDeletingId(assetId);
     try {
-      const res = await deleteProductImageFn({ data: { imageId } });
+      const res = await deleteMediaAssetFn({ data: { assetId } });
       toast.success(
-        res.file_deleted
-          ? "Đã xoá ảnh và file trong kho lưu trữ"
-          : "Đã gỡ ảnh khỏi sản phẩm — file vẫn còn vì nơi khác đang dùng",
+        res.usages_removed > 0
+          ? `Đã xoá MediaAsset khỏi kho · gỡ ${res.usages_removed} usage`
+          : "Đã xoá MediaAsset khỏi kho lưu trữ",
       );
       setConfirmDeleteId(null);
 
-      setItems((prev) => prev.filter((i) => i.id !== imageId));
+      setItems((prev) => prev.filter((i) => i.asset_id !== assetId));
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        next.delete(imageId);
+        next.delete(assetId);
         return next;
       });
 
-      if (previewItem?.id === imageId) {
+      if (previewItem?.asset_id === assetId) {
         setPreviewItem(null);
       }
 
       syncCountsOnly();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không thể xóa ảnh");
+      toast.error(err instanceof Error ? err.message : "Không thể xóa MediaAsset");
     } finally {
       setDeletingId(null);
     }
@@ -1562,37 +1552,39 @@ function MediaStoragePage() {
               </div>
             ) : null}
 
-            {/* Status — segmented: Tất cả ảnh | Không còn nơi dùng */}
+            {/* Status — segmented: Tất cả | Used | Draft | Orphan */}
             <div
               className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
-              title="Lọc theo trạng thái dùng: Tất cả ảnh = mọi ảnh đang có; Không còn nơi dùng = chỉ ảnh không bảng nào khác trỏ tới"
+              title="Lọc theo trạng thái dùng của MediaAsset: Used = có ≥1 usage đang active (MAP/Thư viện/Lookbook public/Tuyển chọn/Đề xuất/Hero); Draft = có usage nhưng chưa active; Orphan = không nơi nào dùng"
             >
-              <button
-                type="button"
-                onClick={() => patchFilters({ usage: undefined })}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
-                  usage === "all"
-                    ? "bg-card text-foreground shadow-xs ring-1 ring-black/5"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                )}
-                aria-pressed={usage === "all"}
-              >
-                Tất cả ảnh
-              </button>
-              <button
-                type="button"
-                onClick={() => patchFilters({ usage: "unused" })}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
-                  usage === "unused"
-                    ? "bg-terracotta text-white shadow-xs font-bold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
-                )}
-                aria-pressed={usage === "unused"}
-              >
-                Không còn nơi dùng
-              </button>
+              {(
+                [
+                  { key: undefined, label: "Tất cả" },
+                  { key: "used", label: "Used" },
+                  { key: "draft", label: "Draft" },
+                  { key: "orphan", label: "Orphan" },
+                ] as const
+              ).map(({ key, label }) => {
+                const active = usage === (key ?? "all") || ((usage === undefined || usage === "all") && key === undefined);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => patchFilters({ usage: key })}
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
+                      active
+                        ? key === "orphan"
+                          ? "bg-terracotta text-white shadow-xs font-bold"
+                          : "bg-card text-foreground shadow-xs ring-1 ring-black/5"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
+                    )}
+                    aria-pressed={active}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
 
@@ -1761,18 +1753,18 @@ function MediaStoragePage() {
         ) : null}
       </div>
 
-      {/* Banner ngữ cảnh khi lọc "Không còn nơi dùng" */}
-      {usage === "unused" ? (
+      {/* Banner ngữ cảnh khi lọc Orphan */}
+      {usage === "orphan" ? (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in-0 duration-150">
           <div className="flex items-start gap-2.5">
             <Info className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div>
-              <p className="font-semibold text-foreground">Ảnh không còn nơi nào dùng</p>
+              <p className="font-semibold text-foreground">MediaAsset không còn nơi nào dùng (Orphan)</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Không bảng nào khác (sản phẩm, đề xuất vật liệu, Hero trang chủ) trỏ tới những ảnh
-                này — mỗi ảnh chỉ còn được giữ bởi chính bản ghi của nó. File vẫn nằm nguyên trong
-                kho lưu trữ; xoá ở đây là xoá thật, không thể hoàn tác. Bấm chip trên ảnh để xem
-                chi tiết nơi đang dùng.
+                Không bảng nào khác (sản phẩm, đề xuất vật liệu, Hero trang chủ) trỏ tới những file
+                này — chúng chỉ còn tồn tại trong kho media. File vẫn nằm nguyên trong kho lưu trữ;
+                xoá ở đây là xoá thật, không thể hoàn tác. Bấm chip trên ảnh để xem chi tiết nơi
+                đang dùng.
               </p>
             </div>
           </div>
@@ -1814,8 +1806,8 @@ function MediaStoragePage() {
           <ImageIcon className="mx-auto size-10 text-muted-foreground/40" />
           <p className="mt-3 text-sm font-semibold text-foreground">Không tìm thấy ảnh nào phù hợp</p>
           <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-            {usage === "unused"
-              ? "Không có ảnh nào rơi vào trạng thái không còn nơi dùng — mọi ảnh đều đang được ít nhất một bảng khác trỏ tới. Gỡ ảnh khỏi sản phẩm/đề xuất vật liệu/Hero để ảnh xuất hiện ở đây."
+            {usage === "orphan"
+              ? "Không có MediaAsset nào rơi vào trạng thái Orphan — mọi file đều đang được ít nhất một nơi dùng. Gỡ ảnh khỏi sản phẩm/đề xuất vật liệu/Hero để file xuất hiện ở đây."
               : hasActiveFilters
                 ? "Hãy thử bỏ bớt bộ lọc màu, nhóm sản phẩm, hoặc từ khóa tìm kiếm để xem thêm kết quả."
                 : "Chưa có ảnh nào trong mục này."}
@@ -1834,15 +1826,16 @@ function MediaStoragePage() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5">
           {items.map((img) => {
-            const isSelected = selectedIds.has(img.id);
+            const isSelected = selectedIds.has(img.asset_id);
+            const hasProductUsage = img.id > 0;
             const isMap = img.kind === "map";
             const isConcept = img.kind === "concept";
-            const isConfirmingDelete = confirmDeleteId === img.id;
-            const isDeletingThis = deletingId === img.id;
+            const isConfirmingDelete = confirmDeleteId === img.asset_id;
+            const isDeletingThis = deletingId === img.asset_id;
 
             return (
               <div
-                key={img.id}
+                key={img.asset_id}
                 className={cn(
                   "group relative flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-150 shadow-2xs",
                   isSelected
@@ -1854,7 +1847,7 @@ function MediaStoragePage() {
                 <div className="relative aspect-4/3 w-full overflow-hidden bg-muted/40">
                   <img
                     src={img.path}
-                    alt={img.caption || img.product_code}
+                    alt={img.caption || img.product_code || img.storage_key}
                     loading="lazy"
                     className="size-full object-cover transition-transform duration-200 group-hover:scale-103"
                   />
@@ -1862,7 +1855,7 @@ function MediaStoragePage() {
                   {/* Multi-select Checkbox (top-left) */}
                   <button
                     type="button"
-                    onClick={() => toggleSelect(img.id)}
+                    onClick={() => toggleSelect(img.asset_id)}
                     aria-label="Chọn ảnh này"
                     className={cn(
                       "absolute left-1.5 top-1.5 z-10 flex size-6 items-center justify-center rounded-md transition-all cursor-pointer",
@@ -1926,34 +1919,45 @@ function MediaStoragePage() {
                 <div className="flex flex-1 flex-col justify-between p-2.5">
                   {/* Product Details */}
                   <div>
-                    <div className="flex items-center justify-between gap-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setGalleryProduct({
-                            id: img.product_id,
-                            code: img.product_code,
-                            name: img.product_name,
-                            category: img.product_category,
-                          })
-                        }
-                        title="Xem toàn bộ ảnh của sản phẩm này để chọn lại MAP/Concept"
-                        className="inline-flex items-center gap-1 font-mono text-xs font-bold text-foreground hover:text-terracotta hover:underline truncate cursor-pointer text-left"
+                    {hasProductUsage ? (
+                      <>
+                        <div className="flex items-center justify-between gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setGalleryProduct({
+                                id: img.product_id,
+                                code: img.product_code,
+                                name: img.product_name,
+                                category: img.product_category,
+                              })
+                            }
+                            title="Xem toàn bộ ảnh của sản phẩm này để chọn lại MAP/Concept"
+                            className="inline-flex items-center gap-1 font-mono text-xs font-bold text-foreground hover:text-terracotta hover:underline truncate cursor-pointer text-left"
+                          >
+                            <span>{img.product_code}</span>
+                            <Images className="size-3 text-muted-foreground/60 shrink-0" />
+                          </button>
+                          {img.product_category ? (
+                            <span className="shrink-0 text-[10px] text-muted-foreground/80">
+                              {img.product_category}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={img.product_name}>
+                          {img.product_name}
+                        </p>
+                      </>
+                    ) : (
+                      <p
+                        className="truncate font-mono text-[11px] text-muted-foreground"
+                        title={`MediaAsset #${img.asset_id} · ${img.storage_key}`}
                       >
-                        <span>{img.product_code}</span>
-                        <Images className="size-3 text-muted-foreground/60 shrink-0" />
-                      </button>
-                      {img.product_category ? (
-                        <span className="shrink-0 text-[10px] text-muted-foreground/80">
-                          {img.product_category}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={img.product_name}>
-                      {img.product_name}
-                    </p>
+                        MediaAsset #{img.asset_id}
+                      </p>
+                    )}
                     {/* Bối cảnh phòng Lookbook (hiển thị khi là Concept hoặc có tag) */}
-                    {isConcept || img.room_tags.length > 0 ? (
+                    {hasProductUsage && (isConcept || img.room_tags.length > 0) ? (
                       <div className="mt-1.5 flex flex-wrap items-center gap-1">
                         {img.room_tags.map((tag) => (
                           <span
@@ -1975,29 +1979,42 @@ function MediaStoragePage() {
                   {/* Usage summary + Lookbook (Concept) controls */}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {(() => {
-                      const chip = usageChipFor(img);
-                      if (!chip) return null;
-                      const chipKey = storageKeyOf(img.path);
-                      const inUse = otherUsageCount(img) > 0;
+                      const groups = img.usage_groups;
+                      const parts: string[] = [];
+                      if (groups.product > 0) parts.push(`${groups.product} SP`);
+                      if (groups.lookbook > 0) parts.push(`${groups.lookbook} Lookbook`);
+                      if (groups.featured > 0) parts.push(`${groups.featured} Tuyển`);
+                      if (groups.mapping > 0) parts.push(`${groups.mapping} Đề xuất`);
+                      if (groups.hero > 0) parts.push(`${groups.hero} Hero`);
+                      const label =
+                        img.status === "orphan"
+                          ? "Orphan · không nơi dùng"
+                          : img.status === "draft"
+                            ? `Draft · ${parts.length ? parts.join(" · ") : "0 usage"}`
+                            : parts.length
+                              ? `Used · ${parts.join(" · ")}`
+                              : "Used";
                       return (
                         <button
                           type="button"
-                          onClick={() => setUsageDialogKey(chipKey)}
-                          title="Xem ảnh đang được dùng ở đâu"
-                          aria-label="Xem ảnh đang được dùng ở đâu"
+                          onClick={() => setUsageDialogKey(img.storage_key)}
+                          title="Xem MediaAsset đang được dùng ở đâu"
+                          aria-label="Xem MediaAsset đang được dùng ở đâu"
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold border transition-all cursor-pointer",
-                            inUse
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                              : "border-border/80 bg-surface-strong/60 text-muted-foreground hover:bg-surface-strong",
+                            img.status === "orphan"
+                              ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                              : img.status === "draft"
+                                ? "border-border/80 bg-surface-strong/60 text-muted-foreground hover:bg-surface-strong"
+                                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20",
                           )}
                         >
-                          {inUse ? <Layers className="size-2.5 text-emerald-600 dark:text-emerald-400" /> : null}
-                          <span>{chip}</span>
+                          <Layers className="size-2.5" />
+                          <span>{label}</span>
                         </button>
                       );
                     })()}
-                    {isConcept ? (
+                    {hasProductUsage && isConcept ? (
                       <>
                         <button
                           type="button"
@@ -2095,13 +2112,24 @@ function MediaStoragePage() {
                     {isConfirmingDelete ? (
                       <div className="flex flex-col gap-1 rounded-lg bg-red-500/10 p-1.5 text-[10px]">
                         <span className="font-semibold text-red-600 dark:text-red-400">
-                          Xóa ảnh này?
+                          {img.usage_count > 0
+                            ? `Xóa MediaAsset này? (đang dùng ở ${img.usage_count} nơi)`
+                            : "Xóa MediaAsset này?"}
                         </span>
+                        {img.usage_count > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setUsageDialogKey(img.storage_key)}
+                            className="text-left text-[10px] text-red-700 dark:text-red-300 underline cursor-pointer"
+                          >
+                            Xem {img.usage_count} nơi đang dùng trước khi xóa
+                          </button>
+                        ) : null}
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
                             disabled={isDeletingThis}
-                            onClick={() => handleDeleteImage(img.id)}
+                            onClick={() => void handleDeleteImage(img)}
                             className="flex-1 rounded bg-red-600 py-1 font-bold text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer"
                           >
                             {isDeletingThis ? "Đang xóa…" : "Xóa vĩnh viễn"}
@@ -2119,7 +2147,9 @@ function MediaStoragePage() {
                       <div className="flex items-center justify-between gap-1">
                         {/* Pure Icon-Based Contextual Actions (Click directly on icon to Toggle ON/OFF) */}
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {tab === "map" ? (
+                          {hasProductUsage ? (
+                            <>
+                              {tab === "map" ? (
                             <>
                               {/* Toggle Thư viện icon button (Green on, Gray off) */}
                               <button
@@ -2271,12 +2301,14 @@ function MediaStoragePage() {
                               ) : null}
                             </>
                           )}
+                            </>
+                          ) : null}
                         </div>
                         {/* Trash icon */}
                         <button
                           type="button"
-                          onClick={() => setConfirmDeleteId(img.id)}
-                          title="Xóa ảnh"
+                          onClick={() => setConfirmDeleteId(img.asset_id)}
+                          title="Xóa MediaAsset và mọi usage của nó"
                           className="grid size-6 place-items-center rounded text-muted-foreground/60 transition-colors hover:bg-red-500/15 hover:text-red-600 cursor-pointer"
                         >
                           <Trash2 className="size-3" />
@@ -2502,7 +2534,7 @@ function MediaStoragePage() {
               <div className="relative aspect-16/10 w-full bg-black/95">
                 <img
                   src={previewItem.path}
-                  alt={previewItem.product_code}
+                  alt={previewItem.product_code || previewItem.storage_key}
                   className="size-full object-contain"
                 />
               </div>
@@ -2510,51 +2542,58 @@ function MediaStoragePage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <DialogTitle className="text-base font-bold text-foreground font-mono">
-                      {previewItem.product_code}
+                      {previewItem.product_code || `MediaAsset #${previewItem.asset_id}`}
                     </DialogTitle>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const prod = {
-                          id: previewItem.product_id,
-                          code: previewItem.product_code,
-                          name: previewItem.product_name,
-                          category: previewItem.product_category,
-                        };
-                        setPreviewItem(null);
-                        setGalleryProduct(prod);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-md bg-surface-strong px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-terracotta hover:text-white transition-colors cursor-pointer"
-                    >
-                      <Images className="size-3" />
-                      <span>Mở toàn bộ gallery của SP</span>
-                    </button>
+                    {previewItem.id > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prod = {
+                            id: previewItem.product_id,
+                            code: previewItem.product_code,
+                            name: previewItem.product_name,
+                            category: previewItem.product_category,
+                          };
+                          setPreviewItem(null);
+                          setGalleryProduct(prod);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md bg-surface-strong px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-terracotta hover:text-white transition-colors cursor-pointer"
+                      >
+                        <Images className="size-3" />
+                        <span>Mở toàn bộ gallery của SP</span>
+                      </button>
+                    ) : null}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {previewItem.product_name} ·{" "}
-                    {previewItem.product_category || "Chưa phân loại"}
+                    {previewItem.id > 0
+                      ? `${previewItem.product_name} · ${previewItem.product_category || "Chưa phân loại"}`
+                      : previewItem.storage_key}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {/* 1. Toggle Thư viện icon button in modal */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleTogglePublic(previewItem.product_id, previewItem.product_is_public);
-                      setPreviewItem((prev) =>
-                        prev ? { ...prev, product_is_public: prev.product_is_public === 1 ? 0 : 1 } : null,
-                      );
-                    }}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all shadow-xs cursor-pointer border",
-                      previewItem.product_is_public === 1
-                        ? "bg-emerald-600 text-white border-emerald-600"
-                        : "bg-surface-strong border-border text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/40",
-                    )}
-                  >
-                    <Globe className="size-3.5" />
-                    <span>{previewItem.product_is_public === 1 ? "Thư viện: Bật" : "Thư viện: Ẩn"}</span>
-                  </button>
+                  {previewItem.id > 0 ? (
+                    <>
+                      {/* 1. Toggle Thư viện icon button in modal */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleTogglePublic(previewItem.product_id, previewItem.product_is_public);
+                          setPreviewItem((prev) =>
+                            prev ? { ...prev, product_is_public: prev.product_is_public === 1 ? 0 : 1 } : null,
+                          );
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all shadow-xs cursor-pointer border",
+                          previewItem.product_is_public === 1
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-surface-strong border-border text-muted-foreground hover:text-emerald-600 hover:border-emerald-500/40",
+                        )}
+                      >
+                        <Globe className="size-3.5" />
+                        <span>{previewItem.product_is_public === 1 ? "Thư viện: Bật" : "Thư viện: Ẩn"}</span>
+                      </button>
+                    </>
+                  ) : null}
 
                   {/* 2. Hero Banner Button */}
                   <button
@@ -2575,55 +2614,59 @@ function MediaStoragePage() {
                     </span>
                   </button>
 
-                  {/* 3. Popover gán Tuyển chọn */}
-                  <QuickFeaturedRankPopover
-                    item={previewItem}
-                    onUpdated={() => {
-                      loadData();
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSingleSetKind(
-                        previewItem,
-                        previewItem.kind === "map" ? "normal" : "map",
-                      )
-                    }
-                    className={cn(
-                      "rounded-lg px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer",
-                      previewItem.kind === "map"
-                        ? "bg-indigo-600 text-white"
-                        : "border border-border text-muted-foreground hover:bg-accent",
-                    )}
-                  >
-                    MAP
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSingleSetKind(
-                        previewItem,
-                        previewItem.kind === "concept" ? "normal" : "concept",
-                      )
-                    }
-                    className={cn(
-                      "rounded-lg px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer",
-                      previewItem.kind === "concept"
-                        ? "bg-amber-600 text-white"
-                        : "border border-border text-muted-foreground hover:bg-accent",
-                    )}
-                  >
-                    Concept
-                  </button>
-                  {previewItem.kind !== "normal" ? (
-                    <button
-                      type="button"
-                      onClick={() => handleSingleSetKind(previewItem, "normal")}
-                      className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent cursor-pointer"
-                    >
-                      Bỏ gán
-                    </button>
+                  {previewItem.id > 0 ? (
+                    <>
+                      {/* 3. Popover gán Tuyển chọn */}
+                      <QuickFeaturedRankPopover
+                        item={previewItem}
+                        onUpdated={() => {
+                          loadData();
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSingleSetKind(
+                            previewItem,
+                            previewItem.kind === "map" ? "normal" : "map",
+                          )
+                        }
+                        className={cn(
+                          "rounded-lg px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer",
+                          previewItem.kind === "map"
+                            ? "bg-indigo-600 text-white"
+                            : "border border-border text-muted-foreground hover:bg-accent",
+                        )}
+                      >
+                        MAP
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSingleSetKind(
+                            previewItem,
+                            previewItem.kind === "concept" ? "normal" : "concept",
+                          )
+                        }
+                        className={cn(
+                          "rounded-lg px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer",
+                          previewItem.kind === "concept"
+                            ? "bg-amber-600 text-white"
+                            : "border border-border text-muted-foreground hover:bg-accent",
+                        )}
+                      >
+                        Concept
+                      </button>
+                      {previewItem.kind !== "normal" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSingleSetKind(previewItem, "normal")}
+                          className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent cursor-pointer"
+                        >
+                          Bỏ gán
+                        </button>
+                      ) : null}
+                    </>
                   ) : null}
                 </div>
               </div>

@@ -13,7 +13,7 @@
 npm install
 cp .env.example .env
 # điền các biến ở phần dưới, tối thiểu: DATABASE_URL
-npm run db:migrate        # tạo schema (23 bảng) + bật RLS
+npm run db:migrate        # tạo schema (26 bảng) + bật RLS
 npm run db:seed-admin     # tạo user admin từ CRM_ADMIN_*
 npm run dev               # → http://localhost:8080
 ```
@@ -88,6 +88,8 @@ lưu hình local vào `public/images/`. Xem [hinh-anh-va-thu-vien.md](hinh-anh-v
 | `npm run db:migrate`      | Áp `src/db/schema-pg.sql` (idempotent)                                                   |
 | `npm run db:enable-rls`   | Bật RLS cho mọi bảng schema `public`                                                     |
 | `npm run db:seed-admin`   | Tạo/đặt lại admin, hash scrypt                                                           |
+| `npm run db:media-backfill` | Backfill `media_assets` + usage từ 5 nguồn ref (idempotent) — **chưa chạy ở production, cần duyệt** |
+| `npm run db:media-verify` | Verify backfill MediaAsset                                                              |
 | `npm run storage:backup`  | Mirror bucket Supabase → `public/images`                                                 |
 | `npm run clean:generated` | Xoá output build/generated                                                               |
 
