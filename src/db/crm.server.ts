@@ -2,6 +2,7 @@ import { deleteImageRef, isManagedImageRef, putImageBuffer } from "@/lib/storage
 import { normalizeUploadImageBufferMeta } from "@/lib/image-upload.server";
 import { storageKeyForRef } from "@/lib/image-asset-refs";
 import { listImageReferencesForKeys } from "@/db/image-references.server";
+import { linkProductImageAsset, syncMappingItemUsage } from "@/db/media-assets.server";
 import { getDb, type SqlValue } from "./index.server";
 import { unitPriceForProduct, effectiveDiscountPct } from "@/lib/pricing";
 import type {
@@ -416,6 +417,10 @@ export async function addProductImage(input: {
         (input.caption ?? "").trim(),
         kind,
       );
+    // Media asset registry: 1 file = 1 MediaAsset. Gắn asset ngay khi tạo ảnh.
+    if (Number(info.lastInsertRowid) > 0) {
+      await linkProductImageAsset(tx, { id: Number(info.lastInsertRowid), path: pathStr });
+    }
     return Number(info.lastInsertRowid);
   });
   const newId = await runTx();
@@ -1249,7 +1254,7 @@ export async function saveCustomerMapping(input: {
         it.price_override == null || !Number.isFinite(Number(it.price_override))
           ? null
           : Math.max(0, Math.round(Number(it.price_override)));
-      await insItem.run(
+      const info = await insItem.run(
         mappingId,
         it.sort_order ?? i,
         it.area_group_key || `area-${i + 1}`,
@@ -1265,6 +1270,16 @@ export async function saveCustomerMapping(input: {
         it.custom_product_image_path ?? "",
         override,
       );
+      // Media asset registry: gắn usages cho cả image_path lẫn custom_product_image_path
+      // (delete + re-insert, idempotent).
+      const itemId = Number(info.lastInsertRowid);
+      if (itemId > 0) {
+        await syncMappingItemUsage(db, {
+          id: itemId,
+          image_path: it.image_path ?? "",
+          custom_product_image_path: it.custom_product_image_path ?? "",
+        });
+      }
     }
 
     return mappingId;

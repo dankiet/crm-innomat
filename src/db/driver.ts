@@ -70,6 +70,7 @@ export interface AsyncDb {
   transaction<T>(fn: (db: AsyncDb) => Promise<T> | T): TransactionRunner<T>;
   close(): Promise<void>;
 }
+export type { AsyncStmt };
 
 const ID_TABLES = new Set([
   "products",
@@ -90,6 +91,9 @@ const ID_TABLES = new Set([
   "audit_logs",
   "lp_leads",
   "public_users",
+  "media_assets",
+  "mapping_media_usages",
+  "landing_page_media_usages",
 ]);
 const TABLES_WITHOUT_ID = new Set([
   "customer_mapping_quote_links",

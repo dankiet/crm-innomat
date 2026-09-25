@@ -577,6 +577,26 @@ export const deleteProductImageFn = createServerFn({ method: "POST" })
     return result;
   });
 
+/** Xoá MediaAsset (asset-centric) + mọi usage của nó — dùng trên /luu-tru. */
+export const deleteMediaAssetFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { assetId: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import("@/db/auth.server");
+    const me = await requireAdmin();
+    const { getDb } = await import("@/db/index.server");
+    const { deleteMediaAsset } = await import("@/db/media-assets.server");
+    const { writeAudit } = await import("@/db/audit.server");
+    const result = await deleteMediaAsset(getDb(), data.assetId);
+    await writeAudit({
+      user: me,
+      action: "media_asset.delete",
+      entity_type: "media_asset",
+      entity_id: data.assetId,
+      summary: `Xóa MediaAsset #${data.assetId} (${result.usages_removed} usages)`,
+    });
+    return result;
+  });
+
 // ─── Customers ──────────────────────────────────────────────
 
 export const fetchCustomers = createServerFn({ method: "GET" })

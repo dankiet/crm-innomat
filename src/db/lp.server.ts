@@ -13,6 +13,7 @@
 import { createHash } from "node:crypto";
 import { getDb, type SqlValue } from "./index.server";
 import { createCustomer } from "./crm.server";
+import { syncHeroUsage } from "./media-assets.server";
 import { normalizePhone, isPhoneMatchable } from "@/lib/phone";
 import { COLOR_PALETTES, matchColorPalette } from "@/lib/color-palette";
 import { SURFACE_FINISHES, FORMAT_FAMILIES } from "@/lib/material-taxonomy";
@@ -889,5 +890,8 @@ export async function getHeroImageSetting(): Promise<string> {
 }
 
 export async function setHeroImageSetting(imagePath: string): Promise<void> {
-  await setLpSetting("hero_image", imagePath.trim());
+  const trimmed = imagePath.trim();
+  await setLpSetting("hero_image", trimmed);
+  // Media asset registry: đồng bộ landing_page_media_usages (delete + re-insert).
+  await syncHeroUsage(getDb(), trimmed);
 }
