@@ -165,11 +165,12 @@ Từ 2026-09-25 Kho ảnh đi theo **Option 2 (1 file = 1 MediaAsset)** — `med
 registry (không phải GC):
 
 - Gỡ ảnh khỏi sản phẩm / đề xuất vật liệu / Hero trang chủ **không** đụng tới asset hay file.
-  Ảnh chỉ rơi vào trạng thái `draft` / `orphan`, xem được ở `/luu-tru` (segmented **usage**).
-- **Xoá asset** (`deleteMediaAssetFn`) bỏ liên kết usage (`mapping_media_usages`,
-  `landing_page_media_usages`, `product_images.media_asset_id = NULL`) rồi xoá `media_assets`
-  row — **không xoá file storage** (xoá file là việc riêng, chỉ đụng `deleteImageRef` cẩn thận
-  theo tham chiếu còn sót).
+  Ảnh chỉ rơi vào nhóm `unused` (Not in use), xem được ở `/luu-tru` (segmented **usage**).
+- **Xoá asset** (`deleteMediaAssetFn`) là **xoá vĩnh viễn**: gỡ liên kết usage (xoá row
+  `product_images`, clear cột `customer_mapping_items.image_path`/`custom_product_image_path`,
+  clear `lp_settings.hero_image`), đồng bộ lại `products.image_path`, xoá row `media_assets`,
+  **rồi xoá file trong Supabase Storage** (`deleteImageRef`) — chỉ khi không còn bảng nào khác
+  trỏ tới cùng storage key (an toàn cho file dùng chung nhiều sản phẩm).
 - Không cần scheduler: Vercel serverless không có process nền, và cũng không còn gì để chạy nền.
 
 ### Backfill MediaAsset

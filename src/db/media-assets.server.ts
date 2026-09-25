@@ -908,46 +908,81 @@ async function loadAssetRoomTags(
 }
 
 /**
- * Xoá MediaAsset theo asset_id — thao tác asset-centric trên /luu-tru.
- * Xoá mapping_media_usages + landing_page_media_usages + các row product_images
- * đang trỏ tới asset, rồi row media_assets. Trả số usage đã gỡ.
- * KHÔNG xoá file storage ở đây (xoá file là tác vụ riêng, chỉ khi cần thu hồi).
+ * Xoá MediaAsset theo asset_id — **XOÁ VĨNH VIỄN**, gồm cả file vật lý.
+ *
+ * Trong 1 transaction:
+ *  - Gỡ mọi liên kết: xoá row `product_images` (ảnh biến mất khỏi gallery sản phẩm),
+ *    clear cột `customer_mapping_items.image_path` / `custom_product_image_path`,
+ *    clear `lp_settings.hero_image`.
+ *  - Đồng bộ lại `products.image_path` cho sản phẩm bị ảnh hưởng (suy ra từ is_primary).
+ *  - Xoá row `media_assets`.
+ *
+ * Trả `path` để tầng API xoá file storage (`deleteImageRef`). Hàm này KHÔNG tự xoá
+ * file vì phải giữ alias-free cho `node --test`.
  */
 export async function deleteMediaAsset(
   db: AsyncDb,
   assetId: number,
-): Promise<{ deleted: boolean; usages_removed: number }> {
+): Promise<{ deleted: boolean; usages_removed: number; path: string }> {
   const row = (await db
     .prepare("SELECT id, storage_key, path FROM media_assets WHERE id = ?")
     .get<{ id: number; storage_key: string; path: string }>(assetId)) as
     | { id: number; storage_key: string; path: string }
     | undefined;
-  if (!row) return { deleted: false, usages_removed: 0 };
+  if (!row) return { deleted: false, usages_removed: 0, path: "" };
 
   let usagesRemoved = 0;
   await db.transaction(async (tx) => {
-    const m = await tx
-      .prepare("SELECT COUNT(*) AS n FROM mapping_media_usages WHERE media_asset_id = ?")
-      .get<{ n: number }>(assetId);
-    usagesRemoved += Number((m as { n: number } | undefined)?.n ?? 0);
+    // ── Đề xuất vật liệu: gỡ cột ref trên item rồi xoá usage row ──
+    const mapUsages =
+      (await tx
+        .prepare("SELECT mapping_item_id, col FROM mapping_media_usages WHERE media_asset_id = ?")
+        .all<{ mapping_item_id: number; col: string }>(assetId)) ?? [];
+    usagesRemoved += mapUsages.length;
+    for (const u of mapUsages) {
+      const col =
+        u.col === "custom_product_image_path" ? "custom_product_image_path" : "image_path";
+      await tx
+        .prepare(`UPDATE customer_mapping_items SET ${col} = '' WHERE id = ?`)
+        .run(u.mapping_item_id);
+    }
     await tx.prepare("DELETE FROM mapping_media_usages WHERE media_asset_id = ?").run(assetId);
 
-    const h = await tx
-      .prepare("SELECT COUNT(*) AS n FROM landing_page_media_usages WHERE media_asset_id = ?")
-      .get<{ n: number }>(assetId);
-    usagesRemoved += Number((h as { n: number } | undefined)?.n ?? 0);
+    // ── Hero LP: gỡ setting rồi xoá usage row ──
+    const heroUsages =
+      (await tx
+        .prepare("SELECT setting_key FROM landing_page_media_usages WHERE media_asset_id = ?")
+        .all<{ setting_key: string }>(assetId)) ?? [];
+    usagesRemoved += heroUsages.length;
+    for (const u of heroUsages) {
+      await tx.prepare("UPDATE lp_settings SET value = '' WHERE key = ?").run(u.setting_key);
+    }
     await tx.prepare("DELETE FROM landing_page_media_usages WHERE media_asset_id = ?").run(assetId);
 
+    // ── Sản phẩm: XOÁ row ảnh (file sắp bị xoá → giữ row sẽ thành ảnh hỏng) ──
+    const affected =
+      (await tx
+        .prepare("SELECT DISTINCT product_id FROM product_images WHERE media_asset_id = ?")
+        .all<{ product_id: number }>(assetId)) ?? [];
     const p = await tx
       .prepare("SELECT COUNT(*) AS n FROM product_images WHERE media_asset_id = ?")
       .get<{ n: number }>(assetId);
     usagesRemoved += Number((p as { n: number } | undefined)?.n ?? 0);
-    // Tháo liên kết product_images trước rồi xoá asset (FK SET NULL tương đương).
-    await tx
-      .prepare("UPDATE product_images SET media_asset_id = NULL WHERE media_asset_id = ?")
-      .run(assetId);
+    await tx.prepare("DELETE FROM product_images WHERE media_asset_id = ?").run(assetId);
+    // `products.image_path` suy ra từ ảnh is_primary → đồng bộ lại sau khi xoá.
+    for (const { product_id } of affected) {
+      await tx
+        .prepare(
+          `UPDATE products SET image_path = COALESCE((
+             SELECT pi.path FROM product_images pi WHERE pi.product_id = ?
+              ORDER BY pi.is_primary DESC, pi.sort_order ASC, pi.id ASC LIMIT 1
+           ), '') WHERE id = ?`,
+        )
+        .run(product_id, product_id);
+    }
+
     await tx.prepare("DELETE FROM media_assets WHERE id = ?").run(assetId);
   })();
 
-  return { deleted: true, usages_removed: usagesRemoved };
+  return { deleted: true, usages_removed: usagesRemoved, path: row.path };
 }

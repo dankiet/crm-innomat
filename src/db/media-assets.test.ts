@@ -303,12 +303,12 @@ test("db: batchesUsageSummaries không N+1 — 1 batch cho nhiều asset", async
   await db.close();
 });
 
-test("db: deleteMediaAsset trả usages_removed và SET NULL product_images", async () => {
+test("db: deleteMediaAsset xoá vĩnh viễn — row ảnh, hero ref, asset + trả path để xoá file", async () => {
   const db = await open();
   const path = `/images/${H}.webp`;
   const asset = await ensureMediaAsset(db, path);
-  const pid = await seedProduct(db, "A1", { is_public: 1 });
-  const imgId = await seedProductImage(db, pid, path, { kind: "map" });
+  const pid = await seedProduct(db, "A1", { is_public: 1, image_path: path });
+  const imgId = await seedProductImage(db, pid, path, { kind: "map", is_primary: 1 });
   await linkProductImageAsset(db, { id: imgId, path });
   await syncHeroUsage(db, path);
 
@@ -318,9 +318,18 @@ test("db: deleteMediaAsset trả usages_removed và SET NULL product_images", as
   const res = await deleteMediaAsset(db, asset.id);
   assert.equal(res.deleted, true);
   assert.equal(res.usages_removed, 2);
+  assert.equal(res.path, path); // tầng API cần path để xoá file storage
 
-  const img = await db.prepare("SELECT media_asset_id FROM product_images WHERE id = ?").get<{ media_asset_id: number | null }>(imgId);
-  assert.equal(img?.media_asset_id, null);
+  // Row product_images bị XOÁ (giữ lại sẽ thành ảnh 404 vì file sắp bị xoá).
+  const img = await db.prepare("SELECT id FROM product_images WHERE id = ?").get<{ id: number }>(imgId);
+  assert.equal(img, undefined);
+  // products.image_path được đồng bộ lại (không còn ảnh nào → rỗng).
+  const prod = await db.prepare("SELECT image_path FROM products WHERE id = ?").get<{ image_path: string }>(pid);
+  assert.equal(prod?.image_path, "");
+  // Hero setting bị gỡ.
+  const hero = await db.prepare("SELECT value FROM lp_settings WHERE key = 'hero_image'").get<{ value: string }>();
+  assert.equal(hero?.value ?? "", "");
+  // Asset row bị xoá.
   const gone = await db.prepare("SELECT id FROM media_assets WHERE id = ?").get(asset.id);
   assert.equal(gone, undefined);
   await db.close();
@@ -328,23 +337,71 @@ test("db: deleteMediaAsset trả usages_removed và SET NULL product_images", as
 
 test("db: deleteMediaAsset xoá asset không tồn tại → deleted=false", async () => {
   const db = await open();
-  assert.deepEqual(await deleteMediaAsset(db, 999), { deleted: false, usages_removed: 0 });
+  assert.deepEqual(await deleteMediaAsset(db, 999), {
+    deleted: false,
+    usages_removed: 0,
+    path: "",
+  });
   await db.close();
 });
 
-test("db: deleteMediaAsset — xoá asset vẫn còn product_images thường (không active)", async () => {
+test("db: deleteMediaAsset — sản phẩm còn ảnh khác thì image_path chuyển sang ảnh đó", async () => {
   const db = await open();
-  const path = `/images/${H}.webp`;
-  const asset = await ensureMediaAsset(db, path);
-  const pid = await seedProduct(db, "A1", { is_public: 0 });
-  const imgId = await seedProductImage(db, pid, path, { kind: "normal" });
-  await linkProductImageAsset(db, { id: imgId, path });
-  const res = await deleteMediaAsset(db, asset.id);
+  const doomed = `/images/${H}.webp`;
+  const keeper = `/images/${H.replace(/^a/, "b")}.webp`;
+  const pid = await seedProduct(db, "A1", { is_public: 1 });
+
+  // 2 ảnh: ảnh sắp xoá là primary, ảnh còn lại sẽ thay thế.
+  const keepId = await seedProductImage(db, pid, keeper, { kind: "normal", is_primary: 0 });
+  await linkProductImageAsset(db, { id: keepId, path: keeper });
+  const doomId = await seedProductImage(db, pid, doomed, { kind: "map", is_primary: 1 });
+  await linkProductImageAsset(db, { id: doomId, path: doomed });
+  await db.prepare("UPDATE products SET image_path = ? WHERE id = ?").run(doomed, pid);
+
+  const doomAsset = await ensureMediaAsset(db, doomed);
+  const res = await deleteMediaAsset(db, doomAsset.id);
+  assert.equal(res.deleted, true);
+
+  // Ảnh còn lại vẫn nguyên, và trở thành ảnh đại diện.
+  const remain = await db
+    .prepare("SELECT id FROM product_images WHERE product_id = ?")
+    .all<{ id: number }>(pid);
+  assert.equal(remain.length, 1);
+  assert.equal(remain[0]?.id, keepId);
+  const prod = await db
+    .prepare("SELECT image_path FROM products WHERE id = ?")
+    .get<{ image_path: string }>(pid);
+  assert.equal(prod?.image_path, keeper);
+  await db.close();
+});
+
+test("db: deleteMediaAsset — gỡ ref trong Đề xuất vật liệu (cả 2 cột)", async () => {
+  const db = await open();
+  const tile = `/images/${H}.webp`;
+  const custom = `/images/${H.replace(/^a/, "b")}.webp`;
+  const info = await db
+    .prepare(
+      "INSERT INTO customer_mapping_items (mapping_id, image_path, custom_product_image_path) VALUES (?, ?, ?)",
+    )
+    .run(1, tile, custom);
+  const itemId = Number(info.lastInsertRowid);
+  await syncMappingItemUsage(db, {
+    id: itemId,
+    image_path: tile,
+    custom_product_image_path: custom,
+  });
+
+  const tileAsset = await ensureMediaAsset(db, tile);
+  const res = await deleteMediaAsset(db, tileAsset.id);
   assert.equal(res.deleted, true);
   assert.equal(res.usages_removed, 1);
-  // row product_images còn (chỉ bỏ liên kết) — không xoá file/row
-  const img = await db.prepare("SELECT media_asset_id FROM product_images WHERE id = ?").get<{ media_asset_id: number | null }>(imgId);
-  assert.equal(img?.media_asset_id, null);
+
+  // Cột image_path rỗng, custom giữ nguyên (asset khác).
+  const row = await db
+    .prepare("SELECT image_path, custom_product_image_path FROM customer_mapping_items WHERE id = ?")
+    .get<{ image_path: string; custom_product_image_path: string }>(itemId);
+  assert.equal(row?.image_path, "");
+  assert.equal(row?.custom_product_image_path, custom);
   await db.close();
 });
 

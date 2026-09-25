@@ -577,7 +577,7 @@ export const deleteProductImageFn = createServerFn({ method: "POST" })
     return result;
   });
 
-/** Xoá MediaAsset (asset-centric) + mọi usage của nó — dùng trên /luu-tru. */
+/** Xoá MediaAsset (asset-centric) + mọi usage của nó + FILE vật lý — dùng trên /luu-tru. */
 export const deleteMediaAssetFn = createServerFn({ method: "POST" })
   .inputValidator((data: { assetId: number }) => data)
   .handler(async ({ data }) => {
@@ -586,15 +586,36 @@ export const deleteMediaAssetFn = createServerFn({ method: "POST" })
     const { getDb } = await import("@/db/index.server");
     const { deleteMediaAsset } = await import("@/db/media-assets.server");
     const { writeAudit } = await import("@/db/audit.server");
-    const result = await deleteMediaAsset(getDb(), data.assetId);
+    const { listImageReferencesForKeys } = await import("@/db/image-references.server");
+    const { deleteImageRef, isManagedImageRef } = await import("@/lib/storage.server");
+    const { storageKeyForRef } = await import("@/lib/image-asset-refs");
+
+    const db = getDb();
+    const result = await deleteMediaAsset(db, data.assetId);
+    if (!result.deleted) return { ...result, file_deleted: false };
+
+    // Xoá file vật lý — chỉ khi KHÔNG còn bảng nào khác trỏ tới cùng storage key
+    // (an toàn cho trường hợp dữ liệu cũ chưa backfill hết liên kết).
+    let fileDeleted = false;
+    const key = storageKeyForRef(result.path);
+    if (key && isManagedImageRef(result.path)) {
+      const refs = await listImageReferencesForKeys(db, [key]);
+      if ((refs.get(key) ?? []).length === 0) {
+        await deleteImageRef(result.path);
+        fileDeleted = true;
+      }
+    }
+
     await writeAudit({
       user: me,
       action: "media_asset.delete",
       entity_type: "media_asset",
       entity_id: data.assetId,
-      summary: `Xóa MediaAsset #${data.assetId} (${result.usages_removed} usages)`,
+      summary: `Xóa vĩnh viễn MediaAsset #${data.assetId} (${result.usages_removed} usages${
+        fileDeleted ? ", đã xoá file" : ", file giữ lại do còn tham chiếu"
+      })`,
     });
-    return result;
+    return { ...result, file_deleted: fileDeleted };
   });
 
 // ─── Customers ──────────────────────────────────────────────

@@ -179,9 +179,10 @@ Từ 2026-09-25, Kho ảnh theo **Option 2**: mỗi file vật lý (storage key)
   đại diện / Concept / ảnh thường), `unused` (không gắn sản phẩm nào — gồm cả ảnh chỉ nằm trong
   Đề xuất vật liệu hoặc Hero). Nhãn UI **In use** / **Not in use**, mặc định **In use**.
   Chi tiết: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
-- **Gỡ khỏi bản ghi không xoá asset, xoá asset không xoá file** — ba tầng tách biệt:
-  bản ghi business (giữ `path`), asset registry (giữ usage), storage file (GC). Xoá asset chỉ
-  bỏ liên kết usage + set `NULL` `product_images.media_asset_id`.
+- **Xoá asset là xoá vĩnh viễn** — gỡ khỏi mọi nơi đang dùng (xoá row `product_images`, clear
+  ref trong Đề xuất/Hero) và **xoá luôn file trong Supabase Storage**. Chỉ giữ file khi còn
+  bảng khác trỏ tới cùng storage key (file hash dùng chung nhiều sản phẩm).
+  Ngược lại, **gỡ ảnh khỏi bản ghi thì không đụng file** — ảnh chỉ rơi sang nhóm `unused`.
 - **Backfill** (`npm run db:media-backfill`) — script idempotent, đã chạy ở production
   2026-09-25 (3.561 asset, verify PASS 11/11). Chạy **sau** `db:migrate`.
 - Copy UI tuân thủ AGENTS.md: xoá = confirm 2 bước inline, không `window.confirm`.

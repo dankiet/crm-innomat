@@ -70,8 +70,9 @@ Quy tắc (đã tách theo từng phạm vi xoá):
   Vì tên file là hash, hai bản ghi dùng chung một tấm ảnh sẽ chia sẻ đúng một file — xoá thẳng khi
   còn tham chiếu là làm hỏng bản ghi còn lại. Endpoint trả `file_deleted` để UI phân biệt "đã xoá
   file" với "chỉ gỡ khỏi sản phẩm".
-- **Xoá asset trên `/luu-tru`** (`deleteMediaAssetFn`): bỏ liên kết usage + `media_assets` row,
-  **không xoá file** (xem §Kho ảnh asset-centric).
+- **Xoá asset trên `/luu-tru`** (`deleteMediaAssetFn`): **xoá vĩnh viễn** — gỡ mọi liên kết
+  (kể cả xoá row `product_images`) + xoá row `media_assets` + **xoá file storage**, với guard
+  không còn tham chiếu nào trỏ tới cùng storage key (xem §Kho ảnh asset-centric).
 
 `isManagedImageRef` giới hạn phạm vi: chỉ file do CRM quản lý (`/images/...` hoặc host
 `*.supabase.co`) mới bị xoá, URL ngoài không đụng tới.
@@ -155,14 +156,19 @@ Ngoài ra có **ưu tiên theo ngữ cảnh tab** (luôn xếp trước, rồi m
 - Tab **Lookbook**: ảnh đang làm **Hero trang chủ** lên đầu.
 - Tab **Tuyển chọn**: xếp theo `featured_rank` (như cũ).
 
-### Xoá theo asset
+### Xoá theo asset — xoá vĩnh viễn
 
-`deleteMediaAsset(db, assetId)` (`deleteMediaAssetFn` API):
+`deleteMediaAsset(db, assetId)` (`deleteMediaAssetFn` API). Trong 1 transaction:
 
-- Đếm + xoá `mapping_media_usages`, `landing_page_media_usages`.
-- Set `NULL` `product_images.media_asset_id` (không xoá dòng `product_images` — legacy giữ nguyên).
-- Xoá `media_assets` row; trả `{ deleted, usages_removed }` cho UI hiện "đang dùng ở N nơi".
-- **Không xoá file storage** — xoá file vẫn là việc riêng (GC); copy UI ghi rõ "xoá khỏi kho".
+- Gỡ mọi liên kết: **xoá row `product_images`** (ảnh biến mất khỏi gallery sản phẩm),
+  clear cột `customer_mapping_items.image_path` / `custom_product_image_path`,
+  clear `lp_settings.hero_image`.
+- Đồng bộ lại `products.image_path` (suy ra từ ảnh `is_primary` còn lại).
+- Xoá row `media_assets`; trả `{ deleted, usages_removed, path }`.
+
+Tầng API (`deleteMediaAssetFn`) sau đó **xoá file vật lý** bằng `deleteImageRef` — nhưng chỉ khi
+`listImageReferencesForKeys` xác nhận **không còn bảng nào** trỏ tới cùng storage key (file hash
+có thể dùng chung nhiều sản phẩm). Trả `file_deleted` để UI phân biệt.
 
 Khi asset còn usage, UI nhắc "Xem N nơi đang dùng trước khi xóa" mở `AssetUsageDialog`.
 Xoá luôn theo quy tắc 2 bước inline (AGENTS.md) — không `window.confirm`.

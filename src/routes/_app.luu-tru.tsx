@@ -1095,11 +1095,13 @@ function MediaStoragePage() {
     let successCount = 0;
     let failCount = 0;
     let usageCount = 0;
+    let fileCount = 0;
     try {
       await mapLimit(assetIds, 5, async (assetId) => {
         try {
           const res = await deleteMediaAssetFn({ data: { assetId } });
           if (res.deleted) usageCount += res.usages_removed;
+          if (res.file_deleted) fileCount++;
           successCount++;
         } catch {
           failCount++;
@@ -1107,9 +1109,7 @@ function MediaStoragePage() {
       });
       if (successCount > 0) {
         toast.success(
-          usageCount > 0
-            ? `Đã xoá ${successCount} MediaAsset khỏi kho lưu trữ · gỡ ${usageCount} usage`
-            : `Đã xoá ${successCount} MediaAsset khỏi kho lưu trữ`,
+          `Đã xoá vĩnh viễn ${successCount} MediaAsset${fileCount > 0 ? ` · ${fileCount} file trong Storage` : ""}${usageCount > 0 ? ` · gỡ ${usageCount} usage` : ""}`,
         );
       }
       if (failCount > 0) {
@@ -1205,9 +1205,9 @@ function MediaStoragePage() {
     try {
       const res = await deleteMediaAssetFn({ data: { assetId } });
       toast.success(
-        res.usages_removed > 0
-          ? `Đã xoá MediaAsset khỏi kho · gỡ ${res.usages_removed} usage`
-          : "Đã xoá MediaAsset khỏi kho lưu trữ",
+        res.file_deleted
+          ? `Đã xoá vĩnh viễn MediaAsset (gồm file trong Storage)${res.usages_removed > 0 ? ` · gỡ ${res.usages_removed} usage` : ""}`
+          : `Đã gỡ MediaAsset khỏi kho · gỡ ${res.usages_removed} usage (file giữ lại vì còn nơi khác dùng)`,
       );
       setConfirmDeleteId(null);
 
@@ -1772,7 +1772,8 @@ function MediaStoragePage() {
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 Những file này không thuộc sản phẩm nào trong catalog. Một số có thể vẫn đang được
                 dùng ở Đề xuất vật liệu hoặc làm Hero trang chủ — bấm khối usage trên ảnh để xem.
-                Xoá ở đây chỉ gỡ khỏi kho media; file gốc vẫn nằm trong Supabase Storage.
+                Xoá ở đây là <b>xoá vĩnh viễn</b>: gỡ khỏi mọi nơi đang dùng và xoá luôn file
+                trong Supabase Storage.
               </p>
             </div>
           </div>
@@ -2544,7 +2545,7 @@ function MediaStoragePage() {
               Bạn có chắc chắn muốn xóa <b>{selectedIds.size} ảnh đã chọn</b>?
             </p>
             <p className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 p-2.5 rounded-lg">
-              Lưu ý: Ảnh sẽ bị gỡ khỏi kho media và khỏi mọi nơi đang dùng (sản phẩm, đề xuất vật liệu, Hero trang chủ). File gốc vẫn nằm trong Supabase Storage — xoá ở đây không giải phóng dung lượng lưu trữ.
+              Lưu ý: <b>Xoá vĩnh viễn</b> — ảnh bị gỡ khỏi mọi nơi đang dùng (sản phẩm, đề xuất vật liệu, Hero trang chủ) <b>và file bị xoá khỏi Supabase Storage</b>. Không thể hoàn tác.
             </p>
           </div>
           <div className="mt-6 flex items-center justify-end gap-2.5">
