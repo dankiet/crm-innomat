@@ -215,11 +215,13 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 - **Phạm vi (primary tabs)**: `All` · `MAP` · `Lookbook` · `Uncategorized` (nhãn tiếng Anh trên
   UI; `featured` = Tuyển chọn #1—#12 vẫn nhận qua deep-link nhưng không còn là tab). Tab dùng
   segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented trạng thái.
-- **Sử dụng (secondary, URL `usage`)**: **2 trạng thái `used` / `unused`** (nhãn UI **Use** /
-  **Unuse**; mặc định `all` = mọi ảnh). `used` = đã gán vào bất kỳ nơi nào (sản phẩm, Lookbook,
-  Tuyển chọn, Đề xuất, Hero); `unused` = chưa gán vào đâu. Asset-level qua `listMediaAssets`
-  (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric). Có banner ngữ
-  cảnh khi lọc "Unuse"; khối usage trên card click để mở AssetUsageDialog.
+- **Sử dụng (secondary, URL `usage`)**: **2 trạng thái, mặc định `used`** (nhãn UI **In use** /
+  **Not in use**). `used` = đã gán vào ≥1 **sản phẩm** (MAP / đại diện / Concept / ảnh thường);
+  `unused` = không gắn sản phẩm nào — **gồm cả ảnh chỉ nằm trong Đề xuất vật liệu hoặc Hero**
+  (Hero bản chất là ảnh Concept; Đề xuất là tham chiếu ngoài catalog). Asset-level qua
+  `listMediaAssets` (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric).
+  Có banner ngữ cảnh khi lọc "Not in use"; khối usage trên card vẫn đếm đủ mọi nhóm và click để
+  mở AssetUsageDialog.
 - **Sắp xếp**: `Mới nhất` · `Cũ nhất` · `Tên SP (A-Z/Z-A)` · `Mã SP (A-Z/Z-A)` ·
   `Ưu tiên (#1—#12)`. Tab MAP tự đẩy ảnh Tuyển chọn #1–#12 lên đầu; tab Lookbook đẩy ảnh
   đang làm Hero lên đầu.

@@ -60,7 +60,10 @@ export type FlatMediaSort =
   | "name_asc"
   | "name_desc"
   | "priority";
-export type FlatMediaUsage = "all" | "used" | "unused";
+/** Trạng thái gán: `used` (đã gán vào ≥1 nơi) / `unused` (không nơi nào).
+ * Không có "all" — hai giá trị này loại trừ nhau và phủ hết mọi asset;
+ * `undefined` (không truyền) = không lọc. */
+export type FlatMediaUsage = "used" | "unused";
 
 export type FlatMediaItem = {
   /** asset id (media_assets.id) — key card + delete asset */
@@ -531,7 +534,8 @@ export async function listMediaAssets(
   const page = Math.max(opts.page ?? 1, 1);
   const pageSize = Math.min(Math.max(opts.pageSize ?? 48, 12), 120);
   const offset = (page - 1) * pageSize;
-  const usage = opts.usage ?? "all";
+  // Không truyền = không lọc trạng thái (caller quyết định default "used").
+  const usage = opts.usage ?? null;
 
   // WHERE tổng hợp trên media_assets (asset-level): asset có ≥1 usage thỏa filter.
   const where: string[] = [];
@@ -609,16 +613,12 @@ export async function listMediaAssets(
     addAssetProductWhere("p.featured_rank IS NULL", []);
   }
 
-  // ── Status filter (used/unused) — asset-level ──
-  // used  = có ≥1 usage ở bất kỳ nguồn nào (product_images / mapping / hero).
-  // unused = không nơi nào trỏ tới.
-  if (usage !== "all") {
-    const hasAnyUsageSql = `(
-      EXISTS (SELECT 1 FROM product_images pi WHERE pi.media_asset_id = ma.id)
-      OR EXISTS (SELECT 1 FROM mapping_media_usages mu WHERE mu.media_asset_id = ma.id)
-      OR EXISTS (SELECT 1 FROM landing_page_media_usages lu WHERE lu.media_asset_id = ma.id)
-    )`;
-    where.push(usage === "used" ? hasAnyUsageSql : `NOT ${hasAnyUsageSql}`);
+  // ── Status filter (used/unused) — theo ẢNH SẢN PHẨM ──
+  // used   = asset được gán vào ≥1 sản phẩm (product_images).
+  // unused = không gắn sản phẩm nào — dù có thể đang được Đề xuất/Hero trỏ tới.
+  if (usage !== null) {
+    const hasProductUsageSql = `EXISTS (SELECT 1 FROM product_images pi WHERE pi.media_asset_id = ma.id)`;
+    where.push(usage === "used" ? hasProductUsageSql : `NOT ${hasProductUsageSql}`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";

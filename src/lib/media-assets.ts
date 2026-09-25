@@ -70,13 +70,14 @@ export function summarizeUsages(
 }
 
 /**
- * 2 trạng thái — `used` khi asset được gán vào BẤT KỲ đâu (product gallery,
- * mapping, hero…), `unused` khi không nơi nào trỏ tới. Ảnh gắn sản phẩm nhưng
- * chưa public vẫn tính `used` (đã gán, chỉ chưa hiển thị).
+ * 2 trạng thái theo **ảnh sản phẩm**:
+ *  - `used`   = asset được gán vào ≥1 sản phẩm (MAP / đại diện / Concept / ảnh thường).
+ *  - `unused` = không gắn vào sản phẩm nào — kể cả khi file có được Đề xuất vật liệu
+ *               hoặc Hero trỏ tới. Hero bản chất là ảnh Concept nên đã nằm trong nhóm
+ *               ảnh sản phẩm khi được gán; Đề xuất là tham chiếu ngoài catalog.
  */
 export function classifyAssetStatus(s: MediaUsageSummary): MediaAssetStatus {
-  const hasAnyUsage = s.product > 0 || s.mapping > 0 || s.hero > 0;
-  return hasAnyUsage ? "used" : "unused";
+  return s.product > 0 ? "used" : "unused";
 }
 
 /** Bất biến bắt buộc: ảnh đang public trên Lookbook KHÔNG BAO GIỜ unused. */

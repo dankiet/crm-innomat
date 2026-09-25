@@ -175,9 +175,10 @@ Từ 2026-09-25, Kho ảnh theo **Option 2**: mỗi file vật lý (storage key)
 
 - **Một file duy nhất dù xuất hiện ở nhiều nơi** — cùng `storage_key` luôn về cùng asset
   (`ensureMediaAsset` idempotent theo key).
-- **2 trạng thái**: `used` (đã gán vào bất kỳ nơi nào — sản phẩm MAP/gallery/đại diện/Concept,
-  mapping, hoặc hero; gồm cả ảnh gắn sản phẩm **chưa public**), `unused` (không nơi nào trỏ tới).
-  Nhãn UI **Use** / **Unuse**. Chi tiết: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
+- **2 trạng thái** (phân loại theo **ảnh sản phẩm**): `used` (đã gán vào ≥1 sản phẩm — MAP /
+  đại diện / Concept / ảnh thường), `unused` (không gắn sản phẩm nào — gồm cả ảnh chỉ nằm trong
+  Đề xuất vật liệu hoặc Hero). Nhãn UI **In use** / **Not in use**, mặc định **In use**.
+  Chi tiết: [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md).
 - **Gỡ khỏi bản ghi không xoá asset, xoá asset không xoá file** — ba tầng tách biệt:
   bản ghi business (giữ `path`), asset registry (giữ usage), storage file (GC). Xoá asset chỉ
   bỏ liên kết usage + set `NULL` `product_images.media_asset_id`.

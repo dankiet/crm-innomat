@@ -60,12 +60,14 @@ test("pure: classify — used khi có MAP", () => {
   assert.equal(classifyAssetStatus(summarizeUsages([product({ kind: "map" })])), "used");
 });
 
-test("pure: classify — used khi có mapping usage", () => {
-  assert.equal(classifyAssetStatus(summarizeUsages([], 1, 0)), "used");
+test("pure: classify — CHỈ mapping (không có ảnh sản phẩm) → unused", () => {
+  // Đề xuất vật liệu là tham chiếu ngoài catalog → không tính "in use".
+  assert.equal(classifyAssetStatus(summarizeUsages([], 1, 0)), "unused");
 });
 
-test("pure: classify — used khi có hero usage", () => {
-  assert.equal(classifyAssetStatus(summarizeUsages([], 0, 1)), "used");
+test("pure: classify — CHỈ hero (không có ảnh sản phẩm) → unused", () => {
+  // Hero bản chất là ảnh Concept; khi chưa gắn sản phẩm thì không tính "in use".
+  assert.equal(classifyAssetStatus(summarizeUsages([], 0, 1)), "unused");
 });
 
 test("pure: lookbook public không bao giờ unused (invariant)", () => {
@@ -471,6 +473,31 @@ test("db: listMediaAssets — status filter used/unused", async () => {
   assert.equal(unused.total, 1);
   assert.equal(unused.items[0]?.status, "unused");
   assert.equal(unused.items[0]?.storage_key, `${H.replace(/^a/, "c")}.webp`);
+  await db.close();
+});
+
+test("db: listMediaAssets — asset CHỈ có mapping usage (không ảnh sản phẩm) nằm ở unused", async () => {
+  const db = await open();
+  const mapPath = `/images/${H}.webp`;
+
+  // Chỉ có Đề xuất vật liệu trỏ tới, KHÔNG có product_images.
+  const info = await db
+    .prepare("INSERT INTO customer_mapping_items (mapping_id, image_path, custom_product_image_path) VALUES (?, ?, ?)")
+    .run(1, mapPath, "");
+  await syncMappingItemUsage(db, {
+    id: Number(info.lastInsertRowid),
+    image_path: mapPath,
+    custom_product_image_path: "",
+  });
+
+  const used = await listMediaAssets(db, { usage: "used" });
+  assert.equal(used.total, 0);
+
+  const unused = await listMediaAssets(db, { usage: "unused" });
+  assert.equal(unused.total, 1);
+  assert.equal(unused.items[0]?.status, "unused");
+  // Nhưng vẫn ghi nhận usage Đề xuất để UI hiện đúng "nơi đang dùng".
+  assert.equal(unused.items[0]?.usage_groups.mapping, 1);
   await db.close();
 });
 

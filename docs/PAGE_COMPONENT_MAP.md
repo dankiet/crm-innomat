@@ -291,8 +291,8 @@ thêm trong cleanup này dùng đúng khuôn đó.
       └── Reference: fetchMediaUsageFn (ảnh đang được dùng ở đâu)
 ```
 
-`?usage=all|used|unused` — trạng thái gán asset-level (mặc định all).
-Card **asset-first**: tên sản phẩm (đậm) + badge `USE`/`UNUSE` + dòng phụ mã SP · `WxH` ·
+`?usage=used|unused` — phân loại theo **ảnh sản phẩm**, mặc định `used`.
+Card **asset-first**: tên sản phẩm (đậm) + badge `IN USE`/`NOT IN USE` + dòng phụ mã SP · `WxH` ·
 dung lượng + khối usage (`2 Sản phẩm · 1 Lookbook`) click mở `AssetUsageDialog`.
 Sort: `Mới nhất`/`Cũ nhất`/`Tên SP (A-Z,Z-A)`/`Mã SP (A-Z,Z-A)`/`Ưu tiên`; tab MAP đẩy ảnh
 Tuyển chọn lên đầu, tab Lookbook đẩy ảnh Hero lên đầu.

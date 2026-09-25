@@ -104,7 +104,7 @@ const FLAT_MEDIA_SORTS: readonly string[] = [
   "name_desc",
   "priority",
 ];
-const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "used", "unused"];
+const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["used", "unused"];
 const PUBLIC_FILTERS: readonly string[] = ["all", "public", "hidden"];
 
 function parseMediaTab(v: unknown): FlatMediaTab | undefined {
@@ -622,7 +622,8 @@ function MediaStoragePage() {
   const sort = searchParams.sort ?? "newest";
   const page = searchParams.page ?? 1;
   const pageSize = searchParams.pageSize ?? 24;
-  const usage = searchParams.usage ?? "all";
+  // Mặc định "used" (In use) — bỏ lựa chọn "Tất cả" vì In use ∪ Not in use phủ hết ảnh.
+  const usage = searchParams.usage ?? "used";
 
   /** Đổi filter: ghi URL và luôn reset về trang 1 (đúng hành vi cũ). */
   function patchFilters(patch: Partial<MediaStorageSearch>) {
@@ -643,7 +644,6 @@ function MediaStoragePage() {
     selectedShapes.length > 0 ||
     selectedTextures.length > 0 ||
     selectedCollections.length > 0 ||
-    usage !== "all" ||
     (tab !== "all" && tab !== "featured") ||
     (searchParams.selected != null)
   );
@@ -1563,19 +1563,18 @@ function MediaStoragePage() {
               </div>
             ) : null}
 
-            {/* Status — segmented: Tất cả | Use | Unuse */}
+            {/* Status — segmented: In use / Not in use (mặc định In use) */}
             <div
               className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
-              title="Lọc theo mức gán của MediaAsset: Use = đã gán vào ít nhất một nơi (sản phẩm, Lookbook, Tuyển chọn, Đề xuất, Hero); Unuse = chưa gán vào đâu cả"
+              title="Lọc theo ảnh sản phẩm: In use = đã gán vào sản phẩm (MAP / đại diện / Concept / ảnh thường); Not in use = chưa gán vào sản phẩm nào (gồm ảnh chỉ nằm trong Đề xuất vật liệu hoặc Hero)"
             >
               {(
                 [
-                  { key: undefined, label: "Tất cả" },
-                  { key: "used", label: "Use" },
-                  { key: "unused", label: "Unuse" },
+                  { key: "used", label: "In use" },
+                  { key: "unused", label: "Not in use" },
                 ] as const
               ).map(({ key, label }) => {
-                const active = usage === (key ?? "all") || ((usage === undefined || usage === "all") && key === undefined);
+                const active = usage === key;
                 return (
                   <button
                     key={label}
@@ -1763,26 +1762,26 @@ function MediaStoragePage() {
         ) : null}
       </div>
 
-      {/* Banner ngữ cảnh khi lọc Unuse */}
+      {/* Banner ngữ cảnh khi lọc Not in use */}
       {usage === "unused" ? (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in-0 duration-150">
           <div className="flex items-start gap-2.5">
             <Info className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div>
-              <p className="font-semibold text-foreground">Ảnh chưa gán vào đâu (Unuse)</p>
+              <p className="font-semibold text-foreground">Ảnh chưa gán vào sản phẩm nào</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Không nơi nào (sản phẩm, đề xuất vật liệu, Hero trang chủ) trỏ tới những file
-                này — chúng chỉ còn tồn tại trong kho media. File vẫn nằm nguyên trong kho lưu trữ;
-                xoá ở đây là xoá thật, không thể hoàn tác. Bấm khối usage trên ảnh để xem chi tiết.
+                Những file này không thuộc sản phẩm nào trong catalog. Một số có thể vẫn đang được
+                dùng ở Đề xuất vật liệu hoặc làm Hero trang chủ — bấm khối usage trên ảnh để xem.
+                File vẫn nằm nguyên trong kho lưu trữ; xoá ở đây là xoá thật, không thể hoàn tác.
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={() => patchFilters({ usage: undefined })}
+            onClick={() => patchFilters({ usage: "used" })}
             className="shrink-0 rounded-lg border border-amber-500/30 bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
           >
-            Xem tất cả ảnh
+            Xem ảnh trong sản phẩm
           </button>
         </div>
       ) : null}
@@ -1816,7 +1815,7 @@ function MediaStoragePage() {
           <p className="mt-3 text-sm font-semibold text-foreground">Không tìm thấy ảnh nào phù hợp</p>
           <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
             {usage === "unused"
-              ? "Không có ảnh nào ở trạng thái Unuse — mọi file đều đang được ít nhất một nơi dùng. Gỡ ảnh khỏi sản phẩm/đề xuất vật liệu/Hero để file xuất hiện ở đây."
+              ? "Không có ảnh nào ngoài sản phẩm — mọi file đều đã gán vào ít nhất một sản phẩm."
               : hasActiveFilters
                 ? "Hãy thử bỏ bớt bộ lọc màu, nhóm sản phẩm, hoặc từ khóa tìm kiếm để xem thêm kết quả."
                 : "Chưa có ảnh nào trong mục này."}
@@ -1985,7 +1984,7 @@ function MediaStoragePage() {
                             : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
                         )}
                       >
-                        {img.status === "unused" ? "UNUSE" : "USE"}
+                        {img.status === "unused" ? "NOT IN USE" : "IN USE"}
                       </span>
                     </div>
 

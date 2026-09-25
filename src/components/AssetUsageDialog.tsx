@@ -24,9 +24,8 @@ const ROLE_LABEL: Record<ImageReference["role"], string> = {
 };
 
 const STATUS_LABEL: Record<FlatMediaUsage, string> = {
-  all: "Tất cả",
-  used: "Use",
-  unused: "Unuse",
+  used: "In use",
+  unused: "Not in use",
 };
 
 const GROUP_LABEL: Record<keyof FlatMediaItem["usage_groups"], string> = {

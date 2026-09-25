@@ -111,17 +111,24 @@ signature cũ. Kết quả `FlatMediaItem`:
 - `usage_count` (tổng 5 nhóm), `usage_groups` (product/lookbook/featured/hero/mapping),
   `status` (`used`/`unused`).
 
-**Status 2 trạng thái** (gộp `draft` vào `used` từ 2026-09-25):
+**Status 2 trạng thái** — phân loại theo **ảnh sản phẩm** (đổi 2026-09-25):
 
-| Status   | Điều kiện                                                                    |
-| -------- | ---------------------------------------------------------------------------- |
-| `used`   | Có ≥1 usage ở **bất kỳ nguồn nào**: ảnh sản phẩm (MAP / gallery / đại diện / Concept), mapping, hoặc hero. Gồm cả ảnh gắn sản phẩm **chưa public** |
-| `unused` | Không nơi nào trỏ tới (không `product_images`, không `mapping_media_usages`, không `landing_page_media_usages`) |
+| Status       | Điều kiện                                                                     |
+| ------------ | ----------------------------------------------------------------------------- |
+| `used`       | Asset được gán vào **≥1 sản phẩm** — MAP / ảnh đại diện / Concept / ảnh thường (kể cả sản phẩm **chưa public**) |
+| `unused`     | **Không gắn vào sản phẩm nào** — kể cả khi file đang được **Đề xuất vật liệu** hoặc **Hero** trỏ tới |
 
-> Trước đây có 3 trạng thái (`used`/`draft`/`orphan`). `draft` (gắn nhưng chưa public)
-> gộp vào `used` vì ảnh đã gắn vào sản phẩm vẫn là "đã gán" — chỉ chưa hiển thị.
+> Vì sao `unused` gồm cả ảnh Đề xuất/Hero: **Hero bản chất là ảnh Concept** — khi được gán làm
+> Hero nó đã nằm trong nhóm ảnh sản phẩm; còn **Đề xuất vật liệu là tham chiếu ngoài catalog**
+> (hàng ngoài danh mục), không phải ảnh thuộc sản phẩm.
+>
+> Trước đó từng có 3 trạng thái (`used`/`draft`/`orphan`) rồi gộp thành "mọi nơi gán" — cả hai
+> đều bỏ để theo định nghĩa hẹp này.
 
-Filter `usage=all|used|unused` → 3 nút segmented trên UI (nhãn **Tất cả / Use / Unuse**).
+Lưu ý: `usage_groups` trên card **vẫn đếm đủ** (kể cả mapping/hero) — một asset `unused` vẫn
+hiện "1 Đề xuất" để bạn biết file đang được dùng ở đâu trước khi xoá.
+
+Filter `usage=used|unused` → 2 nút segmented, **mặc định `used`** (nhãn **In use** / **Not in use**).
 
 ### Bố cục card (asset-first)
 
@@ -129,7 +136,7 @@ Mỗi card hiển thị **asset là chủ thể**, sản phẩm chỉ là usage 
 
 1. Thumbnail + badge MAP/Concept.
 2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm" khi asset không có
-   product usage. Bên phải là badge `USE`/`UNUSE`.
+   product usage. Bên phải là badge `IN USE`/`NOT IN USE`.
 3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng (phần nào thiếu thì ẩn).
 4. Khối usage (click mở `AssetUsageDialog`): `2 Sản phẩm` · `1 Lookbook` · … hoặc "Không nơi nào dùng".
 5. Tag phòng Lookbook + toolbar thao tác.
