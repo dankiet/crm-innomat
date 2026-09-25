@@ -75,6 +75,7 @@ import { MultiSelectFilter } from "@/components/product-filter/MultiSelectFilter
 import { PaginationBar } from "@/components/PaginationBar";
 import { parseCsv } from "@/lib/product-facets";
 import { parsePositiveInt } from "@/lib/parse";
+import { formatFileSize } from "@/lib/format";
 type MediaStorageSearch = {
   tab?: FlatMediaTab;
   category?: string;
@@ -1930,6 +1931,12 @@ function MediaStoragePage() {
                         <p className="mt-0.5 text-[9px] text-muted-foreground/70">
                           Asset #{img.asset_id} · {img.created_at.slice(0, 10)}
                         </p>
+                        {img.width && img.height ? (
+                          <p className="mt-0.5 text-[9px] text-muted-foreground/70">
+                            {img.width}×{img.height}
+                            {formatFileSize(img.file_size) ? ` · ${formatFileSize(img.file_size)}` : ""}
+                          </p>
+                        ) : null}
                       </div>
                       <span
                         className={cn(

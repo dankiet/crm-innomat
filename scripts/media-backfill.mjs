@@ -47,28 +47,31 @@ const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized:
 try {
   await client.connect();
 
-  // ── 1. Distinct các storage-key từ 5 nguồn reference ──────────────
+  // ── 1. Distinct storage-key + một path đại diện từ 5 nguồn reference ──────
+  // Mỗi key lấy MIN(path) làm path hiển thị (path thật để card render <img src>).
   const keysSql = `
-    SELECT key FROM (
-        SELECT substring(i.path from '([^/]+)$') AS key FROM product_images i WHERE i.path IS NOT NULL AND i.path <> ''
-      UNION SELECT substring(p.image_path from '([^/]+)$') FROM products p WHERE p.image_path IS NOT NULL AND p.image_path <> ''
-      UNION SELECT substring(m.image_path from '([^/]+)$') FROM customer_mapping_items m WHERE m.image_path IS NOT NULL AND m.image_path <> ''
-      UNION SELECT substring(m.custom_product_image_path from '([^/]+)$') FROM customer_mapping_items m WHERE m.custom_product_image_path IS NOT NULL AND m.custom_product_image_path <> ''
-      UNION SELECT substring(s.value from '([^/]+)$') FROM lp_settings s WHERE s.key = 'hero_image' AND s.value IS NOT NULL AND s.value <> ''
+    SELECT key, MIN(path) AS path FROM (
+        SELECT substring(i.path from '([^/]+)$') AS key, i.path AS path FROM product_images i WHERE i.path IS NOT NULL AND i.path <> ''
+      UNION ALL SELECT substring(p.image_path from '([^/]+)$'), p.image_path FROM products p WHERE p.image_path IS NOT NULL AND p.image_path <> ''
+      UNION ALL SELECT substring(m.image_path from '([^/]+)$'), m.image_path FROM customer_mapping_items m WHERE m.image_path IS NOT NULL AND m.image_path <> ''
+      UNION ALL SELECT substring(m.custom_product_image_path from '([^/]+)$'), m.custom_product_image_path FROM customer_mapping_items m WHERE m.custom_product_image_path IS NOT NULL AND m.custom_product_image_path <> ''
+      UNION ALL SELECT substring(s.value from '([^/]+)$'), s.value FROM lp_settings s WHERE s.key = 'hero_image' AND s.value IS NOT NULL AND s.value <> ''
     ) t WHERE key IS NOT NULL AND key <> ''
+    GROUP BY key
   `;
   const { rows: keyRows } = await client.query(keysSql);
   const keys = keyRows.map((r) => r.key);
   console.log(`[media-backfill] distinct storage keys từ 5 nguồn: ${keys.length}`);
 
-  // ── 2. media_assets: create-or-ignore ─────────────────────────────
+  // ── 2. media_assets: create-or-ignore; điền path khi còn rỗng ─────
   await client.query("BEGIN");
-  for (const key of keys) {
+  for (const row of keyRows) {
     await client.query(
       `INSERT INTO media_assets (storage_key, path, created_at, updated_at)
-       VALUES ($1, '', now(), now())
-       ON CONFLICT (storage_key) DO NOTHING`,
-      [key],
+       VALUES ($1, $2, now(), now())
+       ON CONFLICT (storage_key) DO UPDATE
+         SET path = CASE WHEN media_assets.path = '' THEN EXCLUDED.path ELSE media_assets.path END`,
+      [row.key, row.path ?? ""],
     );
   }
   await client.query("COMMIT");

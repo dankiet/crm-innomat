@@ -50,7 +50,7 @@ kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [n
 
 | Bảng                        | Vai trò                                                        | Ràng buộc đáng chú ý                                                         |
 | --------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `media_assets`              | 1 file ảnh (storage key) = 1 dòng                              | `storage_key UNIQUE` (tail `<sha256>.<ext>`); index `path`                    |
+| `media_assets`              | 1 file ảnh (storage key) = 1 dòng                              | `storage_key UNIQUE` (tail `<sha256>.<ext>`); index `path`; `path` = ref thật (URL/`/images/...`) để render; `width`/`height`/`mime_type`/`file_size` NULL khi chưa đo |
 | `mapping_media_usages`      | Đề xuất vật liệu đang dùng asset ở cột nào                     | `media_asset_id → media_assets ON DELETE CASCADE`; `mapping_item_id ON DELETE CASCADE`; `UNIQUE(mapping_item_id, col)`; `col CHECK IN ('image_path','custom_product_image_path')` |
 | `landing_page_media_usages` | Landing/Hero đang dùng asset                                   | `media_asset_id → media_assets ON DELETE CASCADE`; `setting_key UNIQUE`       |
 

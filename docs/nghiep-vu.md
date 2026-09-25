@@ -181,6 +181,6 @@ Từ 2026-09-25, Kho ảnh theo **Option 2**: mỗi file vật lý (storage key)
 - **Gỡ khỏi bản ghi không xoá asset, xoá asset không xoá file** — ba tầng tách biệt:
   bản ghi business (giữ `path`), asset registry (giữ usage), storage file (GC). Xoá asset chỉ
   bỏ liên kết usage + set `NULL` `product_images.media_asset_id`.
-- **Backfill cần duyệt trước khi chạy ở production** (`npm run db:media-backfill`) — script
-  idempotent, đã test trên fake SQLite.
+- **Backfill** (`npm run db:media-backfill`) — script idempotent, đã chạy ở production
+  2026-09-25 (3.561 asset, verify PASS 11/11). Chạy **sau** `db:migrate`.
 - Copy UI tuân thủ AGENTS.md: xoá = confirm 2 bước inline, không `window.confirm`.

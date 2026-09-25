@@ -61,6 +61,11 @@ export type FlatMediaItem = {
   storage_key: string;
   path: string;
   created_at: string;
+  /** metadata file vật lý (NULL nếu chưa đo — vd asset backfill từ legacy) */
+  width: number | null;
+  height: number | null;
+  mime_type: string;
+  file_size: number | null;
   /** representative product usage id (product_images.id) — cho action cũ; 0 nếu không có */
   id: number;
   /** representative product usage — 0 khi asset không có product usage */
@@ -104,12 +109,34 @@ export async function ensureMediaAsset(
     .prepare("SELECT * FROM media_assets WHERE storage_key = ?")
     .get<MediaAssetRow>(key);
   if (existing) {
-    // Cập nhật path display nếu khác (không đổi storage_key — 1 file 1 asset).
-    if (existing.path !== path) {
+    // Asset đã có: bù meta còn thiếu (backfill đời đầu để NULL) + path hiển thị.
+    // Chỉ ghi khi có giá trị mới → idempotent, không ghi đè dữ liệu đã đo.
+    const nextPath = existing.path !== path ? path : existing.path;
+    const nextWidth = existing.width ?? meta?.width ?? null;
+    const nextHeight = existing.height ?? meta?.height ?? null;
+    const nextMime = existing.mime_type || meta?.mime_type || "";
+    const nextSize = existing.file_size ?? meta?.file_size ?? null;
+    const changed =
+      nextPath !== existing.path ||
+      nextWidth !== existing.width ||
+      nextHeight !== existing.height ||
+      nextMime !== existing.mime_type ||
+      nextSize !== existing.file_size;
+    if (changed) {
       await db
-        .prepare("UPDATE media_assets SET path = ?, updated_at = ? WHERE id = ?")
-        .run(path, nowUtc(), existing.id);
-      return { ...existing, path };
+        .prepare(
+          `UPDATE media_assets SET path = ?, width = ?, height = ?, mime_type = ?, file_size = ?, updated_at = ?
+            WHERE id = ?`,
+        )
+        .run(nextPath, nextWidth, nextHeight, nextMime, nextSize, nowUtc(), existing.id);
+      return {
+        ...existing,
+        path: nextPath,
+        width: nextWidth,
+        height: nextHeight,
+        mime_type: nextMime,
+        file_size: nextSize,
+      };
     }
     return existing;
   }
@@ -357,6 +384,12 @@ export async function applyMediaBackfill(db: AsyncDb, sources: BackfillSource[])
   heroUsages: number;
 }> {
   const plan = planBackfill(sources);
+  // key → một path đại diện (để card render <img src>; backfill cũ để rỗng → lưới trắng).
+  const keyToPath = new Map<string, string>();
+  for (const s of sources) {
+    const key = storageKeyOf(s.path);
+    if (key && !keyToPath.has(key)) keyToPath.set(key, s.path);
+  }
   let assetKeys = 0;
   for (const key of plan.assetKeys) {
     const res = await db
@@ -364,8 +397,15 @@ export async function applyMediaBackfill(db: AsyncDb, sources: BackfillSource[])
         `INSERT OR IGNORE INTO media_assets (storage_key, path, created_at, updated_at)
          VALUES (?, ?, ?, ?)`,
       )
-      .run(key, "", nowUtc(), nowUtc());
+      .run(key, keyToPath.get(key) ?? "", nowUtc(), nowUtc());
     if (Number(res.changes) > 0) assetKeys++;
+    // Asset đã tồn tại mà path còn rỗng (backfill đời đầu) → điền lại path thật.
+    const p = keyToPath.get(key);
+    if (p) {
+      await db
+        .prepare("UPDATE media_assets SET path = ? WHERE storage_key = ? AND path = ''")
+        .run(p, key);
+    }
   }
   let productUsages = 0;
   for (const key of plan.productUsageKeys) {
@@ -674,13 +714,23 @@ export async function listMediaAssets(
   const total = counts.all;
 
   const listSql = `
-    SELECT ma.id, ma.storage_key, ma.path, ma.created_at
+    SELECT ma.id, ma.storage_key, ma.path, ma.created_at,
+           ma.width, ma.height, ma.mime_type, ma.file_size
       FROM media_assets ma
       ${whereSql}
       ORDER BY ${orderBySql}
       LIMIT ? OFFSET ?
   `;
-  const rows = (await db.prepare(listSql).all<{ id: number; storage_key: string; path: string; created_at: string }>(...params, pageSize, offset)) ?? [];
+  const rows = (await db.prepare(listSql).all<{
+    id: number;
+    storage_key: string;
+    path: string;
+    created_at: string;
+    width: number | null;
+    height: number | null;
+    mime_type: string;
+    file_size: number | null;
+  }>(...params, pageSize, offset)) ?? [];
 
   // ── Representative product usage + room tags + usage summaries (batch, no N+1) ──
   const assetIds = rows.map((r) => r.id);
@@ -704,6 +754,10 @@ export async function listMediaAssets(
       storage_key: row.storage_key,
       path: row.path,
       created_at: row.created_at,
+      width: row.width ?? null,
+      height: row.height ?? null,
+      mime_type: row.mime_type ?? "",
+      file_size: row.file_size ?? null,
       id: rep?.rep_image_id ?? 0,
       product_id: rep?.product_id ?? 0,
       product_code: rep?.product_code ?? "",

@@ -103,7 +103,10 @@ signature cũ. Kết quả `FlatMediaItem`:
 - `id` / `product_id` — representative product usage (`product_images.id`/`product_id`);
   **0-sentinel** khi asset không có usage product (sản phẩm bị xoá hoặc file chỉ nằm ở
   mapping/hero). UI guard bằng `> 0`.
-- `storage_key` (tail hash), `path`, `created_at`.
+- `storage_key` (tail hash), `path` (**path thật** để card render `<img src>` — không rỗng),
+  `created_at`.
+- `width` / `height` / `mime_type` / `file_size` — metadata file vật lý. `NULL` khi chưa đo
+  (asset backfill từ legacy không có nguồn kích thước); card ẩn dòng kích thước khi thiếu.
 - `kind` (map/concept/normal) + `room_tags` — lấy từ representative product usage.
 - `usage_count` (tổng 5 nhóm), `usage_groups` (product/lookbook/featured/hero/mapping),
   `status` (`used`/`draft`/`orphan`).
@@ -124,7 +127,7 @@ Mỗi card hiển thị **asset là chủ thể**, sản phẩm chỉ là usage 
 
 1. Thumbnail + badge MAP/Concept.
 2. Hash rút gọn (mono) + badge `USED`/`DRAFT`/`ORPHAN`.
-3. `Asset #<id> · <ngày tạo>`.
+3. `Asset #<id> · <ngày tạo>`; dòng dưới là `WxH · dung lượng` (ẩn khi chưa đo metadata).
 4. Khối usage (click mở `AssetUsageDialog`): `2 Sản phẩm` · `1 Lookbook` · … hoặc "Không nơi nào dùng".
 5. Sản phẩm đại diện (mờ, phụ) — chỉ khi `id > 0`.
 6. Tag phòng Lookbook + toolbar thao tác.

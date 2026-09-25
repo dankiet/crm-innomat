@@ -367,6 +367,11 @@ export async function addProductImage(input: {
   caption?: string;
   is_primary?: boolean;
   kind?: ProductImageKind;
+  /** metadata file vật lý (có khi upload qua app; NULL khi chỉ tham chiếu path có sẵn) */
+  width?: number | null;
+  height?: number | null;
+  mime_type?: string;
+  file_size?: number | null;
 }): Promise<ProductImageRow> {
   const db = getDb();
   if (!(await getProduct(input.product_id))) {
@@ -419,7 +424,14 @@ export async function addProductImage(input: {
       );
     // Media asset registry: 1 file = 1 MediaAsset. Gắn asset ngay khi tạo ảnh.
     if (Number(info.lastInsertRowid) > 0) {
-      await linkProductImageAsset(tx, { id: Number(info.lastInsertRowid), path: pathStr });
+      await linkProductImageAsset(tx, {
+        id: Number(info.lastInsertRowid),
+        path: pathStr,
+        width: input.width,
+        height: input.height,
+        mime_type: input.mime_type,
+        file_size: input.file_size,
+      });
     }
     return Number(info.lastInsertRowid);
   });
@@ -459,7 +471,7 @@ export async function uploadProductImageFile(input: {
     throw new Error("Ảnh quá lớn (tối đa 12MB)");
   }
 
-  const { buffer: normalized } = await normalizeUploadImageBufferMeta(rawBuf);
+  const { buffer: normalized, width, height, mimeType } = await normalizeUploadImageBufferMeta(rawBuf);
   const publicPath = await saveManagedImage(normalized, ".webp");
   return await addProductImage({
     product_id: input.product_id,
@@ -467,6 +479,10 @@ export async function uploadProductImageFile(input: {
     caption: input.caption,
     is_primary: input.is_primary,
     kind: input.kind,
+    width,
+    height,
+    mime_type: mimeType,
+    file_size: normalized.length,
   });
 }
 

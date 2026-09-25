@@ -413,6 +413,44 @@ test("db: listMediaAssets — asset-level, item không product usage có id=0", 
   await db.close();
 });
 
+test("db: listMediaAssets — surface path + meta (width/height/mime/file_size)", async () => {
+  const db = await open();
+  const path = `/images/${H}.webp`;
+  await ensureMediaAsset(db, path, { width: 1600, height: 1200, mime_type: "image/webp", file_size: 245_000 });
+  const res = await listMediaAssets(db);
+  assert.equal(res.total, 1);
+  const item = res.items[0]!;
+  // path thật (không rỗng) — card render <img src>; meta để hiện kích thước.
+  assert.equal(item.path, path);
+  assert.equal(item.width, 1600);
+  assert.equal(item.height, 1200);
+  assert.equal(item.mime_type, "image/webp");
+  assert.equal(item.file_size, 245_000);
+  await db.close();
+});
+
+test("db: applyMediaBackfill điền path thật (không để rỗng) + bù meta khi chạy lại", async () => {
+  const db = await open();
+  const k1 = `${H}.webp`;
+  const srcs = [{ src: "product_images", path: `https://x.supabase.co/.../${k1}` }];
+
+  await applyMediaBackfill(db, srcs as never);
+  const afterFirst = await db
+    .prepare("SELECT path FROM media_assets WHERE storage_key = ?")
+    .get<{ path: string }>(k1);
+  // Backfill đời đầu để path='' → lưới trắng; giờ phải điền path thật.
+  assert.equal(afterFirst?.path, `https://x.supabase.co/.../${k1}`);
+
+  // Chạy lại với cùng nguồn: không nhân bản, path giữ nguyên.
+  const second = await applyMediaBackfill(db, srcs as never);
+  assert.equal(second.assetKeys, 0);
+  const rows = await db
+    .prepare("SELECT COUNT(*) AS n FROM media_assets WHERE storage_key = ?")
+    .get<{ n: number }>(k1);
+  assert.equal(rows?.n, 1);
+  await db.close();
+});
+
 test("db: listMediaAssets — item có product usage lấy rep product", async () => {
   const db = await open();
   const pid = await seedProduct(db, "BX-1", { is_public: 1, category: "Gach" });

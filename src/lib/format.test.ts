@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { escapeHtml, formatVND, formatVNDShort, nowUtc } from "./format.ts";
+import { escapeHtml, formatFileSize, formatVND, formatVNDShort, nowUtc } from "./format.ts";
 
 test("formatVND: dấu chấm nghìn + hậu tố đ", () => {
   assert.equal(formatVND(0), "0đ");
@@ -30,4 +30,21 @@ test("escapeHtml: null/undefined → rỗng", () => {
 
 test("nowUtc: đúng dạng YYYY-MM-DD HH:mm:ss", () => {
   assert.match(nowUtc(), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+});
+
+test("formatFileSize: B / KB / MB / GB + làm tròn theo độ lớn", () => {
+  assert.equal(formatFileSize(0), "0 B");
+  assert.equal(formatFileSize(512), "512 B");
+  assert.equal(formatFileSize(2048), "2.0 KB");
+  assert.equal(formatFileSize(1536), "1.5 KB");
+  assert.equal(formatFileSize(5 * 1024 * 1024), "5.0 MB");
+  assert.equal(formatFileSize(150 * 1024 * 1024), "150 MB");
+  assert.equal(formatFileSize(2 * 1024 * 1024 * 1024), "2.0 GB");
+});
+
+test("formatFileSize: null / undefined / âm → chuỗi rỗng (asset chưa đo meta)", () => {
+  assert.equal(formatFileSize(null), "");
+  assert.equal(formatFileSize(undefined), "");
+  assert.equal(formatFileSize(-1), "");
+  assert.equal(formatFileSize(Number.NaN), "");
 });
