@@ -52,8 +52,15 @@ export interface AssetUsageSummary {
 }
 
 export type FlatMediaTab = "all" | "map" | "concept" | "featured" | "unassigned";
-export type FlatMediaSort = "newest" | "oldest" | "code_asc" | "code_desc" | "priority";
-export type FlatMediaUsage = "all" | "used" | "draft" | "orphan";
+export type FlatMediaSort =
+  | "newest"
+  | "oldest"
+  | "code_asc"
+  | "code_desc"
+  | "name_asc"
+  | "name_desc"
+  | "priority";
+export type FlatMediaUsage = "all" | "used" | "unused";
 
 export type FlatMediaItem = {
   /** asset id (media_assets.id) — key card + delete asset */
@@ -602,30 +609,16 @@ export async function listMediaAssets(
     addAssetProductWhere("p.featured_rank IS NULL", []);
   }
 
-  // ── Status filter (used/draft/orphan) — asset-level ──
+  // ── Status filter (used/unused) — asset-level ──
+  // used  = có ≥1 usage ở bất kỳ nguồn nào (product_images / mapping / hero).
+  // unused = không nơi nào trỏ tới.
   if (usage !== "all") {
-    where.push(`(
-      SELECT
-        CASE
-          WHEN EXISTS (SELECT 1 FROM mapping_media_usages mu WHERE mu.media_asset_id = ma.id)
-            OR EXISTS (SELECT 1 FROM landing_page_media_usages lu WHERE lu.media_asset_id = ma.id)
-            OR EXISTS (
-              SELECT 1 FROM product_images pi JOIN products p ON p.id = pi.product_id
-               WHERE pi.media_asset_id = ma.id AND (
-                 pi.kind = 'map' OR p.is_public = 1
-                 OR (pi.kind = 'concept' AND pi.is_public = 1)
-                 OR (p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12)
-               )
-            )
-          THEN 'used'
-          WHEN EXISTS (SELECT 1 FROM product_images pi WHERE pi.media_asset_id = ma.id)
-            OR EXISTS (SELECT 1 FROM mapping_media_usages mu WHERE mu.media_asset_id = ma.id)
-            OR EXISTS (SELECT 1 FROM landing_page_media_usages lu WHERE lu.media_asset_id = ma.id)
-          THEN 'draft'
-          ELSE 'orphan'
-        END
-    ) = ?`);
-    params.push(usage);
+    const hasAnyUsageSql = `(
+      EXISTS (SELECT 1 FROM product_images pi WHERE pi.media_asset_id = ma.id)
+      OR EXISTS (SELECT 1 FROM mapping_media_usages mu WHERE mu.media_asset_id = ma.id)
+      OR EXISTS (SELECT 1 FROM landing_page_media_usages lu WHERE lu.media_asset_id = ma.id)
+    )`;
+    where.push(usage === "used" ? hasAnyUsageSql : `NOT ${hasAnyUsageSql}`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -693,22 +686,50 @@ export async function listMediaAssets(
   for (const r of roomRows) roomCounts[r.room_slug] = Number(r.n) || 0;
 
   // ── Sort + pagination (asset-level) ──
-  // Representative code/rank qua scalar subquery (LIMIT 1) — portable PG+SQLite.
+  // Representative code/name/rank qua scalar subquery (LIMIT 1) — portable PG+SQLite.
   const repRankSql = `(SELECT p.featured_rank FROM product_images pi JOIN products p ON p.id = pi.product_id
        WHERE pi.media_asset_id = ma.id ORDER BY (pi.kind = 'map') DESC, pi.is_primary DESC, pi.id ASC LIMIT 1)`;
   const repCodeSql = `(SELECT p.code FROM product_images pi JOIN products p ON p.id = pi.product_id
        WHERE pi.media_asset_id = ma.id ORDER BY (pi.kind = 'map') DESC, pi.is_primary DESC, pi.id ASC LIMIT 1)`;
-  let orderBySql = "ma.id DESC";
+  const repNameSql = `(SELECT p.name FROM product_images pi JOIN products p ON p.id = pi.product_id
+       WHERE pi.media_asset_id = ma.id ORDER BY (pi.kind = 'map') DESC, pi.is_primary DESC, pi.id ASC LIMIT 1)`;
+  // Hero usage (LP) — asset đang làm ảnh bìa trang chủ.
+  const isHeroSql = `EXISTS (SELECT 1 FROM landing_page_media_usages lu
+       WHERE lu.media_asset_id = ma.id AND lu.setting_key = 'hero_image')`;
+  // Tuyển chọn #1–#12 — sản phẩm đang giữ vị trí.
+  const isFeaturedSql = `EXISTS (SELECT 1 FROM product_images pi JOIN products p ON p.id = pi.product_id
+       WHERE pi.media_asset_id = ma.id AND p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12)`;
+
+  // Ưu tiên theo ngữ cảnh tab, RỒI mới tới sort người dùng chọn:
+  //  - MAP  : ảnh Tuyển chọn (#1–#12, xếp theo rank) lên đầu.
+  //  - Lookbook: ảnh đang làm Hero trang chủ lên đầu.
+  //  - Còn lại : theo sort người dùng.
+  const sortSql =
+    sort === "oldest"
+      ? "ma.id ASC"
+      : sort === "code_asc"
+        ? `LOWER(COALESCE(${repCodeSql}, '')) ASC, ma.id ASC`
+        : sort === "code_desc"
+          ? `LOWER(COALESCE(${repCodeSql}, '')) DESC, ma.id ASC`
+          : sort === "name_asc"
+            ? `LOWER(COALESCE(${repNameSql}, '')) ASC, ma.id ASC`
+            : sort === "name_desc"
+              ? `LOWER(COALESCE(${repNameSql}, '')) DESC, ma.id ASC`
+              : sort === "priority"
+                ? `COALESCE(${repRankSql}, 9999) ASC, ma.id ASC`
+                : "ma.id DESC";
+
+  let orderBySql: string;
   if (tab === "featured") {
     orderBySql = `COALESCE(${repRankSql}, 9999) ASC, ma.id ASC`;
-  } else if (sort === "oldest") {
-    orderBySql = "ma.id ASC";
-  } else if (sort === "code_asc") {
-    orderBySql = `LOWER(COALESCE(${repCodeSql}, '')) ASC, ma.id ASC`;
-  } else if (sort === "code_desc") {
-    orderBySql = `LOWER(COALESCE(${repCodeSql}, '')) DESC, ma.id ASC`;
-  } else if (sort === "priority") {
-    orderBySql = `COALESCE(${repRankSql}, 9999) ASC, ma.id ASC`;
+  } else if (tab === "map") {
+    // Ưu tiên ảnh Tuyển chọn lên đầu, rồi tới sort người dùng chọn.
+    orderBySql = `CASE WHEN ${isFeaturedSql} THEN 0 ELSE 1 END ASC, COALESCE(${repRankSql}, 9999) ASC, ${sortSql}`;
+  } else if (tab === "concept") {
+    // Ưu tiên ảnh đang làm Hero trang chủ lên đầu.
+    orderBySql = `CASE WHEN ${isHeroSql} THEN 0 ELSE 1 END ASC, ${sortSql}`;
+  } else {
+    orderBySql = sortSql;
   }
 
   const total = counts.all;
@@ -747,7 +768,7 @@ export async function listMediaAssets(
     const groups: Record<MediaUsageGroupKey, number> = usageSummary
       ? usageSummary.groups
       : { product: 0, lookbook: 0, featured: 0, hero: 0, mapping: 0 };
-    const status = usageSummary?.status ?? "orphan";
+    const status = usageSummary?.status ?? "unused";
     const usageCount = Object.values(groups).reduce((a, b) => a + b, 0);
     return {
       asset_id: row.id,

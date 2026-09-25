@@ -204,25 +204,27 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 **Bố cục card (asset-first)** — thứ tự từ trên xuống:
 
 1. Ảnh thumbnail (badge MAP/Concept ở góc).
-2. **Định danh asset**: hash rút gọn (`a88631d6c872…`, mono) + badge trạng thái
-   `USED`/`DRAFT`/`ORPHAN` (viết hoa, góc phải).
-3. `Asset #<id> · <ngày tạo>`.
+2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm"; góc phải badge
+   `USE`/`UNUSE`.
+3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng.
 4. **Khối usage** (click mở `AssetUsageDialog`): liệt kê số theo nhóm — `2 Sản phẩm`,
-   `1 Lookbook`, `1 Tuyển chọn`, `1 Đề xuất`, `1 Hero`; hoặc "Không nơi nào dùng" nếu orphan.
-5. **Sản phẩm đại diện** (phụ, mờ): mã + tên SP, click mở gallery sản phẩm. Chỉ hiện khi asset
-   có product usage (`id > 0`).
-6. Tag phòng Lookbook (nếu là Concept hoặc có tag).
-7. Toolbar thao tác + xoá 2 bước inline.
+   `1 Lookbook`, `1 Tuyển chọn`, `1 Đề xuất`, `1 Hero`; hoặc "Không nơi nào dùng" nếu chưa gán.
+5. Tag phòng Lookbook.
+6. Toolbar thao tác + xoá 2 bước inline.
 
 - **Phạm vi (primary tabs)**: `All` · `MAP` · `Lookbook` · `Uncategorized` (nhãn tiếng Anh trên
   UI; `featured` = Tuyển chọn #1—#12 vẫn nhận qua deep-link nhưng không còn là tab). Tab dùng
-  segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented trạng thái dùng.
-- **Sử dụng (secondary, URL `usage`)**: 4 trạng thái **`all` (mặc định) / `used` / `draft` /
-  `orphan`** — asset-level qua `listMediaAssets` (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)
-  §Kho ảnh asset-centric). Có banner ngữ cảnh khi lọc "Orphan"; khối usage trên card click để
-  mở AssetUsageDialog.
+  segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented trạng thái.
+- **Sử dụng (secondary, URL `usage`)**: **2 trạng thái `used` / `unused`** (nhãn UI **Use** /
+  **Unuse**; mặc định `all` = mọi ảnh). `used` = đã gán vào bất kỳ nơi nào (sản phẩm, Lookbook,
+  Tuyển chọn, Đề xuất, Hero); `unused` = chưa gán vào đâu. Asset-level qua `listMediaAssets`
+  (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric). Có banner ngữ
+  cảnh khi lọc "Unuse"; khối usage trên card click để mở AssetUsageDialog.
+- **Sắp xếp**: `Mới nhất` · `Cũ nhất` · `Tên SP (A-Z/Z-A)` · `Mã SP (A-Z/Z-A)` ·
+  `Ưu tiên (#1—#12)`. Tab MAP tự đẩy ảnh Tuyển chọn #1–#12 lên đầu; tab Lookbook đẩy ảnh
+  đang làm Hero lên đầu.
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
-- **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (5 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
+- **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (7 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
   dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,
   dùng chung với `/san-pham`) kèm nút **"Xoá tất cả (N)"** gọi `resetAllFilters`; nhờ đó bộ lọc
   nào cũng gỡ được, kể cả `category` (Nhóm) — nút "Xóa bộ lọc SP" cũ bỏ sót `category`.

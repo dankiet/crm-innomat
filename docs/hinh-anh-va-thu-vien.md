@@ -109,28 +109,41 @@ signature cũ. Kết quả `FlatMediaItem`:
   (asset backfill từ legacy không có nguồn kích thước); card ẩn dòng kích thước khi thiếu.
 - `kind` (map/concept/normal) + `room_tags` — lấy từ representative product usage.
 - `usage_count` (tổng 5 nhóm), `usage_groups` (product/lookbook/featured/hero/mapping),
-  `status` (`used`/`draft`/`orphan`).
+  `status` (`used`/`unused`).
 
-**Status 3 trạng thái** (thay cho "Active/To Delete" cũ):
+**Status 2 trạng thái** (gộp `draft` vào `used` từ 2026-09-25):
 
-| Status  | Điều kiện                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------ |
-| `used`  | Có ≥1 usage **active**: image MAP, sản phẩm public, Concept public (Lookbook), featured 1..12, mapping, hoặc hero |
-| `draft` | Có usage nhưng **không active** (vd ảnh thường của sản phẩm ẩn)                            |
-| `orphan`| Không còn bảng nào (product/mapping/hero) trỏ tới asset                                    |
+| Status   | Điều kiện                                                                    |
+| -------- | ---------------------------------------------------------------------------- |
+| `used`   | Có ≥1 usage ở **bất kỳ nguồn nào**: ảnh sản phẩm (MAP / gallery / đại diện / Concept), mapping, hoặc hero. Gồm cả ảnh gắn sản phẩm **chưa public** |
+| `unused` | Không nơi nào trỏ tới (không `product_images`, không `mapping_media_usages`, không `landing_page_media_usages`) |
 
-Filter `usage=all|used|draft|orphan` → 4 nút segmented trên UI.
+> Trước đây có 3 trạng thái (`used`/`draft`/`orphan`). `draft` (gắn nhưng chưa public)
+> gộp vào `used` vì ảnh đã gắn vào sản phẩm vẫn là "đã gán" — chỉ chưa hiển thị.
+
+Filter `usage=all|used|unused` → 3 nút segmented trên UI (nhãn **Tất cả / Use / Unuse**).
 
 ### Bố cục card (asset-first)
 
 Mỗi card hiển thị **asset là chủ thể**, sản phẩm chỉ là usage phụ:
 
 1. Thumbnail + badge MAP/Concept.
-2. Hash rút gọn (mono) + badge `USED`/`DRAFT`/`ORPHAN`.
-3. `Asset #<id> · <ngày tạo>`; dòng dưới là `WxH · dung lượng` (ẩn khi chưa đo metadata).
+2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm" khi asset không có
+   product usage. Bên phải là badge `USE`/`UNUSE`.
+3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng (phần nào thiếu thì ẩn).
 4. Khối usage (click mở `AssetUsageDialog`): `2 Sản phẩm` · `1 Lookbook` · … hoặc "Không nơi nào dùng".
-5. Sản phẩm đại diện (mờ, phụ) — chỉ khi `id > 0`.
-6. Tag phòng Lookbook + toolbar thao tác.
+5. Tag phòng Lookbook + toolbar thao tác.
+
+### Sắp xếp
+
+Sort người dùng chọn (popover Sắp xếp): `Mới nhất` · `Cũ nhất` · `Tên SP (A-Z)` · `Tên SP (Z-A)` ·
+`Mã SP (A-Z)` · `Mã SP (Z-A)` · `Ưu tiên (#1—#12)`.
+
+Ngoài ra có **ưu tiên theo ngữ cảnh tab** (luôn xếp trước, rồi mới tới sort người dùng):
+
+- Tab **MAP**: ảnh thuộc sản phẩm **Tuyển chọn #1–#12** lên đầu (xếp theo rank).
+- Tab **Lookbook**: ảnh đang làm **Hero trang chủ** lên đầu.
+- Tab **Tuyển chọn**: xếp theo `featured_rank` (như cũ).
 
 ### Xoá theo asset
 

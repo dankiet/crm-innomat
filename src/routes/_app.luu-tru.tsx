@@ -95,8 +95,16 @@ type MediaStorageSearch = {
 };
 
 const FLAT_MEDIA_TABS: readonly string[] = ["all", "map", "concept", "featured", "unassigned"];
-const FLAT_MEDIA_SORTS: readonly string[] = ["newest", "oldest", "code_asc", "code_desc", "priority"];
-const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "used", "draft", "orphan"];
+const FLAT_MEDIA_SORTS: readonly string[] = [
+  "newest",
+  "oldest",
+  "code_asc",
+  "code_desc",
+  "name_asc",
+  "name_desc",
+  "priority",
+];
+const USAGE_OPTIONS: readonly FlatMediaUsage[] = ["all", "used", "unused"];
 const PUBLIC_FILTERS: readonly string[] = ["all", "public", "hidden"];
 
 function parseMediaTab(v: unknown): FlatMediaTab | undefined {
@@ -167,6 +175,8 @@ const TABS: Array<{ key: FlatMediaTab; label: string; countKey: "all" | "map" | 
 const SORT_OPTIONS: Array<{ key: FlatMediaSort; label: string; icon: typeof Clock }> = [
   { key: "newest", label: "Mới nhất", icon: Clock },
   { key: "oldest", label: "Cũ nhất", icon: Clock },
+  { key: "name_asc", label: "Tên SP (A-Z)", icon: ArrowDownAZ },
+  { key: "name_desc", label: "Tên SP (Z-A)", icon: ArrowUpAZ },
   { key: "code_asc", label: "Mã SP (A-Z)", icon: ArrowDownAZ },
   { key: "code_desc", label: "Mã SP (Z-A)", icon: ArrowUpAZ },
   { key: "priority", label: "Ưu tiên (#1—#12)", icon: Sparkles },
@@ -1553,17 +1563,16 @@ function MediaStoragePage() {
               </div>
             ) : null}
 
-            {/* Status — segmented: Tất cả | Used | Draft | Orphan */}
+            {/* Status — segmented: Tất cả | Use | Unuse */}
             <div
               className="flex items-center gap-0.5 bg-surface-strong/50 p-0.5 rounded-full border border-border/80 shrink-0 text-xs"
-              title="Lọc theo trạng thái dùng của MediaAsset: Used = có ≥1 usage đang active (MAP/Thư viện/Lookbook public/Tuyển chọn/Đề xuất/Hero); Draft = có usage nhưng chưa active; Orphan = không nơi nào dùng"
+              title="Lọc theo mức gán của MediaAsset: Use = đã gán vào ít nhất một nơi (sản phẩm, Lookbook, Tuyển chọn, Đề xuất, Hero); Unuse = chưa gán vào đâu cả"
             >
               {(
                 [
                   { key: undefined, label: "Tất cả" },
-                  { key: "used", label: "Used" },
-                  { key: "draft", label: "Draft" },
-                  { key: "orphan", label: "Orphan" },
+                  { key: "used", label: "Use" },
+                  { key: "unused", label: "Unuse" },
                 ] as const
               ).map(({ key, label }) => {
                 const active = usage === (key ?? "all") || ((usage === undefined || usage === "all") && key === undefined);
@@ -1575,7 +1584,7 @@ function MediaStoragePage() {
                     className={cn(
                       "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer",
                       active
-                        ? key === "orphan"
+                        ? key === "unused"
                           ? "bg-terracotta text-white shadow-xs font-bold"
                           : "bg-card text-foreground shadow-xs ring-1 ring-black/5"
                         : "text-muted-foreground hover:text-foreground hover:bg-surface-strong/60",
@@ -1754,18 +1763,17 @@ function MediaStoragePage() {
         ) : null}
       </div>
 
-      {/* Banner ngữ cảnh khi lọc Orphan */}
-      {usage === "orphan" ? (
+      {/* Banner ngữ cảnh khi lọc Unuse */}
+      {usage === "unused" ? (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in-0 duration-150">
           <div className="flex items-start gap-2.5">
             <Info className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div>
-              <p className="font-semibold text-foreground">MediaAsset không còn nơi nào dùng (Orphan)</p>
+              <p className="font-semibold text-foreground">Ảnh chưa gán vào đâu (Unuse)</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Không bảng nào khác (sản phẩm, đề xuất vật liệu, Hero trang chủ) trỏ tới những file
+                Không nơi nào (sản phẩm, đề xuất vật liệu, Hero trang chủ) trỏ tới những file
                 này — chúng chỉ còn tồn tại trong kho media. File vẫn nằm nguyên trong kho lưu trữ;
-                xoá ở đây là xoá thật, không thể hoàn tác. Bấm chip trên ảnh để xem chi tiết nơi
-                đang dùng.
+                xoá ở đây là xoá thật, không thể hoàn tác. Bấm khối usage trên ảnh để xem chi tiết.
               </p>
             </div>
           </div>
@@ -1807,8 +1815,8 @@ function MediaStoragePage() {
           <ImageIcon className="mx-auto size-10 text-muted-foreground/40" />
           <p className="mt-3 text-sm font-semibold text-foreground">Không tìm thấy ảnh nào phù hợp</p>
           <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-            {usage === "orphan"
-              ? "Không có MediaAsset nào rơi vào trạng thái Orphan — mọi file đều đang được ít nhất một nơi dùng. Gỡ ảnh khỏi sản phẩm/đề xuất vật liệu/Hero để file xuất hiện ở đây."
+            {usage === "unused"
+              ? "Không có ảnh nào ở trạng thái Unuse — mọi file đều đang được ít nhất một nơi dùng. Gỡ ảnh khỏi sản phẩm/đề xuất vật liệu/Hero để file xuất hiện ở đây."
               : hasActiveFilters
                 ? "Hãy thử bỏ bớt bộ lọc màu, nhóm sản phẩm, hoặc từ khóa tìm kiếm để xem thêm kết quả."
                 : "Chưa có ảnh nào trong mục này."}
@@ -1919,36 +1927,65 @@ function MediaStoragePage() {
                 {/* ── Asset Identity & Usage ── */}
                 <div className="flex flex-1 flex-col justify-between p-2.5">
                   <div>
-                    {/* Asset header: hash + status badge */}
+                    {/* Header: tên sản phẩm (chính) + mã SP · kích thước (phụ) */}
                     <div className="flex items-start justify-between gap-1">
                       <div className="min-w-0">
-                        <p
-                          className="truncate font-mono text-[11px] font-semibold text-foreground"
-                          title={`${img.storage_key} · Asset #${img.asset_id}`}
-                        >
-                          {img.storage_key.slice(0, 12)}…
-                        </p>
-                        <p className="mt-0.5 text-[9px] text-muted-foreground/70">
-                          Asset #{img.asset_id} · {img.created_at.slice(0, 10)}
-                        </p>
-                        {img.width && img.height ? (
-                          <p className="mt-0.5 text-[9px] text-muted-foreground/70">
-                            {img.width}×{img.height}
-                            {formatFileSize(img.file_size) ? ` · ${formatFileSize(img.file_size)}` : ""}
-                          </p>
-                        ) : null}
+                        {hasProductUsage ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setGalleryProduct({
+                                  id: img.product_id,
+                                  code: img.product_code,
+                                  name: img.product_name,
+                                  category: img.product_category,
+                                })
+                              }
+                              title={`Xem toàn bộ ảnh của ${img.product_code} — ${img.product_name}`}
+                              className="block w-full truncate text-left text-[11px] font-semibold text-foreground hover:text-terracotta hover:underline cursor-pointer"
+                            >
+                              {img.product_name || img.product_code}
+                            </button>
+                            <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">
+                              {img.product_code}
+                              {img.width && img.height
+                                ? ` · ${img.width}×${img.height}`
+                                : ""}
+                              {formatFileSize(img.file_size)
+                                ? ` · ${formatFileSize(img.file_size)}`
+                                : ""}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p
+                              className="truncate text-[11px] font-semibold text-muted-foreground"
+                              title={`Asset #${img.asset_id} (không thuộc sản phẩm nào)`}
+                            >
+                              Không thuộc sản phẩm
+                            </p>
+                            <p className="mt-0.5 truncate text-[9px] text-muted-foreground/70">
+                              Asset #{img.asset_id}
+                              {img.width && img.height
+                                ? ` · ${img.width}×${img.height}`
+                                : ""}
+                              {formatFileSize(img.file_size)
+                                ? ` · ${formatFileSize(img.file_size)}`
+                                : ""}
+                            </p>
+                          </>
+                        )}
                       </div>
                       <span
                         className={cn(
                           "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-                          img.status === "orphan"
+                          img.status === "unused"
                             ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                            : img.status === "draft"
-                              ? "bg-surface-strong text-muted-foreground"
-                              : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
                         )}
                       >
-                        {img.status}
+                        {img.status === "unused" ? "UNUSE" : "USE"}
                       </span>
                     </div>
 
@@ -1998,29 +2035,6 @@ function MediaStoragePage() {
                         </span>
                       )}
                     </button>
-
-                    {/* Representative product (secondary, muted) */}
-                    {hasProductUsage ? (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setGalleryProduct({
-                              id: img.product_id,
-                              code: img.product_code,
-                              name: img.product_name,
-                              category: img.product_category,
-                            })
-                          }
-                          title="Xem toàn bộ ảnh của sản phẩm này"
-                          className="inline-flex items-center gap-1 truncate text-[10px] text-muted-foreground hover:text-terracotta hover:underline cursor-pointer"
-                        >
-                          <Images className="size-3 shrink-0" />
-                          <span className="font-mono font-medium">{img.product_code}</span>
-                          <span className="truncate">{img.product_name}</span>
-                        </button>
-                      </div>
-                    ) : null}
 
                     {/* Room tags (Lookbook) */}
                     {hasProductUsage && (isConcept || img.room_tags.length > 0) ? (

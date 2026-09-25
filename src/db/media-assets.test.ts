@@ -9,7 +9,6 @@ import assert from "node:assert/strict";
 import {
   summarizeUsages,
   classifyAssetStatus,
-  isActiveProductUsage,
   assertLookbookNeverOrphan,
   usageGroups,
   countRoles,
@@ -46,42 +45,19 @@ function product(partial: Partial<ProductUsageInput> = {}): ProductUsageInput {
   };
 }
 
-test("pure: map image là active publication", () => {
-  assert.equal(isActiveProductUsage(product({ kind: "map" })), true);
+test("pure: classify — unused khi zero usage", () => {
+  assert.equal(classifyAssetStatus(summarizeUsages([])), "unused");
 });
 
-test("pure: product public là active publication", () => {
-  assert.equal(isActiveProductUsage(product({ product_public: 1 })), true);
-});
-
-test("pure: concept public (lookbook) là active publication", () => {
-  assert.equal(isActiveProductUsage(product({ kind: "concept", image_public: 1 })), true);
-});
-
-test("pure: featured 1..12 là active — nhưng 0/13 thì không", () => {
-  assert.equal(isActiveProductUsage(product({ featured_rank: 1 })), true);
-  assert.equal(isActiveProductUsage(product({ featured_rank: 12 })), true);
-  assert.equal(isActiveProductUsage(product({ featured_rank: 0 })), false);
-  assert.equal(isActiveProductUsage(product({ featured_rank: 13 })), false);
-});
-
-test("pure: ảnh thường, sản phẩm ẩn, không featured → không active", () => {
-  assert.equal(isActiveProductUsage(product({})), false);
-});
-
-test("pure: classify — orphan khi zero usage", () => {
-  assert.equal(classifyAssetStatus(summarizeUsages([])), "orphan");
-});
-
-test("pure: classify — draft khi có usage nhưng không active", () => {
+test("pure: classify — used khi ảnh gắn sản phẩm (kể cả chưa public)", () => {
+  // Ảnh thường của sản phẩm ẩn: đã gắn vào sản phẩm → used.
   const s = summarizeUsages([product({ kind: "normal" })], 0, 0);
   assert.equal(s.product, 1);
-  assert.equal(classifyAssetStatus(s), "draft");
+  assert.equal(classifyAssetStatus(s), "used");
 });
 
-test("pure: classify — used khi có active product usage", () => {
-  const s = summarizeUsages([product({ kind: "map" })]);
-  assert.equal(classifyAssetStatus(s), "used");
+test("pure: classify — used khi có MAP", () => {
+  assert.equal(classifyAssetStatus(summarizeUsages([product({ kind: "map" })])), "used");
 });
 
 test("pure: classify — used khi có mapping usage", () => {
@@ -92,7 +68,7 @@ test("pure: classify — used khi có hero usage", () => {
   assert.equal(classifyAssetStatus(summarizeUsages([], 0, 1)), "used");
 });
 
-test("pure: lookbook public không bao giờ orphan (invariant)", () => {
+test("pure: lookbook public không bao giờ unused (invariant)", () => {
   assert.doesNotThrow(() =>
     assertLookbookNeverOrphan(product({ kind: "concept", image_public: 1 })),
   );
@@ -113,7 +89,6 @@ test("pure: summarizeUsages gom đủ 5 nhóm", () => {
   assert.equal(s.featured, 1);
   assert.equal(s.mapping, 2);
   assert.equal(s.hero, 1);
-  assert.equal(s.productActive, 3); // map + concept-public + featured 1..12 đều active
   assert.deepEqual(usageGroups(s), {
     product: 3,
     lookbook: 1,
@@ -288,14 +263,14 @@ test("db: syncHeroUsage tạo/tắt usage hero", async () => {
   await db.close();
 });
 
-test("db: getAssetUsageSummary phân loại used/draft/orphan", async () => {
+test("db: getAssetUsageSummary phân loại used/unused", async () => {
   const db = await open();
   const path = `/images/${H}.webp`;
   const asset = await ensureMediaAsset(db, path);
 
-  // chưa có usage → orphan
+  // chưa có usage → unused
   let s = await getAssetUsageSummary(db, asset.id);
-  assert.equal(s.status, "orphan");
+  assert.equal(s.status, "unused");
 
   // map → used
   const pid = await seedProduct(db, "A1", { is_public: 0 });
@@ -306,10 +281,10 @@ test("db: getAssetUsageSummary phân loại used/draft/orphan", async () => {
   assert.equal(s.groups.product, 1);
   assert.equal(s.groups.mapping, 0);
 
-  // làm thường + sản phẩm ẩn → draft
+  // làm thường + sản phẩm ẩn → vẫn used (đã gắn sản phẩm)
   await db.prepare("UPDATE product_images SET kind = 'normal' WHERE id = ?").run(imgId);
   s = await getAssetUsageSummary(db, asset.id);
-  assert.equal(s.status, "draft");
+  assert.equal(s.status, "used");
   await db.close();
 });
 
@@ -321,8 +296,8 @@ test("db: batchesUsageSummaries không N+1 — 1 batch cho nhiều asset", async
   const a2 = await ensureMediaAsset(db, `/images/${k2}`);
   const map = await batchesUsageSummaries(db, [a1.id, a2.id, 99999]);
   assert.equal(map.size, 2);
-  assert.equal(map.get(a1.id)?.status, "orphan");
-  assert.equal(map.get(a2.id)?.status, "orphan");
+  assert.equal(map.get(a1.id)?.status, "unused");
+  assert.equal(map.get(a2.id)?.status, "unused");
   await db.close();
 });
 
@@ -409,7 +384,7 @@ test("db: listMediaAssets — asset-level, item không product usage có id=0", 
   assert.equal(item.storage_key, KEY);
   assert.equal(item.id, 0); // không có product usage
   assert.equal(item.product_id, 0);
-  assert.equal(item.status, "orphan");
+  assert.equal(item.status, "unused");
   await db.close();
 });
 
@@ -468,35 +443,34 @@ test("db: listMediaAssets — item có product usage lấy rep product", async (
   await db.close();
 });
 
-test("db: listMediaAssets — status filter used/draft/orphan", async () => {
+test("db: listMediaAssets — status filter used/unused", async () => {
   const db = await open();
   const usedPath = `/images/${H}.webp`;
   const draftPath = `/images/${H.replace(/^a/, "b")}.webp`;
-  const orphanPath = `/images/${H.replace(/^a/, "c")}.webp`;
+  const unusedPath = `/images/${H.replace(/^a/, "c")}.webp`;
 
   // used: map public product
   const p1 = await seedProduct(db, "U1", { is_public: 1 });
   const img1 = await seedProductImage(db, p1, usedPath, { kind: "map" });
   await linkProductImageAsset(db, { id: img1, path: usedPath });
 
-  // draft: normal + product hidden
+  // cũng used: ảnh thường của sản phẩm ẩn (đã gắn sản phẩm, chỉ chưa public)
   const p2 = await seedProduct(db, "D1", { is_public: 0 });
   const img2 = await seedProductImage(db, p2, draftPath, { kind: "normal" });
   await linkProductImageAsset(db, { id: img2, path: draftPath });
 
-  await ensureMediaAsset(db, orphanPath);
+  // unused: asset không nơi nào trỏ tới
+  await ensureMediaAsset(db, unusedPath);
 
   const used = await listMediaAssets(db, { usage: "used" });
-  assert.equal(used.total, 1);
-  assert.equal(used.items[0]?.product_code, "U1");
+  assert.equal(used.total, 2);
+  assert.deepEqual(used.items.map((i) => i.product_code).sort(), ["D1", "U1"]);
+  assert.ok(used.items.every((i) => i.status === "used"));
 
-  const draft = await listMediaAssets(db, { usage: "draft" });
-  assert.equal(draft.total, 1);
-  assert.equal(draft.items[0]?.product_code, "D1");
-
-  const orphan = await listMediaAssets(db, { usage: "orphan" });
-  assert.equal(orphan.total, 1);
-  assert.equal(orphan.items[0]?.status, "orphan");
+  const unused = await listMediaAssets(db, { usage: "unused" });
+  assert.equal(unused.total, 1);
+  assert.equal(unused.items[0]?.status, "unused");
+  assert.equal(unused.items[0]?.storage_key, `${H.replace(/^a/, "c")}.webp`);
   await db.close();
 });
 

@@ -8,7 +8,12 @@
  *  - Planning backfill & replace (kiểm tra idempotence bằng thuần).
  */
 
-export type MediaAssetStatus = "used" | "draft" | "orphan";
+/**
+ * 2 trạng thái gán: `used` (gán vào ≥1 nơi) / `unused` (không gán vào đâu).
+ * Trước 2026-09-25 có 3 trạng thái (used/draft/orphan); `draft` gộp vào `used`
+ * vì ảnh gắn vào sản phẩm dù chưa public vẫn là "đã gán".
+ */
+export type MediaAssetStatus = "used" | "unused";
 
 export const MEDIA_USAGE_GROUPS = ["product", "lookbook", "featured", "hero", "mapping"] as const;
 export type MediaUsageGroupKey = (typeof MEDIA_USAGE_GROUPS)[number];
@@ -32,8 +37,6 @@ export interface MediaUsageSummary {
   hero: number;
   /** số usage mapping (tile + custom) */
   mapping: number;
-  /** sản phẩm public (hỗ trợ used) */
-  productActive: number;
 }
 
 export const EMPTY_USAGE_SUMMARY: MediaUsageSummary = {
@@ -42,18 +45,7 @@ export const EMPTY_USAGE_SUMMARY: MediaUsageSummary = {
   featured: 0,
   hero: 0,
   mapping: 0,
-  productActive: 0,
 };
-
-/** Một usage product có phải "active publication" hay không. */
-export function isActiveProductUsage(u: ProductUsageInput): boolean {
-  return (
-    (u.kind === "map") ||
-    u.product_public === 1 ||
-    (u.kind === "concept" && u.image_public === 1) ||
-    (u.featured_rank != null && u.featured_rank >= 1 && u.featured_rank <= 12)
-  );
-}
 
 /**
  * Tổng hợp usage summary từ danh sách usage product + counts mapping/hero.
@@ -71,27 +63,28 @@ export function summarizeUsages(
   let featured = 0;
   for (const p of products) {
     if (p.kind === "concept" && p.image_public === 1) summary.lookbook++;
-    if (isActiveProductUsage(p)) summary.productActive++;
     if (p.featured_rank != null && p.featured_rank >= 1 && p.featured_rank <= 12) featured++;
   }
   summary.featured = featured;
   return summary;
 }
 
-/** 3 trạng thái dùng — ORPHAN khi zero usage; DRAFT khi có usage nhưng không active. */
+/**
+ * 2 trạng thái — `used` khi asset được gán vào BẤT KỲ đâu (product gallery,
+ * mapping, hero…), `unused` khi không nơi nào trỏ tới. Ảnh gắn sản phẩm nhưng
+ * chưa public vẫn tính `used` (đã gán, chỉ chưa hiển thị).
+ */
 export function classifyAssetStatus(s: MediaUsageSummary): MediaAssetStatus {
   const hasAnyUsage = s.product > 0 || s.mapping > 0 || s.hero > 0;
-  if (!hasAnyUsage) return "orphan";
-  const active = s.productActive > 0 || s.mapping > 0 || s.hero > 0;
-  return active ? "used" : "draft";
+  return hasAnyUsage ? "used" : "unused";
 }
 
-/** Bất biến bắt buộc: ảnh đang public trên Lookbook KHÔNG BAO GIỜ orphan. */
+/** Bất biến bắt buộc: ảnh đang public trên Lookbook KHÔNG BAO GIỜ unused. */
 export function assertLookbookNeverOrphan(p: ProductUsageInput): void {
   if (p.kind === "concept" && p.image_public === 1) {
     const s = summarizeUsages([p]);
-    if (classifyAssetStatus(s) === "orphan") {
-      throw new Error("Lookbook public image must never be orphan");
+    if (classifyAssetStatus(s) === "unused") {
+      throw new Error("Lookbook public image must never be unused");
     }
   }
 }

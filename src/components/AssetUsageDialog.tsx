@@ -25,9 +25,8 @@ const ROLE_LABEL: Record<ImageReference["role"], string> = {
 
 const STATUS_LABEL: Record<FlatMediaUsage, string> = {
   all: "Tất cả",
-  used: "Used",
-  draft: "Draft",
-  orphan: "Orphan",
+  used: "Use",
+  unused: "Unuse",
 };
 
 const GROUP_LABEL: Record<keyof FlatMediaItem["usage_groups"], string> = {
@@ -140,8 +139,8 @@ export const AssetUsageDialog = memo(function AssetUsageDialog({
             </p>
             {groupEntries.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border/80 bg-card px-3 py-2 text-xs text-muted-foreground">
-                Không nơi nào dùng file này (Orphan). File vẫn nằm trong kho lưu trữ cho tới khi
-                bạn xoá thủ công.
+                Không nơi nào dùng file này. File vẫn nằm trong kho lưu trữ cho tới khi bạn xoá
+                thủ công.
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
