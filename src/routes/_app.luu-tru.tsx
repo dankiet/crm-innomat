@@ -1772,7 +1772,7 @@ function MediaStoragePage() {
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 Những file này không thuộc sản phẩm nào trong catalog. Một số có thể vẫn đang được
                 dùng ở Đề xuất vật liệu hoặc làm Hero trang chủ — bấm khối usage trên ảnh để xem.
-                File vẫn nằm nguyên trong kho lưu trữ; xoá ở đây là xoá thật, không thể hoàn tác.
+                Xoá ở đây chỉ gỡ khỏi kho media; file gốc vẫn nằm trong Supabase Storage.
               </p>
             </div>
           </div>
@@ -2544,7 +2544,7 @@ function MediaStoragePage() {
               Bạn có chắc chắn muốn xóa <b>{selectedIds.size} ảnh đã chọn</b>?
             </p>
             <p className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 p-2.5 rounded-lg">
-              Lưu ý: Ảnh sẽ bị gỡ khỏi sản phẩm. File trong kho lưu trữ chỉ bị xoá khi không còn bảng nào khác (đề xuất vật liệu, Hero trang chủ, sản phẩm khác) trỏ tới. Hành động này không thể hoàn tác.
+              Lưu ý: Ảnh sẽ bị gỡ khỏi kho media và khỏi mọi nơi đang dùng (sản phẩm, đề xuất vật liệu, Hero trang chủ). File gốc vẫn nằm trong Supabase Storage — xoá ở đây không giải phóng dung lượng lưu trữ.
             </p>
           </div>
           <div className="mt-6 flex items-center justify-end gap-2.5">
