@@ -1975,18 +1975,6 @@ function MediaStoragePage() {
                           </p>
                         </>
                       )}
-                      {/* Mô tả concept — chỉ hiện khi ảnh CÓ nội dung mô tả */}
-                      {img.ai_description.trim() ? (
-                        <button
-                          type="button"
-                          onClick={() => openDescEditor(img)}
-                          title={img.ai_description}
-                          className="mt-1 inline-flex max-w-full items-center gap-1 rounded bg-terracotta/10 border border-terracotta/25 px-1.5 py-0.5 text-left text-[9px] font-medium text-terracotta hover:bg-terracotta/20 transition-colors cursor-pointer"
-                        >
-                          <Sparkles className="size-2.5 shrink-0" />
-                          <span className="truncate">{img.ai_description}</span>
-                        </button>
-                      ) : null}
                     </div>
 
                     {/* Usage breakdown — prominent list */}
@@ -2078,9 +2066,18 @@ function MediaStoragePage() {
                         <button
                           type="button"
                           onClick={() => openDescEditor(img)}
-                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground border border-border/70 bg-surface-strong/60 hover:text-foreground hover:bg-surface-strong transition-colors cursor-pointer"
-                          title="Mô tả concept"
-                          aria-label="Mô tả concept"
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold border transition-colors cursor-pointer",
+                            img.ai_description.trim()
+                              ? "border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20"
+                              : "border-border/70 bg-surface-strong/60 text-muted-foreground hover:text-foreground hover:bg-surface-strong",
+                          )}
+                          title={
+                            img.ai_description.trim()
+                              ? `Đã có mô tả: ${img.ai_description}`
+                              : "Chưa có mô tả — bấm để thêm"
+                          }
+                          aria-label={img.ai_description.trim() ? "Mô tả concept (đã có)" : "Mô tả concept (chưa có)"}
                         >
                           <Sparkles className="size-2.5" />
                           <span>Mô tả</span>

@@ -1,5 +1,6 @@
 import { Check, Plus, Eye } from "lucide-react";
 import type { Material } from "@/data/mockData";
+import { getToneDisplay } from "@/lib/color-palette";
 
 type MaterialCardProps = {
   material: Material;
@@ -61,7 +62,7 @@ export function MaterialCard({ material, selected, onToggle, onOpenModal }: Mate
         <span
           className="material-swatch"
           aria-label={`Tông ${material.tone}`}
-          style={{ backgroundColor: material.tone }}
+          style={{ backgroundColor: getToneDisplay(material.tone).hex }}
           title={`Tông màu: ${material.tone}`}
         />
       </div>

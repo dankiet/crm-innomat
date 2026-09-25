@@ -58,7 +58,7 @@ export function MoodboardDrawer({
         (m, i) =>
           `${i + 1}. [${m.code}] ${m.name} — ${m.type} (Khổ: ${m.size} | Bề mặt: ${m.finish})`,
       ),
-      "\nLiên hệ nhận mẫu thực tế & File ảnh Map: Hotline / Zalo 0909 xxx xxx",
+      "\nLiên hệ nhận mẫu thực tế & File ảnh Map: Hotline / Zalo 0909 888 951",
     ];
     const text = lines.join("\n");
 
@@ -154,20 +154,43 @@ export function MoodboardDrawer({
               </button>
             </div>
             <div className="palette-bars">
-              {shortlistedMaterials.map((mat) => {
-                const tone = getToneDisplay(mat.tone);
-                return (
+              {(() => {
+                // Gộp theo màu: nhiều mã cùng tông → 1 khối duy nhất (tránh dải
+                // lặp lại y hệt nhau khi shortlist có nhiều sản phẩm trùng màu).
+                const byHex = new Map<string, { hex: string; label: string; codes: string[]; names: string[] }>();
+                for (const mat of shortlistedMaterials) {
+                  const tone = getToneDisplay(mat.tone);
+                  const entry = byHex.get(tone.hex);
+                  if (entry) {
+                    entry.codes.push(mat.code);
+                    entry.names.push(mat.name);
+                  } else {
+                    byHex.set(tone.hex, {
+                      hex: tone.hex,
+                      label: tone.label,
+                      codes: [mat.code],
+                      names: [mat.name],
+                    });
+                  }
+                }
+                const groups = [...byHex.values()];
+                return groups.map((g) => (
                   <div
-                    key={mat.id}
+                    key={g.hex}
                     className="palette-bar-item group"
-                    style={{ backgroundColor: tone.hex }}
-                    title={`${mat.name} (${mat.code}) · ${tone.label}`}
-                    onClick={() => onSelectMaterial(mat)}
+                    style={{ backgroundColor: g.hex, flex: g.codes.length }}
+                    title={
+                      g.codes.length > 1
+                        ? `${g.label} · ${g.codes.length} mã: ${g.codes.join(", ")}`
+                        : `${g.names[0]} (${g.codes[0]}) · ${g.label}`
+                    }
                   >
-                    <span className="palette-tooltip">{mat.code}</span>
+                    <span className="palette-tooltip">
+                      {g.codes.length > 1 ? `${g.label} ×${g.codes.length}` : g.codes[0]}
+                    </span>
                   </div>
-                );
-              })}
+                ));
+              })()}
             </div>
           </div>
         )}
