@@ -699,6 +699,10 @@ export async function listMediaAssets(
   // Tuyển chọn #1–#12 — sản phẩm đang giữ vị trí.
   const isFeaturedSql = `EXISTS (SELECT 1 FROM product_images pi JOIN products p ON p.id = pi.product_id
        WHERE pi.media_asset_id = ma.id AND p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12)`;
+  // Asset không có product usage (chỉ mapping/hero) → tên/mã SP rỗng. Xếp CUỐI ở
+  // cả hai chiều sort (nếu không, ASC sẽ đẩy chuỗi rỗng lên đầu).
+  const emptyLast = (col: string) =>
+    `CASE WHEN COALESCE(${col}, '') = '' THEN 1 ELSE 0 END ASC,`;
 
   // Ưu tiên theo ngữ cảnh tab, RỒI mới tới sort người dùng chọn:
   //  - MAP  : ảnh Tuyển chọn (#1–#12, xếp theo rank) lên đầu.
@@ -708,13 +712,13 @@ export async function listMediaAssets(
     sort === "oldest"
       ? "ma.id ASC"
       : sort === "code_asc"
-        ? `LOWER(COALESCE(${repCodeSql}, '')) ASC, ma.id ASC`
+        ? `${emptyLast(repCodeSql)} LOWER(COALESCE(${repCodeSql}, '')) ASC, ma.id ASC`
         : sort === "code_desc"
-          ? `LOWER(COALESCE(${repCodeSql}, '')) DESC, ma.id ASC`
+          ? `${emptyLast(repCodeSql)} LOWER(COALESCE(${repCodeSql}, '')) DESC, ma.id ASC`
           : sort === "name_asc"
-            ? `LOWER(COALESCE(${repNameSql}, '')) ASC, ma.id ASC`
+            ? `${emptyLast(repNameSql)} LOWER(COALESCE(${repNameSql}, '')) ASC, ma.id ASC`
             : sort === "name_desc"
-              ? `LOWER(COALESCE(${repNameSql}, '')) DESC, ma.id ASC`
+              ? `${emptyLast(repNameSql)} LOWER(COALESCE(${repNameSql}, '')) DESC, ma.id ASC`
               : sort === "priority"
                 ? `COALESCE(${repRankSql}, 9999) ASC, ma.id ASC`
                 : "ma.id DESC";

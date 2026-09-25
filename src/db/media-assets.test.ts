@@ -510,3 +510,61 @@ test("db: listMediaAssets — facet & search & publicFilter", async () => {
   assert.equal(hidden.total, 0);
   await db.close();
 });
+
+test("db: listMediaAssets — sort tên SP đẩy asset KHÔNG có tên xuống cuối (cả A-Z và Z-A)", async () => {
+  const db = await open();
+  // seedProduct đặt name = code, nên tên sort được theo code.
+  const pAlpha = await seedProduct(db, "Alpha");
+  const imgA = await seedProductImage(db, pAlpha, `/images/${H}.webp`);
+  await linkProductImageAsset(db, { id: imgA, path: `/images/${H}.webp` });
+
+  const pZeta = await seedProduct(db, "Zeta");
+  const imgZ = await seedProductImage(db, pZeta, `/images/${H.replace(/^a/, "b")}.webp`);
+  await linkProductImageAsset(db, { id: imgZ, path: `/images/${H.replace(/^a/, "b")}.webp` });
+
+  // asset không có product usage (chỉ tồn tại trong kho) → tên rỗng
+  await ensureMediaAsset(db, `/images/${H.replace(/^a/, "c")}.webp`);
+
+  const asc = await listMediaAssets(db, { sort: "name_asc" });
+  assert.deepEqual(asc.items.map((i) => i.product_name), ["Alpha", "Zeta", ""]);
+
+  const desc = await listMediaAssets(db, { sort: "name_desc" });
+  assert.deepEqual(desc.items.map((i) => i.product_name), ["Zeta", "Alpha", ""]);
+  await db.close();
+});
+
+test("db: listMediaAssets — tab MAP đẩy ảnh Tuyển chọn #1–#12 lên đầu", async () => {
+  const db = await open();
+  // sản phẩm thường (không featured), tạo sau → id lớn hơn
+  const pNormal = await seedProduct(db, "Normal");
+  const imgN = await seedProductImage(db, pNormal, `/images/${H}.webp`, { kind: "map" });
+  await linkProductImageAsset(db, { id: imgN, path: `/images/${H}.webp` });
+
+  // sản phẩm Tuyển chọn #1, tạo sau (id lớn hơn) — phải được đẩy lên đầu
+  const pFeat = await seedProduct(db, "Featured", { featured_rank: 1 });
+  const imgF = await seedProductImage(db, pFeat, `/images/${H.replace(/^a/, "b")}.webp`, { kind: "map" });
+  await linkProductImageAsset(db, { id: imgF, path: `/images/${H.replace(/^a/, "b")}.webp` });
+
+  const res = await listMediaAssets(db, { tab: "map" });
+  assert.equal(res.total, 2);
+  assert.equal(res.items[0]?.product_code, "Featured"); // featured lên đầu dù tạo sau
+  await db.close();
+});
+
+test("db: listMediaAssets — tab Lookbook đẩy ảnh đang làm Hero lên đầu", async () => {
+  const db = await open();
+  const pHidden = await seedProduct(db, "AAA");
+  const imgH = await seedProductImage(db, pHidden, `/images/${H}.webp`, { kind: "concept" });
+  await linkProductImageAsset(db, { id: imgH, path: `/images/${H}.webp` });
+
+  const pOther = await seedProduct(db, "ZZZ");
+  const imgO = await seedProductImage(db, pOther, `/images/${H.replace(/^a/, "b")}.webp`, { kind: "concept" });
+  await linkProductImageAsset(db, { id: imgO, path: `/images/${H.replace(/^a/, "b")}.webp` });
+
+  // đặt asset của "ZZZ" làm Hero → phải lên đầu dù tên xếp sau
+  await syncHeroUsage(db, `/images/${H.replace(/^a/, "b")}.webp`);
+
+  const res = await listMediaAssets(db, { tab: "concept", sort: "name_asc" });
+  assert.equal(res.items[0]?.product_code, "ZZZ");
+  await db.close();
+});

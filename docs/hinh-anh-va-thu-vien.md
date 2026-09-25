@@ -139,6 +139,9 @@ Mỗi card hiển thị **asset là chủ thể**, sản phẩm chỉ là usage 
 Sort người dùng chọn (popover Sắp xếp): `Mới nhất` · `Cũ nhất` · `Tên SP (A-Z)` · `Tên SP (Z-A)` ·
 `Mã SP (A-Z)` · `Mã SP (Z-A)` · `Ưu tiên (#1—#12)`.
 
+Khi sort theo tên/mã SP, asset **không có product usage** (chỉ mapping/hero, tên rỗng) luôn xếp
+**cuối** ở cả hai chiều — nếu không, chiều A-Z sẽ đẩy chuỗi rỗng lên đầu.
+
 Ngoài ra có **ưu tiên theo ngữ cảnh tab** (luôn xếp trước, rồi mới tới sort người dùng):
 
 - Tab **MAP**: ảnh thuộc sản phẩm **Tuyển chọn #1–#12** lên đầu (xếp theo rank).
