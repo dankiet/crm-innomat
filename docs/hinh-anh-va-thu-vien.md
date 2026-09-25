@@ -138,8 +138,8 @@ Mỗi card hiển thị **asset là chủ thể**, sản phẩm chỉ là usage 
 1. Thumbnail + badge MAP/Concept.
 2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm".
 3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng (phần nào thiếu thì ẩn).
-4. **Tag mô tả concept** — chỉ hiện khi ảnh CÓ `ai_description`; ảnh không có mô tả thì không
-   hiện tag nào (click tag để sửa mô tả).
+4. Nút **"Mô tả"** (chỉ ở tab Lookbook) — **highlight terracotta khi ảnh đã có `ai_description`**,
+   xám mờ khi chưa có. Không trích nội dung mô tả ra card; chỉ báo "đã có mô tả".
 5. Khối usage (click mở `AssetUsageDialog`): `2 Sản phẩm` · `1 Lookbook` · … hoặc "Không nơi nào dùng".
 6. Tag phòng Lookbook + toolbar thao tác.
 

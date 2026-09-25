@@ -208,7 +208,8 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 1. Ảnh thumbnail (badge MAP/Concept ở góc).
 2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm".
 3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng.
-4. **Tag mô tả concept** — chỉ hiện khi ảnh có `ai_description` (ảnh không mô tả → không tag).
+4. Nút **"Mô tả"** (tab Lookbook) — highlight terracotta khi ảnh đã có `ai_description`, xám mờ
+   khi chưa (không trích nội dung ra card).
 5. **Khối usage** (click mở `AssetUsageDialog`): liệt kê số theo nhóm — `2 Sản phẩm`,
    `1 Lookbook`, `1 Tuyển chọn`, `1 Đề xuất`, `1 Hero`; hoặc "Không nơi nào dùng" nếu chưa gán.
 6. Tag phòng Lookbook.
