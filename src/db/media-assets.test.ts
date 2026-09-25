@@ -155,10 +155,18 @@ test("pure: planBackfill idempotent — cùng input cho output y hệt", () => {
 async function seedProduct(db: AsyncDb, code: string, extra: Record<string, string | number | null | undefined> = {}): Promise<number> {
   const info = await db
     .prepare(
-      `INSERT INTO products (code, name, category, is_public, featured_rank, image_path)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (code, name, category, is_public, featured_rank, image_path, color)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(code, code, extra.category ?? "", extra.is_public ?? 0, extra.featured_rank ?? null, extra.image_path ?? "");
+    .run(
+      code,
+      code,
+      extra.category ?? "",
+      extra.is_public ?? 0,
+      extra.featured_rank ?? null,
+      extra.image_path ?? "",
+      extra.color ?? "",
+    );
   return Number(info.lastInsertRowid);
 }
 
@@ -650,5 +658,60 @@ test("db: listMediaAssets — tab Lookbook đẩy ảnh đang làm Hero lên đ�
 
   const res = await listMediaAssets(db, { tab: "concept", sort: "name_asc" });
   assert.equal(res.items[0]?.product_code, "ZZZ");
+  await db.close();
+});
+
+test("db: listMediaAssets — lọc theo NHÓM TÔNG gom nhiều màu raw (như /san-pham)", async () => {
+  const db = await open();
+  // 3 sản phẩm: 2 màu raw khác nhau cùng thuộc nhóm "xanh_la", 1 màu nhóm "xam".
+  const pMint = await seedProduct(db, "MINT", { color: "Xanh Mint" });
+  const imgM = await seedProductImage(db, pMint, `/images/${H}.webp`);
+  await linkProductImageAsset(db, { id: imgM, path: `/images/${H}.webp` });
+
+  const pLa = await seedProduct(db, "LA", { color: "Xanh Lá" });
+  const imgL = await seedProductImage(db, pLa, `/images/${H.replace(/^a/, "b")}.webp`);
+  await linkProductImageAsset(db, { id: imgL, path: `/images/${H.replace(/^a/, "b")}.webp` });
+
+  const pXam = await seedProduct(db, "XAM", { color: "Xám" });
+  const imgX = await seedProductImage(db, pXam, `/images/${H.replace(/^a/, "c")}.webp`);
+  await linkProductImageAsset(db, { id: imgX, path: `/images/${H.replace(/^a/, "c")}.webp` });
+
+  // Nhóm "xanh_la" phải gom CẢ "Xanh Mint" lẫn "Xanh Lá" → 2 asset.
+  const green = await listMediaAssets(db, { colors: ["xanh_la"] });
+  assert.equal(green.total, 2);
+  assert.deepEqual(green.items.map((i) => i.product_code).sort(), ["LA", "MINT"]);
+
+  // Nhóm "xam" chỉ 1 asset.
+  const grey = await listMediaAssets(db, { colors: ["xam"] });
+  assert.equal(grey.total, 1);
+  assert.equal(grey.items[0]?.product_code, "XAM");
+
+  // Link cũ dùng màu raw vẫn phải hoạt động (round-trip không vỡ).
+  const legacy = await listMediaAssets(db, { colors: ["Xám"] });
+  assert.equal(legacy.total, 1);
+  await db.close();
+});
+
+test("db: listMediaAssets — toneCounts gom raw color thành 8 nhóm", async () => {
+  const db = await open();
+  const p1 = await seedProduct(db, "C1", { color: "Xanh Mint" });
+  const i1 = await seedProductImage(db, p1, `/images/${H}.webp`);
+  await linkProductImageAsset(db, { id: i1, path: `/images/${H}.webp` });
+
+  const p2 = await seedProduct(db, "C2", { color: "Xanh Lá" });
+  const i2 = await seedProductImage(db, p2, `/images/${H.replace(/^a/, "b")}.webp`);
+  await linkProductImageAsset(db, { id: i2, path: `/images/${H.replace(/^a/, "b")}.webp` });
+
+  const p3 = await seedProduct(db, "C3", { color: "Đỏ" });
+  const i3 = await seedProductImage(db, p3, `/images/${H.replace(/^a/, "c")}.webp`);
+  await linkProductImageAsset(db, { id: i3, path: `/images/${H.replace(/^a/, "c")}.webp` });
+
+  const res = await listMediaAssets(db);
+  // 2 raw khác nhau ("Xanh Mint" + "Xanh Lá") gộp vào 1 nhóm xanh_la.
+  assert.equal(res.toneCounts.xanh_la, 2);
+  // "Đỏ" thuộc nhóm cam_terracotta.
+  assert.equal(res.toneCounts.cam_terracotta, 1);
+  // Nhóm không có asset → không xuất hiện (undefined, không phải 0).
+  assert.equal(res.toneCounts.xam, undefined);
   await db.close();
 });

@@ -70,6 +70,25 @@ export function toneLabel(id: string): string {
 }
 
 /**
+ * Danh sách giá trị `products.color` (raw, lowercase) thuộc một nhóm tông.
+ * Dùng để dịch filter nhóm tông → điều kiện SQL `IN (...)` khi tầng dữ liệu
+ * không tự map được (vd `listMediaAssets` lọc trên `products.color`).
+ */
+export function rawColorsOfToneGroup(groupId: string): string[] {
+  return Object.entries(COLOR_TO_GROUP)
+    .filter(([, g]) => g === groupId)
+    .map(([raw]) => raw);
+}
+
+/** Tất cả giá trị raw đã biết → nhóm (dùng để dựng điều kiện IN cho nhiều nhóm). */
+export function rawColorsOfToneGroups(groupIds: string[]): string[] {
+  const wanted = new Set(groupIds);
+  return Object.entries(COLOR_TO_GROUP)
+    .filter(([, g]) => wanted.has(g))
+    .map(([raw]) => raw);
+}
+
+/**
  * Giá trị chọn từ URL / chip → group id. Chấp nhận cả group id ("xam"), màu
  * raw ("Xám", link cũ) và token blank ("__blank__") để round-trip không vỡ.
  */

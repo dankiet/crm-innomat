@@ -23,6 +23,7 @@ import {
   type MediaUsageGroupKey,
 } from "../lib/media-assets.ts";
 import { type ImageRoomTagSlug, type ProductImageKind, type ProductImageRoomTag } from "../lib/types.ts";
+import { normalizeToneSelection, rawColorsOfToneGroup, toneOf, BLANK_FILTER_VALUE } from "../lib/color-tones.ts";
 
 export interface MediaAssetRow {
   id: number;
@@ -517,6 +518,8 @@ export interface ListMediaAssetsResult {
   counts: { all: number; map: number; concept: number; featured: number; unassigned: number };
   publicCounts: { all: number; public: number; hidden: number };
   roomCounts: Record<string, number>;
+  /** Số asset theo từng nhóm tông màu (id nhóm → count), tính trong phạm vi filter hiện tại. */
+  toneCounts: Record<string, number>;
 }
 
 const LOWER_LIKE = (col: string) => `LOWER(${col}) LIKE LOWER(?)`;
@@ -578,12 +581,24 @@ export async function listMediaAssets(
       addAssetProductWhere(`${cols.map(mapFn).join(",")} IN (${ph})`, vals as SqlValue[]);
     }
   };
-  facet(["p.color"], opts.colors);
+  // ── Màu: URL chứa NHÓM TÔNG ("xam", "xanh_la"…) → dịch sang các giá trị
+  //    products.color raw thuộc nhóm đó. Nhận cả màu raw (link cũ) để không vỡ.
+  if (opts.colors && opts.colors.length > 0) {
+    const raws = new Set<string>();
+    for (const c of opts.colors) {
+      const groupId = normalizeToneSelection(c);
+      if (!groupId || groupId === BLANK_FILTER_VALUE) continue;
+      for (const raw of rawColorsOfToneGroup(groupId)) raws.add(raw);
+    }
+    if (raws.size > 0) {
+      const ph = [...raws].map(() => "?").join(", ");
+      addAssetProductWhere(`LOWER(TRIM(p.color)) IN (${ph})`, [...raws] as SqlValue[]);
+    }
+  }
   facet(["p.surface"], opts.surfaces);
   facet(["p.shape"], opts.shapes);
   facet(["p.texture"], opts.textures);
   facet(["p.collections"], opts.collections);
-
   // ── Search: code/name product hoặc caption ảnh ──
   if (opts.search?.trim()) {
     const q = `%${opts.search.trim()}%`;
@@ -684,6 +699,24 @@ export async function listMediaAssets(
   const roomRows = (await db.prepare(roomSql).all<{ room_slug: string; n: number }>(...params)) ?? [];
   const roomCounts: Record<string, number> = {};
   for (const r of roomRows) roomCounts[r.room_slug] = Number(r.n) || 0;
+
+  // ── toneCounts: gom `products.color` raw → nhóm tông (8 nhóm như /san-pham) ──
+  const toneSql = `
+    SELECT p.color AS raw, COUNT(DISTINCT ma.id) AS n
+      FROM media_assets ma
+      JOIN product_images pi ON pi.media_asset_id = ma.id
+      JOIN products p ON p.id = pi.product_id
+      ${whereSql}
+      AND p.color IS NOT NULL AND TRIM(p.color) <> ''
+    GROUP BY p.color
+  `;
+  const toneRows = (await db.prepare(toneSql).all<{ raw: string; n: number }>(...params)) ?? [];
+  const toneCounts: Record<string, number> = {};
+  for (const r of toneRows) {
+    const gid = toneOf(r.raw);
+    if (!gid) continue;
+    toneCounts[gid] = (toneCounts[gid] ?? 0) + (Number(r.n) || 0);
+  }
 
   // ── Sort + pagination (asset-level) ──
   // Representative code/name/rank qua scalar subquery (LIMIT 1) — portable PG+SQLite.
@@ -802,7 +835,7 @@ export async function listMediaAssets(
     };
   });
 
-  return { items, total, counts, publicCounts, roomCounts };
+  return { items, total, counts, publicCounts, roomCounts, toneCounts };
 }
 
 type RepProductUsage = {

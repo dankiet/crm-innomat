@@ -54,7 +54,6 @@ import type { FeaturedSlotInfo } from "@/db/lp.server";
 import type { ImageReference } from "@/db/image-references.server";
 import {
   IMAGE_ROOM_TAGS,
-  PRODUCT_COLORS,
   PRODUCT_TEXTURES,
   type ImageRoomTagSlug,
   type ProductImageKind,
@@ -76,6 +75,7 @@ import { PaginationBar } from "@/components/PaginationBar";
 import { parseCsv } from "@/lib/product-facets";
 import { parsePositiveInt } from "@/lib/parse";
 import { formatFileSize } from "@/lib/format";
+import { TONE_GROUPS, toneLabel, normalizeToneSelection } from "@/lib/color-tones";
 type MediaStorageSearch = {
   tab?: FlatMediaTab;
   category?: string;
@@ -678,16 +678,16 @@ function MediaStoragePage() {
     let cancelled = false;
     const catParam = category === "all" ? undefined : category;
     Promise.all([
-      fetchProductFieldValues({ data: { field: "color", category: catParam } }).catch(() => [] as string[]),
       fetchProductFieldValues({ data: { field: "surface", category: catParam } }).catch(() => [] as string[]),
       fetchProductFieldValues({ data: { field: "shape", category: catParam } }).catch(() => [] as string[]),
       fetchProductFieldValues({ data: { field: "collections", category: catParam } }).catch(() => [] as string[]),
       fetchProductFieldValues({ data: { field: "texture", category: catParam } }).catch(() => [] as string[]),
-    ]).then(([colors, surfaces, shapes, collections, textures]) => {
+    ]).then(([surfaces, shapes, collections, textures]) => {
       if (cancelled) return;
-      const allColors = Array.from(new Set([...(catParam ? [] : PRODUCT_COLORS), ...colors])).filter(Boolean);
       const allTextures = Array.from(new Set([...(catParam ? [] : PRODUCT_TEXTURES), ...textures])).filter(Boolean);
-      setColorOptions(allColors.map((c) => ({ value: c, label: c })));
+      // Màu: 8 NHÓM TÔNG (giống /san-pham) thay vì từng giá trị raw rời rạc.
+      // Count điền sau ở render (toneCounts về từ server theo filter hiện tại).
+      setColorOptions(TONE_GROUPS.map((g) => ({ value: g.id, label: g.label })));
       setSurfaceOptions(surfaces.filter(Boolean).map((s) => ({ value: s, label: s })));
       setShapeOptions(shapes.filter(Boolean).map((s) => ({ value: s, label: s })));
       setTextureOptions(allTextures.map((t) => ({ value: t, label: t })));
@@ -829,6 +829,7 @@ function MediaStoragePage() {
   const [counts, setCounts] = useState({ all: 0, map: 0, concept: 0, featured: 0, unassigned: 0 });
   const [publicCounts, setPublicCounts] = useState({ all: 0, public: 0, hidden: 0 });
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
+  const [toneCounts, setToneCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   // Multi-select for bulk actions
@@ -897,6 +898,7 @@ function MediaStoragePage() {
         setCounts(res.counts);
         if (res.publicCounts) setPublicCounts(res.publicCounts);
         if (res.roomCounts) setRoomCounts(res.roomCounts);
+        if (res.toneCounts) setToneCounts(res.toneCounts);
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : "Không tải được danh sách ảnh");
@@ -926,6 +928,7 @@ function MediaStoragePage() {
         setCounts(res.counts);
         if (res.publicCounts) setPublicCounts(res.publicCounts);
         if (res.roomCounts) setRoomCounts(res.roomCounts);
+        if (res.toneCounts) setToneCounts(res.toneCounts);
       })
       .catch(() => {});
   }
@@ -1299,10 +1302,13 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          <FilterChip label="Màu" count={selectedColors.length}>
+          <FilterChip label="Tông màu" count={selectedColors.length}>
             <MultiSelectFilter
-              title="Chọn màu"
-              options={colorOptions}
+              title="Chọn tông màu"
+              options={colorOptions.map((o) => ({
+                ...o,
+                count: toneCounts[o.value] ?? 0,
+              }))}
               selected={selectedColors}
               onChange={(next) => patchFilters({ colors: next.length ? next : undefined })}
               searchable
@@ -1317,7 +1323,7 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          <FilterChip label="Dáng" count={selectedShapes.length}>
+          <FilterChip label="Kiểu dáng" count={selectedShapes.length}>
             <MultiSelectFilter
               title="Chọn kiểu dáng"
               options={shapeOptions}
@@ -1326,7 +1332,7 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          <FilterChip label="Vân" count={selectedTextures.length}>
+          <FilterChip label="Hiệu ứng vân" count={selectedTextures.length}>
             <MultiSelectFilter
               title="Chọn hiệu ứng vân"
               options={textureOptions}
@@ -1335,7 +1341,7 @@ function MediaStoragePage() {
               searchable
             />
           </FilterChip>
-          <FilterChip label="BST" count={selectedCollections.length}>
+          <FilterChip label="Bộ sưu tập" count={selectedCollections.length}>
             <MultiSelectFilter
               title="Chọn bộ sưu tập"
               options={collectionOptions}
@@ -1396,14 +1402,14 @@ function MediaStoragePage() {
             {selectedColors.map((c) => (
               <ActiveTag
                 key={`c-${c}`}
-                label={`Xoá lọc màu ${c}`}
+                label={`Xoá lọc tông màu ${toneLabel(normalizeToneSelection(c))}`}
                 onClear={() =>
                   patchFilters({
                     colors: selectedColors.filter((x) => x !== c),
                   })
                 }
               >
-                Màu: {c}
+                {toneLabel(normalizeToneSelection(c))}
               </ActiveTag>
             ))}
             {selectedSurfaces.map((s) => (
@@ -1429,7 +1435,7 @@ function MediaStoragePage() {
                   })
                 }
               >
-                Dáng: {s}
+                {s}
               </ActiveTag>
             ))}
             {selectedTextures.map((t) => (
@@ -1442,7 +1448,7 @@ function MediaStoragePage() {
                   })
                 }
               >
-                Vân: {t}
+                {t}
               </ActiveTag>
             ))}
             {selectedCollections.map((e) => (
@@ -1455,7 +1461,7 @@ function MediaStoragePage() {
                   })
                 }
               >
-                BST: {e}
+                {e}
               </ActiveTag>
             ))}
             {roomSlug !== "all" ? (

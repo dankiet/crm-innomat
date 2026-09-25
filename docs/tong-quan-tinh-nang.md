@@ -229,13 +229,15 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
   `Cũ nhất` · `Ưu tiên (#1—#12)`. Tab MAP tự đẩy ảnh Tuyển chọn #1–#12 lên đầu; tab Lookbook đẩy
   ảnh đang làm Hero lên đầu.
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
-- **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (7 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
-  dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,
-  dùng chung với `/san-pham`) kèm nút **"Xoá tất cả (N)"** gọi `resetAllFilters`; nhờ đó bộ lọc
-  nào cũng gỡ được, kể cả `category` (Nhóm) — nút "Xóa bộ lọc SP" cũ bỏ sót `category`.
-- **Bối cảnh phòng (Lookbook)**: chip **"Bối cảnh"** trong hàng facet (cạnh Nhóm/Màu/Bề mặt/
-  Dáng/Vân/BST), chỉ hiện khi ở tab Lookbook hoặc đang lọc bối cảnh. Chọn bối cảnh tự chuyển
-  tab Lookbook. Nhãn tiếng Anh lấy từ `IMAGE_ROOM_TAGS` / `SPACE_TYPES`
+- **Bộ lọc (đồng bộ với `/san-pham`)**: chip `Nhóm` · `Tông màu` · `Bề mặt` · `Kiểu dáng` ·
+  `Hiệu ứng vân` · `Bộ sưu tập` (+ `Bối cảnh` khi ở tab Lookbook). **Tông màu gộp 8 nhóm**
+  (`src/lib/color-tones.ts`: Trắng/Kem, Xám, Xanh Lá, Xanh Dương, Nâu, Đen, Cam/Terracotta,
+  Vàng) thay vì liệt kê từng giá trị `products.color` thô — options có kèm **số lượng**
+  (`toneCounts` trả từ server). Lọc theo nhóm tự dịch sang các màu raw thuộc nhóm đó; link cũ
+  chứa màu raw ("Xám") vẫn hoạt động.
+- **Bối cảnh phòng (Lookbook)**: chip **"Bối cảnh"** trong hàng facet (cạnh Nhóm/Tông màu/Bề mặt/
+  Kiểu dáng/Hiệu ứng vân/Bộ sưu tập), chỉ hiện khi ở tab Lookbook hoặc đang lọc bối cảnh. Chọn
+  bối cảnh tự chuyển tab Lookbook. Nhãn tiếng Anh lấy từ `IMAGE_ROOM_TAGS` / `SPACE_TYPES`
   (`src/lib/types.ts`) — `Living Room & Lounge`, `Kitchen & Dining`, `Bathroom & Spa`,
   `Bedroom & Suite`, `Balcony & Courtyard`, `F&B / Hotel / Resort`, `Office / Workspace`,
   `Other Space`, `Unknown`. Không hardcode lại chuỗi phòng trong component.

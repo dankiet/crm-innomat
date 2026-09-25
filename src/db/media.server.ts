@@ -12,6 +12,12 @@ import type { ImageRoomTagSlug, Product, ProductImageKind, ProductImageRoomTag }
 
 // --- RECOVERED FUNCTIONS ---
 
+/**
+ * Trường sửa được của sản phẩm. KHÔNG có `image_path`: cột đó là SNAPSHOT DẪN
+ * XUẤT từ `product_images` (ảnh primary), do `syncPrimaryImagePath` và luồng
+ * thêm/xoá ảnh ghi. Cho phép sửa trực tiếp sẽ tạo ref trỏ tới ảnh không còn gắn
+ * với sản phẩm — nguồn gốc lỗi "ảnh vô hình" trên /luu-tru.
+ */
 export type ProductUpdate = {
   code?: string;
   /** Multi mã HHDV: "A|B|C" hoặc raw có dấu phẩy/xuống dòng */
@@ -39,7 +45,6 @@ export type ProductUpdate = {
   is_public?: number;
   /** Thứ tự ưu tiên trên landing page; null = xếp sau, theo id. */
   featured_rank?: number | null;
-  image_path?: string;
 };
 
 export async function updateProduct(id: number, input: ProductUpdate): Promise<Product> {
@@ -106,8 +111,7 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
         note = @note,
         is_hot = @is_hot,
         is_public = @is_public,
-        featured_rank = @featured_rank,
-        image_path = @image_path
+        featured_rank = @featured_rank
        WHERE id = @id`,
     )
     .run({
@@ -140,7 +144,6 @@ export async function updateProduct(id: number, input: ProductUpdate): Promise<P
         input.is_public !== undefined ? (input.is_public ? 1 : 0) : (existing.is_public ?? 0),
       featured_rank:
         input.featured_rank !== undefined ? input.featured_rank : (existing.featured_rank ?? null),
-      image_path: String(input.image_path ?? existing.image_path ?? "").trim(),
     } as unknown as SqlValue);
 
   return (await getProduct(id))!;
@@ -170,7 +173,6 @@ export type ProductCreateInput = {
   is_hot?: number;
   is_public?: number;
   featured_rank?: number | null;
-  image_path?: string;
 };
 
 export async function createProduct(input: ProductCreateInput): Promise<Product> {
@@ -205,12 +207,12 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
         code, name, size, material, surface, shape, texture, collections, category, supplier,
         color, area_per_tile_m2,
         retail_price, trade_price, b2b_price, discount_tp, discount_b2b,
-        note, is_hot, is_public, featured_rank, image_path
+        note, is_hot, is_public, featured_rank
       ) VALUES (
         @code, @name, @size, @material, @surface, @shape, @texture, @collections, @category, @supplier,
         @color, @area_per_tile_m2,
         @retail_price, @trade_price, @b2b_price, @discount_tp, @discount_b2b,
-        @note, @is_hot, @is_public, @featured_rank, @image_path
+        @note, @is_hot, @is_public, @featured_rank
       )`,
     )
     .run({
@@ -238,7 +240,6 @@ export async function createProduct(input: ProductCreateInput): Promise<Product>
       is_public: input.is_public ? 1 : 0,
       featured_rank: input.featured_rank ?? null,
       is_hot: input.is_hot ? 1 : 0,
-      image_path: (input.image_path ?? "").trim(),
     } as unknown as SqlValue);
 
   return (await getProduct(Number(info.lastInsertRowid)))!;
@@ -281,6 +282,7 @@ export async function listFlatMediaImages(opts?: {
   counts: { all: number; map: number; concept: number; featured: number; unassigned: number };
   publicCounts: { all: number; public: number; hidden: number };
   roomCounts: Record<string, number>;
+  toneCounts: Record<string, number>;
 }> {
   return await listMediaAssets(getDb(), opts);
 }
