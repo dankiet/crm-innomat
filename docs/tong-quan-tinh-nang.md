@@ -189,11 +189,13 @@ Từ 2026-09-25 theo **Option 2 (1 file = 1 MediaAsset)**:
 trò detail cho dialog (5 nguồn `path`) nhưng **đọc chính là `listMediaAssets`**.
 
 Card hiển thị chip tổng hợp trực tiếp từ `usage_groups` (Product/Lookbook/Tuyển chọn/Hero/
-Mapping) + `status` (`used`·`draft`·`orphan`). Click → **AssetUsageDialog** liệt kê nhóm usage
+Mapping) + `status` (`used`·`unused`). Click → **AssetUsageDialog** liệt kê nhóm usage
 và references chi tiết theo role + href khi có route.
 
-Xoá asset (`deleteMediaAssetFn`) chỉ gỡ **liên kết usage** — nếu còn usage, dialog nhắc
-"Xem N nơi đang dùng trước khi xóa"; file storage **không** bị xoá (là việc riêng của GC, xem
+Xoá asset (`deleteMediaAssetFn`) là **xoá vĩnh viễn**: gỡ mọi liên kết (xoá row `product_images`,
+clear ref trong Đề xuất/Hero), xoá row `media_assets`, **và xoá file trong Supabase Storage** —
+chỉ giữ file khi còn bảng khác trỏ tới cùng storage key. Nếu còn usage, dialog nhắc
+"Xem N nơi đang dùng trước khi xóa" (xem
 [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §"Kho ảnh asset-centric").
 
 ## 12. Media — `/luu-tru`
@@ -205,7 +207,7 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 
 1. Ảnh thumbnail (badge MAP/Concept ở góc).
 2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm"; góc phải badge
-   `USE`/`UNUSE`.
+   `IN USE`/`NOT IN USE`.
 3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng.
 4. **Khối usage** (click mở `AssetUsageDialog`): liệt kê số theo nhóm — `2 Sản phẩm`,
    `1 Lookbook`, `1 Tuyển chọn`, `1 Đề xuất`, `1 Hero`; hoặc "Không nơi nào dùng" nếu chưa gán.
@@ -285,5 +287,4 @@ RPC: **72** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/ap
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
 
 `npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
-[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **100 test pass** (67 cũ + 33 media-assets
-mới).
+[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **104 test pass**.

@@ -63,8 +63,8 @@ xem §Kho ảnh asset-centric bên dưới).
 Quy tắc (đã tách theo từng phạm vi xoá):
 
 - **Gỡ ảnh khỏi bản ghi** (`deleteProduct`, `deleteCustomerMapping`, `deleteCustomer`,
-  `setHeroImageSetting`) **không** đụng tới file hay asset. Ảnh chỉ rơi vào trạng thái
-  `draft` / `orphan` trên `/luu-tru`.
+  `setHeroImageSetting`) **không** đụng tới file hay asset. Ảnh chỉ rơi vào nhóm `unused`
+  (Not in use) trên `/luu-tru`.
 - **Xoá ảnh trong phạm vi sản phẩm** (`deleteProductImage` — từ màn hình sản phẩm): kiểm tra
   Reference Resolver và **có thể gọi `deleteImageRef()`** khi **không còn nguồn nào** trỏ tới path.
   Vì tên file là hash, hai bản ghi dùng chung một tấm ảnh sẽ chia sẻ đúng một file — xoá thẳng khi

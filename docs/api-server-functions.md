@@ -77,7 +77,10 @@ chuyển khách hàng giữa các sale.
 `setPrimaryProductImageFn`, `deleteProductImageFn`.
 Kho ảnh (asset-centric): `fetchFlatMediaImages` (đọc theo MediaAsset — xem
 [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric),
-`deleteMediaAssetFn` (xoá 1 MediaAsset + mọi usage của nó; trả `{ deleted, usages_removed }`).
+`deleteMediaAssetFn` — **xoá vĩnh viễn** 1 MediaAsset: gỡ mọi liên kết usage (xoá row
+`product_images`, clear ref trong Đề xuất/Hero), xoá row `media_assets`, **và xoá file trong
+Supabase Storage** (chỉ khi không còn bảng nào trỏ tới cùng storage key). Trả
+`{ deleted, usages_removed, path, file_deleted }`.
 
 `fetchProductFieldValues` / `bulkUpdateProductFieldFn` / `clearProductFieldValueFn` nhận **tên cột**
 từ client, nên chỉ chấp nhận cột nằm trong **whitelist `PRODUCT_SUGGEST_FIELDS`** — đây là lá chắn
