@@ -1915,48 +1915,107 @@ function MediaStoragePage() {
                   </button>
                 </div>
 
-                {/* Product Metadata & Actions */}
+                {/* ── Asset Identity & Usage ── */}
                 <div className="flex flex-1 flex-col justify-between p-2.5">
-                  {/* Product Details */}
                   <div>
-                    {hasProductUsage ? (
-                      <>
-                        <div className="flex items-center justify-between gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setGalleryProduct({
-                                id: img.product_id,
-                                code: img.product_code,
-                                name: img.product_name,
-                                category: img.product_category,
-                              })
-                            }
-                            title="Xem toàn bộ ảnh của sản phẩm này để chọn lại MAP/Concept"
-                            className="inline-flex items-center gap-1 font-mono text-xs font-bold text-foreground hover:text-terracotta hover:underline truncate cursor-pointer text-left"
-                          >
-                            <span>{img.product_code}</span>
-                            <Images className="size-3 text-muted-foreground/60 shrink-0" />
-                          </button>
-                          {img.product_category ? (
-                            <span className="shrink-0 text-[10px] text-muted-foreground/80">
-                              {img.product_category}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={img.product_name}>
-                          {img.product_name}
+                    {/* Asset header: hash + status badge */}
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="min-w-0">
+                        <p
+                          className="truncate font-mono text-[11px] font-semibold text-foreground"
+                          title={`${img.storage_key} · Asset #${img.asset_id}`}
+                        >
+                          {img.storage_key.slice(0, 12)}…
                         </p>
-                      </>
-                    ) : (
-                      <p
-                        className="truncate font-mono text-[11px] text-muted-foreground"
-                        title={`MediaAsset #${img.asset_id} · ${img.storage_key}`}
+                        <p className="mt-0.5 text-[9px] text-muted-foreground/70">
+                          Asset #{img.asset_id} · {img.created_at.slice(0, 10)}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+                          img.status === "orphan"
+                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                            : img.status === "draft"
+                              ? "bg-surface-strong text-muted-foreground"
+                              : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+                        )}
                       >
-                        MediaAsset #{img.asset_id}
-                      </p>
-                    )}
-                    {/* Bối cảnh phòng Lookbook (hiển thị khi là Concept hoặc có tag) */}
+                        {img.status}
+                      </span>
+                    </div>
+
+                    {/* Usage breakdown — prominent list */}
+                    <button
+                      type="button"
+                      onClick={() => setUsageDialogKey(img.storage_key)}
+                      title="Xem chi tiết nơi đang dùng"
+                      className="mt-1.5 w-full rounded-md border border-border/60 bg-surface-strong/40 px-2 py-1.5 text-left transition-colors hover:bg-surface-strong/80 cursor-pointer"
+                    >
+                      {img.usage_count > 0 ? (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+                          {img.usage_groups.product > 0 && (
+                            <span className="text-foreground">
+                              <span className="font-semibold">{img.usage_groups.product}</span>{" "}
+                              <span className="text-muted-foreground">Sản phẩm</span>
+                            </span>
+                          )}
+                          {img.usage_groups.lookbook > 0 && (
+                            <span className="text-foreground">
+                              <span className="font-semibold">{img.usage_groups.lookbook}</span>{" "}
+                              <span className="text-muted-foreground">Lookbook</span>
+                            </span>
+                          )}
+                          {img.usage_groups.featured > 0 && (
+                            <span className="text-foreground">
+                              <span className="font-semibold">{img.usage_groups.featured}</span>{" "}
+                              <span className="text-muted-foreground">Tuyển chọn</span>
+                            </span>
+                          )}
+                          {img.usage_groups.mapping > 0 && (
+                            <span className="text-foreground">
+                              <span className="font-semibold">{img.usage_groups.mapping}</span>{" "}
+                              <span className="text-muted-foreground">Đề xuất</span>
+                            </span>
+                          )}
+                          {img.usage_groups.hero > 0 && (
+                            <span className="text-foreground">
+                              <span className="font-semibold">{img.usage_groups.hero}</span>{" "}
+                              <span className="text-muted-foreground">Hero</span>
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] italic text-muted-foreground/60">
+                          Không nơi nào dùng
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Representative product (secondary, muted) */}
+                    {hasProductUsage ? (
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setGalleryProduct({
+                              id: img.product_id,
+                              code: img.product_code,
+                              name: img.product_name,
+                              category: img.product_category,
+                            })
+                          }
+                          title="Xem toàn bộ ảnh của sản phẩm này"
+                          className="inline-flex items-center gap-1 truncate text-[10px] text-muted-foreground hover:text-terracotta hover:underline cursor-pointer"
+                        >
+                          <Images className="size-3 shrink-0" />
+                          <span className="font-mono font-medium">{img.product_code}</span>
+                          <span className="truncate">{img.product_name}</span>
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {/* Room tags (Lookbook) */}
                     {hasProductUsage && (isConcept || img.room_tags.length > 0) ? (
                       <div className="mt-1.5 flex flex-wrap items-center gap-1">
                         {img.room_tags.map((tag) => (
@@ -1976,44 +2035,8 @@ function MediaStoragePage() {
                     ) : null}
                   </div>
 
-                  {/* Usage summary + Lookbook (Concept) controls */}
+                  {/* Lookbook (Concept) controls */}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {(() => {
-                      const groups = img.usage_groups;
-                      const parts: string[] = [];
-                      if (groups.product > 0) parts.push(`${groups.product} SP`);
-                      if (groups.lookbook > 0) parts.push(`${groups.lookbook} Lookbook`);
-                      if (groups.featured > 0) parts.push(`${groups.featured} Tuyển`);
-                      if (groups.mapping > 0) parts.push(`${groups.mapping} Đề xuất`);
-                      if (groups.hero > 0) parts.push(`${groups.hero} Hero`);
-                      const label =
-                        img.status === "orphan"
-                          ? "Orphan · không nơi dùng"
-                          : img.status === "draft"
-                            ? `Draft · ${parts.length ? parts.join(" · ") : "0 usage"}`
-                            : parts.length
-                              ? `Used · ${parts.join(" · ")}`
-                              : "Used";
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => setUsageDialogKey(img.storage_key)}
-                          title="Xem MediaAsset đang được dùng ở đâu"
-                          aria-label="Xem MediaAsset đang được dùng ở đâu"
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold border transition-all cursor-pointer",
-                            img.status === "orphan"
-                              ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
-                              : img.status === "draft"
-                                ? "border-border/80 bg-surface-strong/60 text-muted-foreground hover:bg-surface-strong"
-                                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20",
-                          )}
-                        >
-                          <Layers className="size-2.5" />
-                          <span>{label}</span>
-                        </button>
-                      );
-                    })()}
                     {hasProductUsage && isConcept ? (
                       <>
                         <button

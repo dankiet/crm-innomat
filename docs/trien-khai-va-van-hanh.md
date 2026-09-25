@@ -172,9 +172,13 @@ registry (không phải GC):
   theo tham chiếu còn sót).
 - Không cần scheduler: Vercel serverless không có process nền, và cũng không còn gì để chạy nền.
 
-### Backfill MediaAsset (cần duyệt)
+### Backfill MediaAsset
 
 `npm run db:media-backfill` đọc 5 nguồn ref hiện có, tạo `media_assets` + usage tương ứng.
-**Idempotent** (chạy lại ra cùng kết quả; đã test trên fake SQLite) nhưng là DDL+dữ liệu thật nên
-**chưa chạy ở production — chờ duyệt**. Verify bằng `npm run db:media-verify`.
-Xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric.
+**Idempotent** (chạy lại ra cùng kết quả). Đã chạy ở production **2026-09-25** (có duyệt):
+3.561 asset · 3.597 product usage · 156 mapping · 1 hero. Verify bằng `npm run db:media-verify`
+(PASS 11/11). Xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric.
+
+> Lưu ý vận hành: schema (`media_assets` + 2 bảng usage) **phải migrate TRƯỚC** khi deploy code
+> asset-centric — nếu không, `/luu-tru` sẽ trắng lưới vì đọc `FROM media_assets`. Thứ tự:
+> `db:migrate` → `db:media-backfill` → deploy.

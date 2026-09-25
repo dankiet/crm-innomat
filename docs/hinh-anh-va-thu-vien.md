@@ -118,6 +118,17 @@ signature cũ. Kết quả `FlatMediaItem`:
 
 Filter `usage=all|used|draft|orphan` → 4 nút segmented trên UI.
 
+### Bố cục card (asset-first)
+
+Mỗi card hiển thị **asset là chủ thể**, sản phẩm chỉ là usage phụ:
+
+1. Thumbnail + badge MAP/Concept.
+2. Hash rút gọn (mono) + badge `USED`/`DRAFT`/`ORPHAN`.
+3. `Asset #<id> · <ngày tạo>`.
+4. Khối usage (click mở `AssetUsageDialog`): `2 Sản phẩm` · `1 Lookbook` · … hoặc "Không nơi nào dùng".
+5. Sản phẩm đại diện (mờ, phụ) — chỉ khi `id > 0`.
+6. Tag phòng Lookbook + toolbar thao tác.
+
 ### Xoá theo asset
 
 `deleteMediaAsset(db, assetId)` (`deleteMediaAssetFn` API):
@@ -134,5 +145,6 @@ Xoá luôn theo quy tắc 2 bước inline (AGENTS.md) — không `window.confir
 
 `applyMediaBackfill(db, sources)` trong `src/db/media-assets.server.ts` + scripts
 `db:media-backfill` / `db:media-verify` (idempotent — chạy lại ra cùng kết quả).
-**Chưa chạy ở production — cần duyệt trước** (ghi ở [trien-khai-va-van-hanh](trien-khai-va-van-hanh.md)).
+Đã chạy ở production ngày **2026-09-25** (có duyệt): 3.561 asset, 3.597 product usage,
+156 mapping, 1 hero; `db:media-verify` PASS 11/11 (xem [trien-khai-va-van-hanh](trien-khai-va-van-hanh.md)).
 

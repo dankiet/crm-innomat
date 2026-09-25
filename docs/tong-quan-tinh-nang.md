@@ -198,15 +198,29 @@ Xoá asset (`deleteMediaAssetFn`) chỉ gỡ **liên kết usage** — nếu cò
 
 ## 12. Media — `/luu-tru`
 
-Media Workspace duy nhất: mọi ảnh sản phẩm + phân loại + trạng thái dùng.
+Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, không phải 1 dòng
+`product_images`.
+
+**Bố cục card (asset-first)** — thứ tự từ trên xuống:
+
+1. Ảnh thumbnail (badge MAP/Concept ở góc).
+2. **Định danh asset**: hash rút gọn (`a88631d6c872…`, mono) + badge trạng thái
+   `USED`/`DRAFT`/`ORPHAN` (viết hoa, góc phải).
+3. `Asset #<id> · <ngày tạo>`.
+4. **Khối usage** (click mở `AssetUsageDialog`): liệt kê số theo nhóm — `2 Sản phẩm`,
+   `1 Lookbook`, `1 Tuyển chọn`, `1 Đề xuất`, `1 Hero`; hoặc "Không nơi nào dùng" nếu orphan.
+5. **Sản phẩm đại diện** (phụ, mờ): mã + tên SP, click mở gallery sản phẩm. Chỉ hiện khi asset
+   có product usage (`id > 0`).
+6. Tag phòng Lookbook (nếu là Concept hoặc có tag).
+7. Toolbar thao tác + xoá 2 bước inline.
 
 - **Phạm vi (primary tabs)**: `All` · `MAP` · `Lookbook` · `Uncategorized` (nhãn tiếng Anh trên
   UI; `featured` = Tuyển chọn #1—#12 vẫn nhận qua deep-link nhưng không còn là tab). Tab dùng
   segmented nhỏ (`px-2.5 py-1 text-[11px]`) cùng cỡ với segmented trạng thái dùng.
 - **Sử dụng (secondary, URL `usage`)**: 4 trạng thái **`all` (mặc định) / `used` / `draft` /
   `orphan`** — asset-level qua `listMediaAssets` (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)
-  §Kho ảnh asset-centric). Có banner ngữ cảnh khi lọc "Orphan"; chip trạng thái trên mỗi card
-  click để mở AssetUsageDialog.
+  §Kho ảnh asset-centric). Có banner ngữ cảnh khi lọc "Orphan"; khối usage trên card click để
+  mở AssetUsageDialog.
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
 - **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (5 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
   dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,

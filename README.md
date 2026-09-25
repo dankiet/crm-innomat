@@ -51,7 +51,7 @@ Windows: bấm đúp `START_LOCAL.bat` để mở dev server + browser trên por
 | `npm run db:migrate`              | Áp `src/db/schema-pg.sql` (ưu tiên `DATABASE_URL_UNPOOLED`)   |
 | `npm run db:enable-rls`           | Bật RLS cho mọi bảng public                                   |
 | `npm run db:seed-admin`           | Tạo/đặt lại admin từ `CRM_ADMIN_*`                            |
-| `npm run db:media-backfill`       | Backfill `media_assets` + usage từ 5 nguồn ref (idempotent; **cần duyệt** ở prod) |
+| `npm run db:media-backfill`       | Backfill `media_assets` + usage từ 5 nguồn ref (idempotent)   |
 | `npm run db:media-verify`         | Verify backfill MediaAsset                                    |
 | `npm run storage:backup`          | Mirror bucket Supabase về `public/images`                     |
 | `npm run clean:generated`         | Xoá output build/generated                                    |

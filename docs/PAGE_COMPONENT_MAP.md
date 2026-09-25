@@ -292,9 +292,9 @@ thêm trong cleanup này dùng đúng khuôn đó.
 ```
 
 `?usage=all|used|draft|orphan` — status asset-level (used/draft/orphan, mặc định all).
-Chip trên card đọc `usage_groups` (trả từ `fetchFlatMediaImages`) để hiện
-"Used · N SP · M Lookbook" v.v.; chip click → `AssetUsageDialog` (references nạp bằng
-`fetchMediaUsageFn` cho phần detail).
+Card **asset-first**: hash rút gọn + badge USED/DRAFT/ORPHAN + `Asset #id · ngày` + khối usage
+(`2 Sản phẩm · 1 Lookbook`) click mở `AssetUsageDialog`; sản phẩm đại diện là dòng phụ (mờ).
+Chi tiết reference trong dialog nạp bằng `fetchMediaUsageFn`.
 
 ---
 
