@@ -12,20 +12,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { Material } from "@/data/mockData";
-import { COLOR_PALETTES, matchColorPalette } from "@/lib/color-palette";
+import { getToneDisplay } from "@/lib/color-palette";
 
-function getToneDisplay(rawTone: string | null | undefined): { label: string; hex: string; border: string } {
-  if (!rawTone) return { label: "Đa sắc", hex: "#B94A2E", border: "rgba(0,0,0,0.15)" };
-  if (rawTone.startsWith("#")) {
-    return { label: rawTone, hex: rawTone, border: "rgba(0,0,0,0.15)" };
-  }
-  const pid = matchColorPalette(rawTone);
-  const found = COLOR_PALETTES.find((p) => p.id === pid);
-  if (found) {
-    return { label: rawTone, hex: found.hex, border: found.dotBorder || "rgba(0,0,0,0.15)" };
-  }
-  return { label: rawTone, hex: "#B94A2E", border: "rgba(0,0,0,0.15)" };
-}
 type MaterialModalProps = {
   material: Material | null;
   selected: boolean;

@@ -177,3 +177,25 @@ export function matchColorPalette(rawColor: string | null | undefined): string |
 
   return null;
 }
+
+/**
+ * Hiển thị tông màu từ giá trị `tone` của material: nhận cả mã hex (`#RRGGBB`) lẫn
+ * tên màu tiếng Việt trong DB ("Trắng", "Xanh Mint"…). Tên màu được map sang hex qua
+ * `matchColorPalette` để luôn có màu hợp lệ cho swatch/dải màu moodboard.
+ */
+export function getToneDisplay(rawTone: string | null | undefined): {
+  label: string;
+  hex: string;
+  border: string;
+} {
+  if (!rawTone) return { label: "Đa sắc", hex: "#B94A2E", border: "rgba(0,0,0,0.15)" };
+  if (rawTone.startsWith("#")) {
+    return { label: rawTone, hex: rawTone, border: "rgba(0,0,0,0.15)" };
+  }
+  const pid = matchColorPalette(rawTone);
+  const found = COLOR_PALETTES.find((p) => p.id === pid);
+  if (found) {
+    return { label: rawTone, hex: found.hex, border: found.dotBorder || "rgba(0,0,0,0.15)" };
+  }
+  return { label: rawTone, hex: "#B94A2E", border: "rgba(0,0,0,0.15)" };
+}

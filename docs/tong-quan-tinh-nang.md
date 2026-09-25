@@ -206,13 +206,13 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 **Bố cục card (asset-first)** — thứ tự từ trên xuống:
 
 1. Ảnh thumbnail (badge MAP/Concept ở góc).
-2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm"; góc phải badge
-   `IN USE`/`NOT IN USE`.
+2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm".
 3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng.
-4. **Khối usage** (click mở `AssetUsageDialog`): liệt kê số theo nhóm — `2 Sản phẩm`,
+4. **Tag mô tả concept** — chỉ hiện khi ảnh có `ai_description` (ảnh không mô tả → không tag).
+5. **Khối usage** (click mở `AssetUsageDialog`): liệt kê số theo nhóm — `2 Sản phẩm`,
    `1 Lookbook`, `1 Tuyển chọn`, `1 Đề xuất`, `1 Hero`; hoặc "Không nơi nào dùng" nếu chưa gán.
-5. Tag phòng Lookbook.
-6. Toolbar thao tác + xoá 2 bước inline.
+6. Tag phòng Lookbook.
+7. Toolbar thao tác + xoá 2 bước inline.
 
 - **Phạm vi (primary tabs)**: `All` · `MAP` · `Lookbook` · `Uncategorized` (nhãn tiếng Anh trên
   UI; `featured` = Tuyển chọn #1—#12 vẫn nhận qua deep-link nhưng không còn là tab). Tab dùng
@@ -224,9 +224,9 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
   `listMediaAssets` (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric).
   Có banner ngữ cảnh khi lọc "Not in use"; khối usage trên card vẫn đếm đủ mọi nhóm và click để
   mở AssetUsageDialog.
-- **Sắp xếp**: `Mới nhất` · `Cũ nhất` · `Tên SP (A-Z/Z-A)` · `Mã SP (A-Z/Z-A)` ·
-  `Ưu tiên (#1—#12)`. Tab MAP tự đẩy ảnh Tuyển chọn #1–#12 lên đầu; tab Lookbook đẩy ảnh
-  đang làm Hero lên đầu.
+- **Sắp xếp** (mặc định `Tên SP (A-Z)`): `Tên SP (A-Z/Z-A)` · `Mã SP (A-Z/Z-A)` · `Mới nhất` ·
+  `Cũ nhất` · `Ưu tiên (#1—#12)`. Tab MAP tự đẩy ảnh Tuyển chọn #1–#12 lên đầu; tab Lookbook đẩy
+  ảnh đang làm Hero lên đầu.
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
 - **Bộ lọc**: Nhóm (product taxonomy) → Facet (Màu, Bề mặt, Dáng, Vân, BST) → Popover Trạng thái (Sử dụng + Tuyển chọn) + Popover Sắp xếp (7 kiểu gồm ưu tiên). Mọi bộ lọc đang áp
   dụng hiện thành **dải chip** (`ActiveTag` — `src/components/product-filter/ActiveTag.tsx`,
@@ -264,24 +264,22 @@ Tổng **26 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 15. Quy mô code
 
-> Đo ngày **2026-09-24** (sau đợt dọn dead code + đợt tối ưu kiến trúc + đợt
-> refactor được duyệt + đợt media-workspace + gỡ Thư viện — xem [CLEANUP_REPORT](CLEANUP_REPORT.md),
-> [REFACTOR_REPORT](REFACTOR_REPORT.md)). **2026-09-25** bổ sung Option 2 MediaAsset:
-> `src/db/media-assets.server.ts` (+873 dòng) và `src/lib/media-assets.ts` (+189 dòng).
+> Đo ngày **2026-09-25** (sau đợt Option 2 MediaAsset + card asset-first + gộp lọc In use/Not in use).
+> Mốc trước đó 2026-09-24: xem [CLEANUP_REPORT](CLEANUP_REPORT.md), [REFACTOR_REPORT](REFACTOR_REPORT.md).
 
 | Vùng             | File | Dòng   |
 | ---------------- | ---: | -----: |
-| `src/routes`     |   21 | 12.068 |
-| `src/components` |   43 | 12.375 |
-| `src/db`         |   13 |  7.026 |
-| `src/lib`        |   33 |  3.006 |
-| `src/api`        |    2 |  2.027 |
+| `src/routes`     |   21 | 12.155 |
+| `src/components` |   43 | 12.413 |
+| `src/db`         |   13 |  7.266 |
+| `src/lib`        |   34 |  3.217 |
+| `src/api`        |    2 |  2.068 |
 | `src/render`     |    2 |    815 |
-| `src/*.ts` (gốc) |    4 |    645 |
+| `src/*.ts` (gốc) |    3 |    629 |
 | `src/data`       |    1 |    321 |
 | `src/hooks`      |    2 |     63 |
-| **Tổng `src/`**  |  121 | **38.346** |
-| `*.test.ts` (node --test) | 11 | 1.067 |
+| **Tổng `src/`**  |  123 | **39.226** |
+| `*.test.ts` (node --test) | 11 | 1.238 |
 
 RPC: **72** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/api/lp.ts` = **93**
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).

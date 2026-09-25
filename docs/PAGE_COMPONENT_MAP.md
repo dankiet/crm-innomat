@@ -292,10 +292,11 @@ thêm trong cleanup này dùng đúng khuôn đó.
 ```
 
 `?usage=used|unused` — phân loại theo **ảnh sản phẩm**, mặc định `used`.
-Card **asset-first**: tên sản phẩm (đậm) + badge `IN USE`/`NOT IN USE` + dòng phụ mã SP · `WxH` ·
-dung lượng + khối usage (`2 Sản phẩm · 1 Lookbook`) click mở `AssetUsageDialog`.
-Sort: `Mới nhất`/`Cũ nhất`/`Tên SP (A-Z,Z-A)`/`Mã SP (A-Z,Z-A)`/`Ưu tiên`; tab MAP đẩy ảnh
-Tuyển chọn lên đầu, tab Lookbook đẩy ảnh Hero lên đầu.
+Card **asset-first**: tên sản phẩm (đậm) + dòng phụ mã SP · `WxH` · dung lượng + tag mô tả
+(chỉ khi ảnh có `ai_description`) + khối usage (`2 Sản phẩm · 1 Lookbook`) click mở
+`AssetUsageDialog`.
+Sort (mặc định `Tên SP A-Z`): `Tên SP (A-Z,Z-A)`/`Mã SP (A-Z,Z-A)`/`Mới nhất`/`Cũ nhất`/`Ưu tiên`;
+tab MAP đẩy ảnh Tuyển chọn lên đầu, tab Lookbook đẩy ảnh Hero lên đầu.
 Chi tiết reference trong dialog nạp bằng `fetchMediaUsageFn`.
 
 ---

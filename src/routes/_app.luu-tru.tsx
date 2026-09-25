@@ -173,12 +173,12 @@ const TABS: Array<{ key: FlatMediaTab; label: string; countKey: "all" | "map" | 
 ];
 
 const SORT_OPTIONS: Array<{ key: FlatMediaSort; label: string; icon: typeof Clock }> = [
-  { key: "newest", label: "Mới nhất", icon: Clock },
-  { key: "oldest", label: "Cũ nhất", icon: Clock },
   { key: "name_asc", label: "Tên SP (A-Z)", icon: ArrowDownAZ },
   { key: "name_desc", label: "Tên SP (Z-A)", icon: ArrowUpAZ },
   { key: "code_asc", label: "Mã SP (A-Z)", icon: ArrowDownAZ },
   { key: "code_desc", label: "Mã SP (Z-A)", icon: ArrowUpAZ },
+  { key: "newest", label: "Mới nhất", icon: Clock },
+  { key: "oldest", label: "Cũ nhất", icon: Clock },
   { key: "priority", label: "Ưu tiên (#1—#12)", icon: Sparkles },
 ];
 
@@ -619,7 +619,7 @@ function MediaStoragePage() {
   const selectedShapes = searchParams.shapes ?? [];
   const selectedTextures = searchParams.textures ?? [];
   const selectedCollections = searchParams.collections ?? [];
-  const sort = searchParams.sort ?? "newest";
+  const sort = searchParams.sort ?? "name_asc";
   const page = searchParams.page ?? 1;
   const pageSize = searchParams.pageSize ?? 24;
   // Mặc định "used" (In use) — bỏ lựa chọn "Tất cả" vì In use ∪ Not in use phủ hết ảnh.
@@ -1621,7 +1621,7 @@ function MediaStoragePage() {
                         key={opt.key}
                         type="button"
                         onClick={() => {
-                          patchFilters({ sort: opt.key === "newest" ? undefined : opt.key });
+                          patchFilters({ sort: opt.key === "name_asc" ? undefined : opt.key });
                           setSortPopoverOpen(false);
                         }}
                         className={cn(
@@ -1928,65 +1928,65 @@ function MediaStoragePage() {
                 <div className="flex flex-1 flex-col justify-between p-2.5">
                   <div>
                     {/* Header: tên sản phẩm (chính) + mã SP · kích thước (phụ) */}
-                    <div className="flex items-start justify-between gap-1">
-                      <div className="min-w-0">
-                        {hasProductUsage ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setGalleryProduct({
-                                  id: img.product_id,
-                                  code: img.product_code,
-                                  name: img.product_name,
-                                  category: img.product_category,
-                                })
-                              }
-                              title={`Xem toàn bộ ảnh của ${img.product_code} — ${img.product_name}`}
-                              className="block w-full truncate text-left text-[11px] font-semibold text-foreground hover:text-terracotta hover:underline cursor-pointer"
-                            >
-                              {img.product_name || img.product_code}
-                            </button>
-                            <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">
-                              {img.product_code}
-                              {img.width && img.height
-                                ? ` · ${img.width}×${img.height}`
-                                : ""}
-                              {formatFileSize(img.file_size)
-                                ? ` · ${formatFileSize(img.file_size)}`
-                                : ""}
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p
-                              className="truncate text-[11px] font-semibold text-muted-foreground"
-                              title={`Asset #${img.asset_id} (không thuộc sản phẩm nào)`}
-                            >
-                              Không thuộc sản phẩm
-                            </p>
-                            <p className="mt-0.5 truncate text-[9px] text-muted-foreground/70">
-                              Asset #{img.asset_id}
-                              {img.width && img.height
-                                ? ` · ${img.width}×${img.height}`
-                                : ""}
-                              {formatFileSize(img.file_size)
-                                ? ` · ${formatFileSize(img.file_size)}`
-                                : ""}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-                          img.status === "unused"
-                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-                        )}
-                      >
-                        {img.status === "unused" ? "NOT IN USE" : "IN USE"}
-                      </span>
+                    <div className="min-w-0">
+                      {hasProductUsage ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setGalleryProduct({
+                                id: img.product_id,
+                                code: img.product_code,
+                                name: img.product_name,
+                                category: img.product_category,
+                              })
+                            }
+                            title={`Xem toàn bộ ảnh của ${img.product_code} — ${img.product_name}`}
+                            className="block w-full truncate text-left text-[11px] font-semibold text-foreground hover:text-terracotta hover:underline cursor-pointer"
+                          >
+                            {img.product_name || img.product_code}
+                          </button>
+                          <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">
+                            {img.product_code}
+                            {img.width && img.height
+                              ? ` · ${img.width}×${img.height}`
+                              : ""}
+                            {formatFileSize(img.file_size)
+                              ? ` · ${formatFileSize(img.file_size)}`
+                              : ""}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p
+                            className="truncate text-[11px] font-semibold text-muted-foreground"
+                            title={`Asset #${img.asset_id} (không thuộc sản phẩm nào)`}
+                          >
+                            Không thuộc sản phẩm
+                          </p>
+                          <p className="mt-0.5 truncate text-[9px] text-muted-foreground/70">
+                            Asset #{img.asset_id}
+                            {img.width && img.height
+                              ? ` · ${img.width}×${img.height}`
+                              : ""}
+                            {formatFileSize(img.file_size)
+                              ? ` · ${formatFileSize(img.file_size)}`
+                              : ""}
+                          </p>
+                        </>
+                      )}
+                      {/* Mô tả concept — chỉ hiện khi ảnh CÓ nội dung mô tả */}
+                      {img.ai_description.trim() ? (
+                        <button
+                          type="button"
+                          onClick={() => openDescEditor(img)}
+                          title={img.ai_description}
+                          className="mt-1 inline-flex max-w-full items-center gap-1 rounded bg-terracotta/10 border border-terracotta/25 px-1.5 py-0.5 text-left text-[9px] font-medium text-terracotta hover:bg-terracotta/20 transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="size-2.5 shrink-0" />
+                          <span className="truncate">{img.ai_description}</span>
+                        </button>
+                      ) : null}
                     </div>
 
                     {/* Usage breakdown — prominent list */}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Trash2, ArrowRight, BookOpen, Sparkles, Check, Copy } from "lucide-react";
 import type { Material } from "@/data/mockData";
+import { getToneDisplay } from "@/lib/color-palette";
 
 type MoodboardDrawerProps = {
   isOpen: boolean;
@@ -153,17 +154,20 @@ export function MoodboardDrawer({
               </button>
             </div>
             <div className="palette-bars">
-              {shortlistedMaterials.map((mat) => (
-                <div
-                  key={mat.id}
-                  className="palette-bar-item group"
-                  style={{ backgroundColor: mat.tone }}
-                  title={`${mat.name} (${mat.code})`}
-                  onClick={() => onSelectMaterial(mat)}
-                >
-                  <span className="palette-tooltip">{mat.code}</span>
-                </div>
-              ))}
+              {shortlistedMaterials.map((mat) => {
+                const tone = getToneDisplay(mat.tone);
+                return (
+                  <div
+                    key={mat.id}
+                    className="palette-bar-item group"
+                    style={{ backgroundColor: tone.hex }}
+                    title={`${mat.name} (${mat.code}) · ${tone.label}`}
+                    onClick={() => onSelectMaterial(mat)}
+                  >
+                    <span className="palette-tooltip">{mat.code}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

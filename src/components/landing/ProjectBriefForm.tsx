@@ -13,6 +13,7 @@ import {
 import { submitLpLeadFn } from "@/api/lp";
 import { trackEvent } from "@/lib/lp-tracking";
 import { LP_PROJECT_STAGES, LP_PROJECT_TYPES } from "@/lib/lp-types";
+import { getToneDisplay } from "@/lib/color-palette";
 import { useShortlistedMaterials } from "./useShortlistedMaterials";
 type ProjectBriefFormProps = {
   intent: string;
@@ -196,7 +197,7 @@ export function ProjectBriefForm({
             <div className="flex flex-wrap gap-2">
               {shortlistedItems.map((m) => (
                 <span key={m.id} className="brief-summary-chip">
-                  <span className="chip-dot" style={{ backgroundColor: m.tone }} />
+                  <span className="chip-dot" style={{ backgroundColor: getToneDisplay(m.tone).hex }} />
                   <b>{m.code}</b> - {m.name}
                 </span>
               ))}

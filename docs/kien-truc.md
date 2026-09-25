@@ -93,17 +93,17 @@ dev server port **8080** với `host: true`.
 
 ## Kích thước để định hướng
 
-`src/` khoảng **38.346 dòng** TS/TSX trên 121 file (số liệu 2026-09-24, sau khi gỡ `/thu-vien`
-và tầng registry/GC ảnh — xem [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §15 để có bảng đầy đủ
-và cập nhật). Sáu file lớn nhất đáng biết:
+`src/` khoảng **39.226 dòng** TS/TSX trên 123 file (số liệu **2026-09-25**, sau đợt Option 2
+MediaAsset — xem [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §15 để có bảng đầy đủ và cập nhật).
+Sáu file lớn nhất đáng biết:
 
 | File                                       | Dòng  | Vai trò                                                  |
 | ------------------------------------------ | ----- | -------------------------------------------------------- |
-| `src/routes/_app.luu-tru.tsx`              | 2.937 | Lưu trữ ảnh: trang + popover + dialog                    |
-| `src/db/crm.server.ts`                     | 2.358 | Lớp nghiệp vụ chính (khách hàng, báo giá, đơn, sản phẩm) |
+| `src/routes/_app.luu-tru.tsx`              | 3.024 | Lưu trữ ảnh: trang + popover + dialog                    |
+| `src/db/crm.server.ts`                     | 2.389 | Lớp nghiệp vụ chính (khách hàng, báo giá, đơn, sản phẩm) |
 | `src/routes/_app.san-pham.tsx`             | 2.074 | Catalog sản phẩm: trang + 6 dialog con                   |
 | `src/components/CustomerMappingDialog.tsx` | 1.945 | Đề xuất vật liệu (DXVL)                                  |
-| `src/api/functions.ts`                     | 1.670 | Toàn bộ RPC (con số hiện tại: [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §15) |
+| `src/api/functions.ts`                     | 1.711 | Toàn bộ RPC (con số hiện tại: [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §15) |
 | `src/components/NewQuoteDialog.tsx`        | 1.650 | Tạo báo giá: chọn SP, chiết khấu, VAT                    |
 
 Việc tách các file này được bàn ở [audit-2026-09-19](audit-2026-09-19.md) §C.

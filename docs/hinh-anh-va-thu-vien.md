@@ -136,16 +136,17 @@ Filter `usage=used|unused` → 2 nút segmented, **mặc định `used`** (nhãn
 Mỗi card hiển thị **asset là chủ thể**, sản phẩm chỉ là usage phụ:
 
 1. Thumbnail + badge MAP/Concept.
-2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm" khi asset không có
-   product usage. Bên phải là badge `IN USE`/`NOT IN USE`.
+2. **Tên sản phẩm** (đậm, click mở gallery) — hoặc "Không thuộc sản phẩm".
 3. Dòng phụ (mono, mờ): mã SP · `WxH` · dung lượng (phần nào thiếu thì ẩn).
-4. Khối usage (click mở `AssetUsageDialog`): `2 Sản phẩm` · `1 Lookbook` · … hoặc "Không nơi nào dùng".
-5. Tag phòng Lookbook + toolbar thao tác.
+4. **Tag mô tả concept** — chỉ hiện khi ảnh CÓ `ai_description`; ảnh không có mô tả thì không
+   hiện tag nào (click tag để sửa mô tả).
+5. Khối usage (click mở `AssetUsageDialog`): `2 Sản phẩm` · `1 Lookbook` · … hoặc "Không nơi nào dùng".
+6. Tag phòng Lookbook + toolbar thao tác.
 
 ### Sắp xếp
 
-Sort người dùng chọn (popover Sắp xếp): `Mới nhất` · `Cũ nhất` · `Tên SP (A-Z)` · `Tên SP (Z-A)` ·
-`Mã SP (A-Z)` · `Mã SP (Z-A)` · `Ưu tiên (#1—#12)`.
+Sort người dùng chọn (popover Sắp xếp): **mặc định `Tên SP (A-Z)`** · `Tên SP (Z-A)` ·
+`Mã SP (A-Z)` · `Mã SP (Z-A)` · `Mới nhất` · `Cũ nhất` · `Ưu tiên (#1—#12)`.
 
 Khi sort theo tên/mã SP, asset **không có product usage** (chỉ mapping/hero, tên rỗng) luôn xếp
 **cuối** ở cả hai chiều — nếu không, chiều A-Z sẽ đẩy chuỗi rỗng lên đầu.
