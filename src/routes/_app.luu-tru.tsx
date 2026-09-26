@@ -1099,12 +1099,14 @@ function MediaStoragePage() {
     let failCount = 0;
     let usageCount = 0;
     let fileCount = 0;
+    let fileFailCount = 0;
     try {
       await mapLimit(assetIds, 5, async (assetId) => {
         try {
           const res = await deleteMediaAssetFn({ data: { assetId } });
           if (res.deleted) usageCount += res.usages_removed;
           if (res.file_deleted) fileCount++;
+          if (res.file_failed) fileFailCount++;
           successCount++;
         } catch {
           failCount++;
@@ -1113,6 +1115,11 @@ function MediaStoragePage() {
       if (successCount > 0) {
         toast.success(
           `Đã xoá vĩnh viễn ${successCount} MediaAsset${fileCount > 0 ? ` · ${fileCount} file trong Storage` : ""}${usageCount > 0 ? ` · gỡ ${usageCount} usage` : ""}`,
+        );
+      }
+      if (fileFailCount > 0) {
+        toast.error(
+          `${fileFailCount} file KHÔNG xoá được trong Storage — chạy lại sau hoặc dùng \`npm run media:sync\``,
         );
       }
       if (failCount > 0) {
@@ -1207,11 +1214,17 @@ function MediaStoragePage() {
     setDeletingId(assetId);
     try {
       const res = await deleteMediaAssetFn({ data: { assetId } });
-      toast.success(
-        res.file_deleted
-          ? `Đã xoá vĩnh viễn MediaAsset (gồm file trong Storage)${res.usages_removed > 0 ? ` · gỡ ${res.usages_removed} usage` : ""}`
-          : `Đã gỡ MediaAsset khỏi kho · gỡ ${res.usages_removed} usage (file giữ lại vì còn nơi khác dùng)`,
-      );
+      if (res.file_failed) {
+        toast.error(
+          `Đã gỡ MediaAsset khỏi kho, nhưng KHÔNG xoá được file trong Storage${res.usages_removed > 0 ? ` · gỡ ${res.usages_removed} usage` : ""}`,
+        );
+      } else {
+        toast.success(
+          res.file_deleted
+            ? `Đã xoá vĩnh viễn MediaAsset (gồm file trong Storage)${res.usages_removed > 0 ? ` · gỡ ${res.usages_removed} usage` : ""}`
+            : `Đã gỡ MediaAsset khỏi kho · gỡ ${res.usages_removed} usage (file giữ lại vì còn nơi khác dùng)`,
+        );
+      }
       setConfirmDeleteId(null);
 
       setItems((prev) => prev.filter((i) => i.asset_id !== assetId));
@@ -2813,7 +2826,7 @@ function ProductGalleryDialog({
     setDeletingId(imageId);
     try {
       await deleteProductImageFn({ data: { imageId } });
-      toast.success("Đã xóa ảnh thành công");
+      toast.success("Đã gỡ ảnh khỏi sản phẩm — ảnh vẫn còn trong kho");
       setConfirmDeleteId(null);
       setImages((prev) => {
         const next = prev.filter((img) => img.id !== imageId);

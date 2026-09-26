@@ -950,19 +950,19 @@ async function loadAssetRoomTags(
  *  - Đồng bộ lại `products.image_path` cho sản phẩm bị ảnh hưởng (suy ra từ is_primary).
  *  - Xoá row `media_assets`.
  *
- * Trả `path` để tầng API xoá file storage (`deleteImageRef`). Hàm này KHÔNG tự xoá
- * file vì phải giữ alias-free cho `node --test`.
+ * Trả `path` + `storage_key` để tầng API xoá file storage (`deleteImageKey`).
+ * Hàm này KHÔNG tự xoá file vì phải giữ alias-free cho `node --test`.
  */
 export async function deleteMediaAsset(
   db: AsyncDb,
   assetId: number,
-): Promise<{ deleted: boolean; usages_removed: number; path: string }> {
+): Promise<{ deleted: boolean; usages_removed: number; path: string; storage_key: string }> {
   const row = (await db
     .prepare("SELECT id, storage_key, path FROM media_assets WHERE id = ?")
     .get<{ id: number; storage_key: string; path: string }>(assetId)) as
     | { id: number; storage_key: string; path: string }
     | undefined;
-  if (!row) return { deleted: false, usages_removed: 0, path: "" };
+  if (!row) return { deleted: false, usages_removed: 0, path: "", storage_key: "" };
 
   let usagesRemoved = 0;
   await db.transaction(async (tx) => {
@@ -1017,5 +1017,5 @@ export async function deleteMediaAsset(
     await tx.prepare("DELETE FROM media_assets WHERE id = ?").run(assetId);
   })();
 
-  return { deleted: true, usages_removed: usagesRemoved, path: row.path };
+  return { deleted: true, usages_removed: usagesRemoved, path: row.path, storage_key: row.storage_key };
 }

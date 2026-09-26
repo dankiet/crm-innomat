@@ -1,7 +1,5 @@
-import { deleteImageRef, isManagedImageRef, putImageBuffer } from "@/lib/storage.server";
+import { putImageBuffer } from "@/lib/storage.server";
 import { normalizeUploadImageBufferMeta } from "@/lib/image-upload.server";
-import { storageKeyForRef } from "@/lib/image-asset-refs";
-import { listImageReferencesForKeys } from "@/db/image-references.server";
 import { linkProductImageAsset, syncMappingItemUsage } from "@/db/media-assets.server";
 import { getDb, type SqlValue } from "./index.server";
 import { unitPriceForProduct, effectiveDiscountPct } from "@/lib/pricing";
@@ -554,8 +552,6 @@ export async function setProductImageKind(
 export async function deleteProductImage(imageId: number): Promise<{
   product_id: number;
   images: ProductImageRow[];
-  /** true khi physical file cũng bị xoá (không còn bảng nào trỏ tới). */
-  file_deleted: boolean;
 }> {
   const db = getDb();
   const row = (await db
@@ -583,24 +579,13 @@ export async function deleteProductImage(imageId: number): Promise<{
 
   await syncPrimaryImagePath(row.product_id);
 
-  // Xoá file là thao tác THỦ CÔNG của người dùng trên /luu-tru — chỉ chạy khi
-  // không bảng nào khác còn trỏ tới physical này (file hash dùng chung).
-  // Không có bước tự động nào khác xoá file: gỡ ảnh khỏi sản phẩm/mapping/Hero
-  // chỉ làm ảnh rơi vào trạng thái "không còn nơi dùng".
-  const key = storageKeyForRef(row.path);
-  let fileDeleted = false;
-  if (key && isManagedImageRef(row.path)) {
-    const refs = await listImageReferencesForKeys(db, [key]);
-    if ((refs.get(key) ?? []).length === 0) {
-      await deleteImageRef(row.path);
-      fileDeleted = true;
-    }
-  }
-
+  // Chỉ GỠ ảnh khỏi sản phẩm — KHÔNG xoá file vật lý. File chỉ bị xoá từ đúng một
+  // nơi: xoá asset trên /luu-tru (`deleteMediaAssetFn`). Nhờ vậy thao tác ở đây
+  // luôn nhẹ và hoàn tác được: ảnh rơi về nhóm "Not in use" trong kho, vẫn gắn
+  // lại được cho sản phẩm khác.
   return {
     product_id: row.product_id,
     images: await listProductImages(row.product_id),
-    file_deleted: fileDeleted,
   };
 }
 

@@ -60,7 +60,6 @@ const emptyForm = {
   discount_b2b: "",
   note: "",
   is_hot: false,
-  image_path: "",
 };
 
 export function NewProductDialog({
@@ -227,7 +226,6 @@ export function NewProductDialog({
           discount_b2b: form.discount_b2b ? Math.round(Number(form.discount_b2b)) : null,
           note: form.note.trim(),
           is_hot: form.is_hot ? 1 : 0,
-          image_path: form.image_path.trim(),
         },
       });
 
@@ -267,7 +265,7 @@ export function NewProductDialog({
             <div className="flex gap-3 items-start">
               <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
                 <div className="size-20 rounded-xl overflow-hidden ring-1 ring-black/5 bg-white">
-                  <ProductImage src={form.image_path} code={form.code} fit="contain" />
+                  <ProductImage code={form.code} fit="contain" />
                 </div>
                 <p className="text-[10px] text-muted-foreground text-center max-w-[5.5rem] leading-tight">
                   Thêm ảnh sau khi tạo (Sửa hình)

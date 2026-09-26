@@ -60,18 +60,6 @@ async function filenameFor(buffer: Buffer, ext: string): Promise<string> {
   return `${hash}${safeExt.toLowerCase()}`;
 }
 
-/** Ref hình ảnh do CRM quản lý (Supabase URL hoặc /images/...). */
-export function isManagedImageRef(ref: string): boolean {
-  if (!ref) return false;
-  if (ref.startsWith("/images/")) return true;
-  try {
-    const u = new URL(ref);
-    return u.hostname.endsWith("supabase.co");
-  } catch {
-    return false;
-  }
-}
-
 function publicUrl(cfg: { url: string; bucket: string }, objectPath: string): string {
   return `${cfg.url}/storage/v1/object/public/${cfg.bucket}/${objectPath}`;
 }
@@ -126,31 +114,46 @@ export async function readImageBytes(ref: string): Promise<Buffer | null> {
   return null;
 }
 
-/** Xoá 1 file ảnh theo ref. Caller phải tự kiểm tra còn tham chiếu hay không. */
-export async function deleteImageRef(ref: string): Promise<void> {
-  if (!ref) return;
+/**
+ * Xoá 1 file ảnh theo `storage_key` (tên file content-addressed).
+ *
+ * Chỉ dùng cho đường **XOÁ VĨNH VIỄN** (`deleteMediaAssetFn` trên `/luu-tru`).
+ * Nhận thẳng key từ row `media_assets` thay vì parse lại URL hiển thị — không
+ * phụ thuộc `path` có phải URL hợp lệ hay không.
+ *
+ * Trả `true` khi file đã KHÔNG còn (xoá xong, hoặc vốn không tồn tại), `false`
+ * khi Storage/local từ chối xoá. Caller PHẢI dùng giá trị trả về: nuốt lỗi ở
+ * đây chính là cách file mồ côi sinh ra trong khi UI vẫn báo "đã xoá vĩnh viễn".
+ */
+export async function deleteImageKey(key: string): Promise<boolean> {
+  if (!key) return true;
+  const objectPath = STORAGE_PREFIX ? `${STORAGE_PREFIX}/${key}` : key;
   const storage = await loadStorage();
-  if (/^https?:\/\//.test(ref) && storage) {
+  if (storage) {
     const cfg = config()!;
     try {
-      const url = new URL(ref);
-      const objectPath = decodeURIComponent(
-        url.pathname.replace(`/storage/v1/object/public/${cfg.bucket}/`, ""),
-      );
-      if (objectPath && objectPath !== url.pathname) {
-        await storage.from(cfg.bucket).remove([objectPath]);
+      const { error } = await storage.from(cfg.bucket).remove([objectPath]);
+      if (error) {
+        console.error(`[storage] xoá ${objectPath} thất bại: ${error.message}`);
+        return false;
       }
-    } catch {
-      /* ignore */
+      return true;
+    } catch (err) {
+      console.error(
+        `[storage] xoá ${objectPath} lỗi: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return false;
     }
-    return;
   }
-  if (ref.startsWith("/images/")) {
-    try {
-      const file = path.join(process.cwd(), "public", ref.replace(/^\//, ""));
-      if (fs.existsSync(file)) fs.unlinkSync(file);
-    } catch {
-      /* ignore */
-    }
+  // Chế độ local (thiếu cấu hình Supabase): file nằm ở public/images.
+  try {
+    const file = path.join(process.cwd(), "public", "images", key);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    return true;
+  } catch (err) {
+    console.error(
+      `[storage] xoá file local ${key} thất bại: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return false;
   }
 }

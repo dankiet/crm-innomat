@@ -68,7 +68,6 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
     note: "",
     is_hot: false,
     is_public: false,
-    image_path: "",
   });
   const [fieldOptions, setFieldOptions] = useState<Record<SuggestField, string[]>>({
     color: [],
@@ -143,7 +142,6 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
       note: product.note || "",
       is_hot: Boolean(product.is_hot),
       is_public: Boolean(product.is_public),
-      image_path: product.image_path || "",
     });
     setPendingDelete(false);
     const productInternalCodes = parseInternalCodesList(product.multi_codes_list);
@@ -233,7 +231,6 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
           note: (form.note || "").trim(),
           is_hot: form.is_hot ? 1 : 0,
           is_public: form.is_public ? 1 : 0,
-          image_path: (form.image_path || "").trim(),
         },
       });
       toast.success("Đã cập nhật sản phẩm");
@@ -275,7 +272,7 @@ export function EditProductDialog({ open, onOpenChange, product, onEditImages, c
             <div className="flex gap-3 items-start">
               <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
                 <div className="size-20 rounded-xl overflow-hidden ring-1 ring-black/5 bg-white">
-                  <ProductImage src={form.image_path} code={form.code} fit="contain" />
+                  <ProductImage src={product?.image_path} code={form.code} fit="contain" />
                 </div>
                 {onEditImages ? (
                   <button

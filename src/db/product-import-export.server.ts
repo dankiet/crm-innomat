@@ -628,7 +628,6 @@ function rowToUpdate(row: ProductImportRow): ProductUpdate {
   if (row.shape !== undefined) u.shape = row.shape;
   if (row.collections !== undefined) u.collections = row.collections;
   if (row.unit !== undefined) u.unit = row.unit;
-  if (row.image_path !== undefined) u.image_path = row.image_path;
   if (row.note !== undefined) u.note = row.note;
   if (row.is_hot !== undefined) u.is_hot = row.is_hot ? 1 : 0;
   return u;
@@ -653,7 +652,6 @@ function rowToCreate(row: ProductImportRow): ProductCreateInput {
     shape: row.shape ?? "",
     collections: row.collections ?? "",
     unit: row.unit ?? "",
-    image_path: row.image_path ?? "",
     note: row.note ?? "",
     is_hot: row.is_hot ? 1 : 0,
   };

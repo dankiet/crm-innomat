@@ -326,7 +326,8 @@ test("db: deleteMediaAsset xoá vĩnh viễn — row ảnh, hero ref, asset + tr
   const res = await deleteMediaAsset(db, asset.id);
   assert.equal(res.deleted, true);
   assert.equal(res.usages_removed, 2);
-  assert.equal(res.path, path); // tầng API cần path để xoá file storage
+  assert.equal(res.path, path); // tầng API cần storage_key để xoá file storage
+  assert.equal(res.storage_key, KEY);
 
   // Row product_images bị XOÁ (giữ lại sẽ thành ảnh 404 vì file sắp bị xoá).
   const img = await db.prepare("SELECT id FROM product_images WHERE id = ?").get<{ id: number }>(imgId);
@@ -349,6 +350,7 @@ test("db: deleteMediaAsset xoá asset không tồn tại → deleted=false", asy
     deleted: false,
     usages_removed: 0,
     path: "",
+    storage_key: "",
   });
   await db.close();
 });

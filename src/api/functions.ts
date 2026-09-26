@@ -357,7 +357,6 @@ export const updateProductFn = createServerFn({ method: "POST" })
       is_hot?: number;
       is_public?: number;
       featured_rank?: number | null;
-      image_path?: string;
     }) => data,
   )
   .handler(async ({ data }) => {
@@ -401,7 +400,6 @@ export const createProductFn = createServerFn({ method: "POST" })
       is_hot?: number;
       is_public?: number;
       featured_rank?: number | null;
-      image_path?: string;
     }) => data,
   )
   .handler(async ({ data }) => {
@@ -587,22 +585,30 @@ export const deleteMediaAssetFn = createServerFn({ method: "POST" })
     const { deleteMediaAsset } = await import("@/db/media-assets.server");
     const { writeAudit } = await import("@/db/audit.server");
     const { listImageReferencesForKeys } = await import("@/db/image-references.server");
-    const { deleteImageRef, isManagedImageRef } = await import("@/lib/storage.server");
-    const { storageKeyForRef } = await import("@/lib/image-asset-refs");
+    const { deleteImageKey } = await import("@/lib/storage.server");
 
     const db = getDb();
     const result = await deleteMediaAsset(db, data.assetId);
-    if (!result.deleted) return { ...result, file_deleted: false };
+    if (!result.deleted) return { ...result, file_deleted: false, file_failed: false };
 
-    // Xoá file vật lý — chỉ khi KHÔNG còn bảng nào khác trỏ tới cùng storage key
-    // (an toàn cho trường hợp dữ liệu cũ chưa backfill hết liên kết).
+    // Xoá file vật lý theo `storage_key` của chính row vừa xoá — không parse lại
+    // `path` hiển thị.
+    //
+    // LƯỚI AN TOÀN CHỐNG DRIFT (không phải ngữ nghĩa "ảnh dùng chung"): bước dọn
+    // DB ở `deleteMediaAsset` xoá row theo `media_asset_id`, nên một row trỏ cùng
+    // key nhưng CHƯA gắn liên kết (drift kiểu `product_images#6864`) sẽ sống sót —
+    // xoá file lúc đó là làm nó thành ảnh hỏng. Trạng thái đã verify (#12/#13 = 0)
+    // thì nhánh này không bao giờ chạy; `npm run media:sync` là công cụ dẹp drift.
     let fileDeleted = false;
-    const key = storageKeyForRef(result.path);
-    if (key && isManagedImageRef(result.path)) {
+    let fileFailed = false;
+    const key = result.storage_key;
+    if (key) {
       const refs = await listImageReferencesForKeys(db, [key]);
       if ((refs.get(key) ?? []).length === 0) {
-        await deleteImageRef(result.path);
-        fileDeleted = true;
+        // `deleteImageKey` trả false khi Storage từ chối xoá — không được báo
+        // thành công, nếu không file mồ côi nằm lại mà không ai biết.
+        fileDeleted = await deleteImageKey(key);
+        fileFailed = !fileDeleted;
       }
     }
 
@@ -612,10 +618,14 @@ export const deleteMediaAssetFn = createServerFn({ method: "POST" })
       entity_type: "media_asset",
       entity_id: data.assetId,
       summary: `Xóa vĩnh viễn MediaAsset #${data.assetId} (${result.usages_removed} usages${
-        fileDeleted ? ", đã xoá file" : ", file giữ lại do còn tham chiếu"
+        fileDeleted
+          ? ", đã xoá file"
+          : fileFailed
+            ? ", XOÁ FILE THẤT BẠI — file còn trong Storage"
+            : ", file giữ lại do còn tham chiếu"
       })`,
     });
-    return { ...result, file_deleted: fileDeleted };
+    return { ...result, file_deleted: fileDeleted, file_failed: fileFailed };
   });
 
 // ─── Customers ──────────────────────────────────────────────
