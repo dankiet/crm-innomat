@@ -166,11 +166,15 @@ registry (không phải GC):
 
 - Gỡ ảnh khỏi sản phẩm / đề xuất vật liệu / Hero trang chủ **không** đụng tới asset hay file.
   Ảnh chỉ rơi vào nhóm `unused` (Not in use), xem được ở `/luu-tru` (segmented **usage**).
-- **Xoá asset** (`deleteMediaAssetFn`) là **xoá vĩnh viễn**: gỡ liên kết usage (xoá row
-  `product_images`, clear cột `customer_mapping_items.image_path`/`custom_product_image_path`,
-  clear `lp_settings.hero_image`), đồng bộ lại `products.image_path`, xoá row `media_assets`,
-  **rồi xoá file trong Supabase Storage** (`deleteImageRef`) — chỉ khi không còn bảng nào khác
-  trỏ tới cùng storage key (an toàn cho file dùng chung nhiều sản phẩm).
+- **Chỉ có ĐÚNG MỘT cửa xoá vĩnh viễn: xoá asset trên `/luu-tru`** (`deleteMediaAssetFn`).
+  Trong 1 transaction: xoá **mọi** row `product_images` gắn asset đó (ảnh mất khỏi gallery của
+  **tất cả** sản phẩm đang dùng nó), clear `customer_mapping_items.image_path` /
+  `custom_product_image_path`, clear `lp_settings.hero_image`, đồng bộ lại `products.image_path`,
+  xoá row `media_assets`, **rồi xoá file trong Supabase Storage** (`deleteImageKey` theo
+  `storage_key` của row vừa xoá). Trả `file_deleted` / `file_failed` để UI không bao giờ báo
+  "đã xoá vĩnh viễn" khi Storage từ chối xoá.
+- Các nút xoá khác (`deleteProductImageFn` ở "Sửa hình" của sản phẩm, `deleteProduct`,
+  xoá đề xuất/khách) **chỉ gỡ liên kết**, không đụng file.
 - Không cần scheduler: Vercel serverless không có process nền, và cũng không còn gì để chạy nền.
 
 ### Backfill MediaAsset
@@ -178,8 +182,37 @@ registry (không phải GC):
 `npm run db:media-backfill` đọc 5 nguồn ref hiện có, tạo `media_assets` + usage tương ứng.
 **Idempotent** (chạy lại ra cùng kết quả). Đã chạy ở production **2026-09-25** (có duyệt):
 3.561 asset · 3.597 product usage · 156 mapping · 1 hero. Verify bằng `npm run db:media-verify`
-(PASS 11/11). Xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric.
+→ PASS với **11 mục kiểm tra của thời điểm đó** (script nay có 14 mục — xem §Đồng bộ bên dưới). Xem
+[hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Kho ảnh asset-centric.
 
 > Lưu ý vận hành: schema (`media_assets` + 2 bảng usage) **phải migrate TRƯỚC** khi deploy code
 > asset-centric — nếu không, `/luu-tru` sẽ trắng lưới vì đọc `FROM media_assets`. Thứ tự:
 > `db:migrate` → `db:media-backfill` → deploy.
+
+## Đồng bộ Storage ↔ DB (`npm run media:sync`)
+
+Backfill chỉ biết ref **trong DB**; nó không thấy file nằm trong bucket mà không ai trỏ tới.
+Xoá ảnh thời kỳ đầu (trước commit `86cf51e`) chỉ gỡ liên kết DB mà **không** xoá file, nên bucket
+tồn đọng file mồ côi. Chiều ngược lại, ref trong DB có thể **thiếu** row `media_assets`.
+
+```bash
+npm run media:sync                        # chỉ đọc (mặc định)
+npm run media:sync -- --apply             # reconcile + xoá rác
+npm run media:sync -- --apply --no-prune  # chỉ reconcile
+npm run media:sync -- --prune             # chỉ xoá rác
+```
+
+Đo ngày **2026-09-26** trên bucket `crm-images`: trước 3.638 object (658 MB) · 3.557
+`media_assets` · **2** ref thiếu asset · **80** file mồ côi (14,8 MB) · 0 ảnh vỡ.
+Đã chạy (có duyệt, **sau khi backup**): reconcile `+1` asset + gắn `product_images #6864`, dẹp
+snapshot `products #2122`, xoá **80** file mồ côi → còn **3.558 object (643 MB)**, khớp tuyệt đối
+với `3.558 media_assets`; `db:media-verify` PASS 14/14. Bản local của các file đã xoá nằm trong
+`public/images/` (`npm run storage:backup` chạy TRƯỚC khi prune).
+
+An toàn: keep-set là **hợp** của `media_assets.storage_key` và mọi key từ 5 nguồn ref, nên ref
+thiếu row không bao giờ bị xoá oan; file rác còn mới hơn `--min-age-hours` (mặc định 24h) bị giữ
+lại (upload ghi Storage trước khi tạo row DB); ngay trước `remove()` script đọc lại ref **và**
+`media_assets` để chống đua. Xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Đồng bộ.
+
+> Thứ tự vận hành: `storage:backup` **trước**, rồi mới `media:sync -- --apply`. Backup mirror
+> bucket → `public/images/` (không track git), nên chạy trước giữ được bản local của file sắp xoá.

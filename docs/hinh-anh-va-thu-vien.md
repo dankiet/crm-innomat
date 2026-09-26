@@ -20,17 +20,17 @@ sẽ mất sau mỗi deploy — production **phải** cấu hình Supabase.
 ### API
 
 ```ts
-isManagedImageRef(ref); // true nếu ref là /images/... hoặc host *.supabase.co
 putImageBuffer(buf, ext); // → ref
 readImageBytes(ref); // Buffer | null; fetch có timeout 8s, đọc local qua public/
-deleteImageRef(ref); // xoá file; KHÔNG tự kiểm tra tham chiếu
+deleteImageKey(key); // → boolean: true nếu file đã KHÔNG còn, false nếu xoá thất bại
 ```
+
+`deleteImageKey` nhận thẳng `storage_key` (tên file content-addressed) — không parse lại URL hiển
+thị, nên không phụ thuộc `path` có hợp lệ hay không. Nó là API **duy nhất** xoá file vật lý, và chỉ
+được gọi từ đường xoá vĩnh viễn trên `/luu-tru`.
 
 `readImageBytes` **không throw** — mọi lỗi (404, timeout, file thiếu) đều trả `null`. Nơi gọi phải
 xử lý `null` (export HTML thì bỏ ảnh đó, không vỡ cả tài liệu).
-
-`isManagedImageRef` là điều kiện để được phép xoá: ảnh do CRM quản lý mới xoá, URL ngoài thì không
-đụng tới.
 
 ## Nén ảnh
 
@@ -60,22 +60,25 @@ Một ref có thể được **nhiều bảng** tham chiếu. Reference Resolver
 — tầng **path → bản ghi**. Từ 2026-09-25 có thêm tầng **file → asset** (`media_assets` + usage,
 xem §Kho ảnh asset-centric bên dưới).
 
-Quy tắc (đã tách theo từng phạm vi xoá):
+Quy tắc — **chỉ có ĐÚNG MỘT cửa xoá vĩnh viễn**:
 
-- **Gỡ ảnh khỏi bản ghi** (`deleteProduct`, `deleteCustomerMapping`, `deleteCustomer`,
-  `setHeroImageSetting`) **không** đụng tới file hay asset. Ảnh chỉ rơi vào nhóm `unused`
-  (Not in use) trên `/luu-tru`.
-- **Xoá ảnh trong phạm vi sản phẩm** (`deleteProductImage` — từ màn hình sản phẩm): kiểm tra
-  Reference Resolver và **có thể gọi `deleteImageRef()`** khi **không còn nguồn nào** trỏ tới path.
-  Vì tên file là hash, hai bản ghi dùng chung một tấm ảnh sẽ chia sẻ đúng một file — xoá thẳng khi
-  còn tham chiếu là làm hỏng bản ghi còn lại. Endpoint trả `file_deleted` để UI phân biệt "đã xoá
-  file" với "chỉ gỡ khỏi sản phẩm".
-- **Xoá asset trên `/luu-tru`** (`deleteMediaAssetFn`): **xoá vĩnh viễn** — gỡ mọi liên kết
-  (kể cả xoá row `product_images`) + xoá row `media_assets` + **xoá file storage**, với guard
-  không còn tham chiếu nào trỏ tới cùng storage key (xem §Kho ảnh asset-centric).
+- **Xoá asset trên `/luu-tru`** (`deleteMediaAssetFn`): **xoá vĩnh viễn, xoá ở TOÀN BỘ nơi dùng**.
+  Trong 1 transaction: xoá **mọi** row `product_images` gắn asset đó (ảnh biến mất khỏi gallery của
+  **tất cả** sản phẩm đang dùng nó), clear `customer_mapping_items.image_path` /
+  `custom_product_image_path`, clear `lp_settings.hero_image`, đồng bộ lại `products.image_path`,
+  xoá row `media_assets`. Tầng API sau đó **xoá luôn file trong Supabase Storage**
+  (`deleteImageKey`, theo `storage_key` của chính row vừa xoá). Trả `file_deleted` / `file_failed`
+  để UI nói đúng: `file_failed` khi Storage từ chối xoá (kèm audit "XOÁ FILE THẤT BẠI"), không bao
+  giờ báo "đã xoá vĩnh viễn" khi file còn nằm lại bucket.
+- **Mọi chỗ khác chỉ GỠ LIÊN KẾT — không đụng tới file.** Gồm `deleteProductImage` (nút thùng rác
+  trong "Sửa hình" của sản phẩm), `deleteProduct`, `deleteCustomerMapping`, `deleteCustomer`,
+  `setHeroImageSetting`. Ảnh chỉ rơi về nhóm `unused` (Not in use) trên `/luu-tru` và vẫn gắn lại
+  được cho sản phẩm khác. Muốn xoá thật thì xoá card tương ứng ở `/luu-tru`.
 
-`isManagedImageRef` giới hạn phạm vi: chỉ file do CRM quản lý (`/images/...` hoặc host
-`*.supabase.co`) mới bị xoá, URL ngoài không đụng tới.
+> Tripwire duy nhất còn lại trong đường xoá vĩnh viễn: nếu sau khi dọn DB mà **vẫn còn** row nào
+> trỏ tới cùng storage key (dữ liệu cũ chưa gắn liên kết), file được GIỮ LẠI — xoá file lúc đó sẽ
+> làm row kia thành ảnh hỏng. Trạng thái sạch (đo 2026-09-26: 0 row) thì nhánh này không bao giờ
+> chạy, và `npm run media:sync` là công cụ dọn phần dư đó.
 
 ## Ảnh sản phẩm
 
@@ -85,6 +88,12 @@ Bảng `product_images`: `path`, `sort_order`, `is_primary`, `caption`.
 - Thêm một partial unique riêng cho `path LIKE '/products/imported/%'` (ảnh import theo lô).
 - `products.image_path` là ảnh đại diện, được `syncPrimaryImagePath()` đồng bộ theo ảnh đang
   `is_primary`. Đừng ghi `image_path` bằng tay.
+  **Cưỡng chế (2026-09-25):** `updateProduct`/`createProduct` **không còn nhận** `image_path`
+  (không có trong `ProductUpdate`/`ProductCreateInput`, validator RPC cũng bỏ), import Excel
+  không ghi cột này, và form sửa sản phẩm chỉ hiển thị ảnh chứ không gửi lên. Trước đây form gửi
+  lại giá trị cũ nên mỗi lần lưu là ghi đè kết quả `syncPrimaryImagePath` mới hơn → cột trỏ tới
+  ảnh không còn gắn với sản phẩm. Chỉ `syncPrimaryImagePath`, luồng thêm/xoá ảnh và
+  `deleteMediaAsset` được ghi cột này.
 
 Endpoint: `fetchProductImages`, `uploadProductImageFn`, `addProductImageByPathFn`,
 `setPrimaryProductImageFn`, `deleteProductImageFn`.
@@ -165,11 +174,12 @@ Ngoài ra có **ưu tiên theo ngữ cảnh tab** (luôn xếp trước, rồi m
   clear cột `customer_mapping_items.image_path` / `custom_product_image_path`,
   clear `lp_settings.hero_image`.
 - Đồng bộ lại `products.image_path` (suy ra từ ảnh `is_primary` còn lại).
-- Xoá row `media_assets`; trả `{ deleted, usages_removed, path }`.
+- Xoá row `media_assets`; trả `{ deleted, usages_removed, path, storage_key }`.
 
-Tầng API (`deleteMediaAssetFn`) sau đó **xoá file vật lý** bằng `deleteImageRef` — nhưng chỉ khi
-`listImageReferencesForKeys` xác nhận **không còn bảng nào** trỏ tới cùng storage key (file hash
-có thể dùng chung nhiều sản phẩm). Trả `file_deleted` để UI phân biệt.
+Tầng API (`deleteMediaAssetFn`) sau đó **xoá file vật lý** bằng `deleteImageKey(storage_key)`.
+Trả `file_deleted` và `file_failed` — `file_failed` khi Storage từ chối xoá (UI hiện toast lỗi kèm
+gợi ý chạy `media:sync`, audit ghi rõ "XOÁ FILE THẤT BẠI") — không bao giờ báo thành công khi file
+còn nằm lại bucket.
 
 Khi asset còn usage, UI nhắc "Xem N nơi đang dùng trước khi xóa" mở `AssetUsageDialog`.
 Xoá luôn theo quy tắc 2 bước inline (AGENTS.md) — không `window.confirm`.
@@ -179,5 +189,49 @@ Xoá luôn theo quy tắc 2 bước inline (AGENTS.md) — không `window.confir
 `applyMediaBackfill(db, sources)` trong `src/db/media-assets.server.ts` + scripts
 `db:media-backfill` / `db:media-verify` (idempotent — chạy lại ra cùng kết quả).
 Đã chạy ở production ngày **2026-09-25** (có duyệt): 3.561 asset, 3.597 product usage,
-156 mapping, 1 hero; `db:media-verify` PASS 11/11 (xem [trien-khai-va-van-hanh](trien-khai-va-van-hanh.md)).
+156 mapping, 1 hero; `db:media-verify` PASS với **11 mục kiểm tra của thời điểm đó** (script nay có
+14 mục — xem §Đồng bộ bên dưới).
+
+### Đồng bộ Storage ↔ DB (`npm run media:sync`)
+
+Backfill chỉ đọc **ref trong DB**; nó không biết file nào nằm trong Storage mà không ai trỏ tới.
+Xoá ảnh thời kỳ đầu (trước `86cf51e` — khi đó xoá chỉ gỡ liên kết DB, không xoá file) để lại
+**file mồ côi** trong bucket. `scripts/media-sync.mjs` đối chiếu hai chiều và sửa cả hai loại lệch.
+
+```bash
+npm run media:sync                          # chỉ đọc, in báo cáo (mặc định)
+npm run media:sync -- --apply               # ghi: reconcile + xoá rác
+npm run media:sync -- --apply --no-prune    # ghi: chỉ reconcile, giữ nguyên file
+npm run media:sync -- --prune               # ghi: chỉ xoá rác
+npm run media:sync -- --limit 10            # giới hạn số file xoá (chạy thử)
+npm run media:sync -- --min-age-hours 48    # tuổi tối thiểu của file rác (mặc định 24)
+```
+
+**Keep-set là HỢP của** `media_assets.storage_key` **và** mọi key trích từ 5 nguồn ref trong DB.
+Chỉ file không nằm trong hợp đó mới bị coi là rác — nhờ vậy ref thiếu row `media_assets` (lỗ write
+path cũ) **không bao giờ** bị xoá oan. Chỉ đụng file có tên đúng dạng storage_key
+(`<sha256>[.<ext>]`); tên lạ bị bỏ qua và báo cáo.
+
+Hai chốt an toàn trước khi xoá:
+
+- **Tuổi tối thiểu** (`--min-age-hours`, mặc định 24h): `uploadProductImageFile` ghi file lên
+  Storage **trước** rồi mới tạo row DB — trong khoảng giữa hai bước, file vừa tải lên chưa nằm
+  trong keep-set nào. File mồ côi còn mới hơn ngưỡng bị **giữ lại** và liệt kê riêng.
+- **Soát lại ngay trước `remove()`**: đọc lại ref **và** `media_assets` để bỏ ra những key vừa
+  xuất hiện trong lúc chạy (chống đua với request đang ghi).
+
+`--apply` còn sửa `products.image_path` lệch về ảnh primary thật **trước** khi reconcile, để ref
+cũ không sinh asset "ma". Sửa snapshot và reconcile nằm trong **cùng một transaction**.
+
+Nguồn chung: `scripts/lib/media-reconcile.mjs` (SQL 5 nguồn, reconcile theo tập, sửa snapshot) —
+`db:media-backfill` và `media:sync` dùng đúng cùng một lõi, nên không có bản SQL thứ ba lệch nhau.
+`scripts/lib/env.mjs` là loader `.env` dùng chung cho mọi script CLI.
+
+**Đã chạy ở production 2026-09-26** (có duyệt, sau `storage:backup`): trước 3.638 object (658 MB)
+· 3.557 asset · 2 ref thiếu asset · 80 file mồ côi (14,8 MB). Sau: `+1` asset, `product_images
+#6864` được gắn, snapshot `products #2122` dẹp về rỗng, 80 file mồ côi đã xoá → **3.558 object
+(643 MB) = 3.558 media_assets**, `db:media-verify` PASS 14/14.
+
+> Thứ tự: `storage:backup` **trước** khi prune — backup mirror bucket về `public/images/` (không
+> track git) nên giữ được bản local của file sắp xoá để khôi phục nếu cần.
 

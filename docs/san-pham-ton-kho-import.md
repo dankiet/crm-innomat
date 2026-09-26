@@ -110,6 +110,11 @@ Import nhận **hai loại file**:
 `b2b_price`, `discount_tp`, `discount_b2b`, `surface`, `shape`, `collections`, `unit`,
 `image_path`, `created_at`, `note`, `is_hot`.
 
+> `image_path` **chỉ được xuất ra để tham chiếu, không được import ngược**. Cột này là ảnh đại
+> diện dẫn xuất từ `product_images` (`syncPrimaryImagePath`); ghi thẳng từ Excel sẽ làm nó trỏ
+> tới ảnh không còn gắn với sản phẩm. `created_at` cũng chỉ để đọc. Ảnh gắn vào sản phẩm qua
+> màn hình sản phẩm (Sửa hình), không qua import.
+
 **2. Bảng giá thô của nhà cung cấp** — dạng
 `STT | Mã số | Kích thước | Tên | Chất liệu | ĐƠN GIÁ xuất… | Cột A/B/C | GIÁ BÁN LẺ | Tỉ lệ | GHI CHÚ`.
 

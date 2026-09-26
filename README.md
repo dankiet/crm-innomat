@@ -53,6 +53,7 @@ Windows: bấm đúp `START_LOCAL.bat` để mở dev server + browser trên por
 | `npm run db:seed-admin`           | Tạo/đặt lại admin từ `CRM_ADMIN_*`                            |
 | `npm run db:media-backfill`       | Backfill `media_assets` + usage từ 5 nguồn ref (idempotent)   |
 | `npm run db:media-verify`         | Verify backfill MediaAsset                                    |
+| `npm run media:sync`              | Reconcile MediaAsset ↔ Storage, xoá file mồ côi               |
 | `npm run storage:backup`          | Mirror bucket Supabase về `public/images`                     |
 | `npm run clean:generated`         | Xoá output build/generated                                    |
 

@@ -11,31 +11,11 @@
  * ⚠️ CHỈ PHÉP CHẠY KHI ĐÃ ĐƯỢC DUYỆT — script ghi vào DB (prod Vercel).
  */
 import pg from "pg";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.join(__dirname, "..");
+import { loadEnv } from "./lib/env.mjs";
+import { readMediaRefs, reconcileMediaKeys } from "./lib/media-reconcile.mjs";
 
-function loadDotEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return;
-  const text = fs.readFileSync(filePath, "utf-8");
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    let val = line.slice(eq + 1).trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1, -1);
-    }
-    if (process.env[key] == null || process.env[key] === "") process.env[key] = val;
-  }
-}
-loadDotEnvFile(path.join(root, ".env"));
-loadDotEnvFile(path.join(root, ".env.local"));
+loadEnv();
 
 const url = process.env.DATABASE_URL_UNPOOLED?.trim() || process.env.DATABASE_URL?.trim();
 if (!url) {
@@ -49,87 +29,21 @@ try {
 
   // ── 1. Distinct storage-key + một path đại diện từ 5 nguồn reference ──────
   // Mỗi key lấy MIN(path) làm path hiển thị (path thật để card render <img src>).
-  const keysSql = `
-    SELECT key, MIN(path) AS path FROM (
-        SELECT substring(i.path from '([^/]+)$') AS key, i.path AS path FROM product_images i WHERE i.path IS NOT NULL AND i.path <> ''
-      UNION ALL SELECT substring(p.image_path from '([^/]+)$'), p.image_path FROM products p WHERE p.image_path IS NOT NULL AND p.image_path <> ''
-      UNION ALL SELECT substring(m.image_path from '([^/]+)$'), m.image_path FROM customer_mapping_items m WHERE m.image_path IS NOT NULL AND m.image_path <> ''
-      UNION ALL SELECT substring(m.custom_product_image_path from '([^/]+)$'), m.custom_product_image_path FROM customer_mapping_items m WHERE m.custom_product_image_path IS NOT NULL AND m.custom_product_image_path <> ''
-      UNION ALL SELECT substring(s.value from '([^/]+)$'), s.value FROM lp_settings s WHERE s.key = 'hero_image' AND s.value IS NOT NULL AND s.value <> ''
-    ) t WHERE key IS NOT NULL AND key <> ''
-    GROUP BY key
-  `;
-  const { rows: keyRows } = await client.query(keysSql);
-  const keys = keyRows.map((r) => r.key);
-  console.log(`[media-backfill] distinct storage keys từ 5 nguồn: ${keys.length}`);
+  const keyRows = await readMediaRefs(client);
+  console.log(`[media-backfill] distinct storage keys từ 5 nguồn: ${keyRows.length}`);
 
-  // ── 2. media_assets: create-or-ignore; điền path khi còn rỗng ─────
-  await client.query("BEGIN");
-  for (const row of keyRows) {
-    await client.query(
-      `INSERT INTO media_assets (storage_key, path, created_at, updated_at)
-       VALUES ($1, $2, now(), now())
-       ON CONFLICT (storage_key) DO UPDATE
-         SET path = CASE WHEN media_assets.path = '' THEN EXCLUDED.path ELSE media_assets.path END`,
-      [row.key, row.path ?? ""],
-    );
-  }
-  await client.query("COMMIT");
-  console.log(`[media-backfill] media_assets rows ensured: ${keys.length}`);
-
-  // ── 3. product_images.media_asset_id (chỉ khi NULL — idempotent) ──
-  await client.query("BEGIN");
-  const { rowCount: piRows } = await client.query(`
-    UPDATE product_images i
-       SET media_asset_id = a.id
-      FROM media_assets a
-     WHERE i.media_asset_id IS NULL
-       AND substring(i.path from '([^/]+)$') = a.storage_key
-  `);
-  await client.query("COMMIT");
-  console.log(`[media-backfill] product_images gắn media_asset_id: ${piRows ?? 0}`);
-
-  // ── 4. mapping_media_usages (tile + custom product image) ──────────
-  await client.query("BEGIN");
-  const { rowCount: mapRows } = await client.query(`
-    INSERT INTO mapping_media_usages (media_asset_id, mapping_item_id, col, created_at)
-    SELECT a.id, m.id, 'image_path', now()
-      FROM customer_mapping_items m
-      JOIN media_assets a ON substring(m.image_path from '([^/]+)$') = a.storage_key
-     WHERE m.image_path IS NOT NULL AND m.image_path <> ''
-    ON CONFLICT (mapping_item_id, col) DO NOTHING
-  `);
-  const { rowCount: customRows } = await client.query(`
-    INSERT INTO mapping_media_usages (media_asset_id, mapping_item_id, col, created_at)
-    SELECT a.id, m.id, 'custom_product_image_path', now()
-      FROM customer_mapping_items m
-      JOIN media_assets a ON substring(m.custom_product_image_path from '([^/]+)$') = a.storage_key
-     WHERE m.custom_product_image_path IS NOT NULL AND m.custom_product_image_path <> ''
-    ON CONFLICT (mapping_item_id, col) DO NOTHING
-  `);
-  await client.query("COMMIT");
-  console.log(`[media-backfill] mapping usages (image_path/custom): ${mapRows ?? 0}/${customRows ?? 0}`);
-
-  // ── 5. landing_page_media_usages (hero_image) ──────────────────────
-  await client.query("BEGIN");
-  const { rowCount: heroRows } = await client.query(`
-    INSERT INTO landing_page_media_usages (media_asset_id, setting_key, created_at, updated_at)
-    SELECT a.id, 'hero_image', now(), now()
-      FROM lp_settings s
-      JOIN media_assets a ON substring(s.value from '([^/]+)$') = a.storage_key
-     WHERE s.key = 'hero_image' AND s.value IS NOT NULL AND s.value <> ''
-    ON CONFLICT (setting_key) DO NOTHING
-  `);
-  await client.query("COMMIT");
-  console.log(`[media-backfill] hero usages: ${heroRows ?? 0}`);
+  // ── 2-5. Tạo asset + gắn usage (lõi dùng chung với media-sync) ────────────
+  const keyToPath = new Map(keyRows.map((r) => [r.key, r.path]));
+  const stats = await reconcileMediaKeys(client, keyToPath);
+  console.log(`[media-backfill] media_assets rows ensured: ${stats.assetKeys}/${keyRows.length}`);
+  console.log(`[media-backfill] product_images gắn media_asset_id: ${stats.productUsages}`);
+  console.log(
+    `[media-backfill] mapping usages (image_path/custom): ${stats.mappingUsages}/${stats.customMappingUsages}`,
+  );
+  console.log(`[media-backfill] hero usages: ${stats.heroUsages}`);
 
   console.log("[media-backfill] DONE — idempotent, chạy lại an toàn.");
 } catch (err) {
-  try {
-    await client.query("ROLLBACK");
-  } catch {
-    /* ignore */
-  }
   console.error("[media-backfill] FAILED:", err.message);
   process.exitCode = 1;
 } finally {

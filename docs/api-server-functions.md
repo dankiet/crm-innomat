@@ -80,7 +80,12 @@ Kho ảnh (asset-centric): `fetchFlatMediaImages` (đọc theo MediaAsset — xe
 `deleteMediaAssetFn` — **xoá vĩnh viễn** 1 MediaAsset: gỡ mọi liên kết usage (xoá row
 `product_images`, clear ref trong Đề xuất/Hero), xoá row `media_assets`, **và xoá file trong
 Supabase Storage** (chỉ khi không còn bảng nào trỏ tới cùng storage key). Trả
-`{ deleted, usages_removed, path, file_deleted }`.
+`{ deleted, usages_removed, path, storage_key, file_deleted, file_failed }`. `file_failed` = true
+khi cần xoá file nhưng Storage từ chối — UI hiện toast lỗi thay vì báo "đã xoá vĩnh viễn".
+
+`deleteProductImageFn` **chỉ gỡ ảnh khỏi sản phẩm** (trả `{ product_id, images }`), không xoá file
+vật lý — muốn xoá thật thì xoá card ở `/luu-tru`. Xem
+[hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Xoá ảnh an toàn.
 
 `fetchProductFieldValues` / `bulkUpdateProductFieldFn` / `clearProductFieldValueFn` nhận **tên cột**
 từ client, nên chỉ chấp nhận cột nằm trong **whitelist `PRODUCT_SUGGEST_FIELDS`** — đây là lá chắn

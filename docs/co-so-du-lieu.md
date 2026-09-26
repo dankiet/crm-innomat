@@ -58,6 +58,9 @@ kèm `discount_tp` / `discount_b2b` là **% chiết khấu dự phòng**. Xem [n
 (`product_images.path`, `customer_mapping_items.*`, `lp_settings.hero_image` vẫn là nguồn sự
 thật), bảng usage mới được đồng bộ kèm theo (xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md)).
 
+Ngoại lệ: `products.image_path` là **snapshot dẫn xuất** (ảnh primary của `product_images`), nên
+không nhận ghi từ form/import — xem [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Ảnh sản phẩm.
+
 ### Người dùng & session
 
 | Bảng       | Ghi chú                                                                                   |

@@ -11,31 +11,10 @@
  * (cùng path trong cùng product), 66 mapping-only assets.
  */
 import pg from "pg";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.join(__dirname, "..");
+import { loadEnv } from "./lib/env.mjs";
 
-function loadDotEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return;
-  const text = fs.readFileSync(filePath, "utf-8");
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    let val = line.slice(eq + 1).trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1, -1);
-    }
-    if (process.env[key] == null || process.env[key] === "") process.env[key] = val;
-  }
-}
-loadDotEnvFile(path.join(root, ".env"));
-loadDotEnvFile(path.join(root, ".env.local"));
+loadEnv();
 
 const url = process.env.DATABASE_URL_UNPOOLED?.trim() || process.env.DATABASE_URL?.trim();
 if (!url) {
@@ -154,6 +133,80 @@ try {
       AND (EXISTS (SELECT 1 FROM mapping_media_usages mu WHERE mu.media_asset_id = a.id)
         OR EXISTS (SELECT 1 FROM landing_page_media_usages lu WHERE lu.media_asset_id = a.id))`);
   console.log(`  ℹ mapping-only assets (không có product_images, dùng mapping/hero): ${mappingOnlyNew}`);
+
+  // #12–#14 so SỐ LƯỢNG là chưa đủ: một usage row có thể trỏ nhầm asset (ref đổi từ
+  // key A sang B mà row cũ không được cập nhật) — đếm vẫn khớp nhưng ảnh sai chỗ.
+  // Mỗi usage phải trỏ đúng asset có storage_key bằng key của ref hiện tại.
+  ok =
+    cmp(
+      "#12 product_images.media_asset_id khớp key của path",
+      0,
+      await scalar(`SELECT COUNT(*) n FROM product_images i
+        JOIN media_assets a ON a.id = i.media_asset_id
+        WHERE substring(i.path from '([^/]+)$') IS DISTINCT FROM a.storage_key`),
+    ) && ok;
+
+  ok =
+    cmp(
+      "#13 mapping usage trỏ đúng asset của ref hiện tại",
+      0,
+      await scalar(`SELECT COUNT(*) n FROM mapping_media_usages u
+        JOIN customer_mapping_items m ON m.id = u.mapping_item_id
+        JOIN media_assets a ON a.id = u.media_asset_id
+        WHERE (u.col = 'image_path'
+                 AND substring(m.image_path from '([^/]+)$') IS DISTINCT FROM a.storage_key)
+           OR (u.col = 'custom_product_image_path'
+                 AND substring(m.custom_product_image_path from '([^/]+)$') IS DISTINCT FROM a.storage_key)`),
+    ) && ok;
+
+  ok =
+    cmp(
+      "#14 hero usage trỏ đúng asset của hero hiện tại",
+      0,
+      await scalar(`SELECT COUNT(*) n FROM landing_page_media_usages u
+        JOIN media_assets a ON a.id = u.media_asset_id
+        WHERE u.setting_key = 'hero_image'
+          AND (SELECT substring(s.value from '([^/]+)$') FROM lp_settings s WHERE s.key = 'hero_image')
+              IS DISTINCT FROM a.storage_key`),
+    ) && ok;
+
+  // Lệch số lượng không tự chỉ ra chỗ sai. In rõ từng row để biết ngay phải sửa
+  // gì: `products.image_path` là snapshot dẫn xuất, có thể trỏ tới ảnh không còn
+  // row product_images nào (nền tảng của lỗi "ảnh vô hình" trên /luu-tru).
+  if (!ok) {
+    const offenders = (
+      await client.query(`
+        SELECT 'product_images #' || i.id AS what, i.path AS ref
+          FROM product_images i
+          LEFT JOIN media_assets a ON a.storage_key = substring(i.path from '([^/]+)$')
+         WHERE i.path <> '' AND a.id IS NULL
+        UNION ALL
+        SELECT 'products #' || p.id || ' (' || p.code || ')', p.image_path
+          FROM products p
+          LEFT JOIN media_assets a ON a.storage_key = substring(p.image_path from '([^/]+)$')
+         WHERE p.image_path <> '' AND a.id IS NULL
+        UNION ALL
+        SELECT 'mapping_item #' || m.id, m.image_path
+          FROM customer_mapping_items m
+          LEFT JOIN media_assets a ON a.storage_key = substring(m.image_path from '([^/]+)$')
+         WHERE m.image_path <> '' AND a.id IS NULL
+        UNION ALL
+        SELECT 'mapping_item.custom #' || m.id, m.custom_product_image_path
+          FROM customer_mapping_items m
+          LEFT JOIN media_assets a ON a.storage_key = substring(m.custom_product_image_path from '([^/]+)$')
+         WHERE m.custom_product_image_path <> '' AND a.id IS NULL
+        UNION ALL
+        SELECT 'hero', s.value
+          FROM lp_settings s
+          LEFT JOIN media_assets a ON a.storage_key = substring(s.value from '([^/]+)$')
+         WHERE s.key = 'hero_image' AND s.value <> '' AND a.id IS NULL
+      `)
+    ).rows;
+    console.log(`\n  → ref KHÔNG có row media_assets (${offenders.length}):`);
+    for (const o of offenders.slice(0, 20)) console.log(`     · ${o.what} → ${o.ref}`);
+    if (offenders.length > 20) console.log(`     … và ${offenders.length - 20} dòng nữa`);
+    console.log("     Sửa: `npm run media:sync -- --apply` (reconcile), rồi chạy lại verify.");
+  }
 
   console.log(ok ? "[media-verify] PASS — legacy ⇄ new khớp nhau." : "[media-verify] FAIL — có chênh lệch.");
   process.exitCode = ok ? 0 : 1;

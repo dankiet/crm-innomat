@@ -194,9 +194,18 @@ và references chi tiết theo role + href khi có route.
 
 Xoá asset (`deleteMediaAssetFn`) là **xoá vĩnh viễn**: gỡ mọi liên kết (xoá row `product_images`,
 clear ref trong Đề xuất/Hero), xoá row `media_assets`, **và xoá file trong Supabase Storage** —
-chỉ giữ file khi còn bảng khác trỏ tới cùng storage key. Nếu còn usage, dialog nhắc
+chỉ giữ file khi còn bảng khác trỏ tới cùng storage key (lưới an toàn chống *drift*; trạng thái đã
+verify thì không chạy). Nếu còn usage, dialog nhắc
 "Xem N nơi đang dùng trước khi xóa" (xem
 [hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §"Kho ảnh asset-centric").
+
+**Đồng bộ Storage ↔ DB** — `npm run media:sync` (chỉ đọc mặc định; `--apply` mới ghi). Xoá ảnh
+thời kỳ đầu (trước `86cf51e`) chỉ gỡ liên kết DB mà không xoá file → bucket tồn đọng file mồ côi;
+chiều ngược lại, ref trong DB có thể thiếu row `media_assets`. Script reconcile cả hai và xoá file
+rác, keep-set là hợp của `media_assets` + 5 nguồn ref nên không bao giờ xoá oan ảnh còn dùng.
+Đã chạy 2026-09-26: bucket khớp tuyệt đối **3.558 object = 3.558 asset** (xoá 80 file mồ côi,
+14,8 MB; `storage:backup` chạy trước) — xem
+[hinh-anh-va-thu-vien](hinh-anh-va-thu-vien.md) §Đồng bộ.
 
 ## 12. Media — `/luu-tru`
 

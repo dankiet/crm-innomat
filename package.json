@@ -16,6 +16,7 @@
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:media-backfill": "node scripts/media-backfill.mjs",
     "db:media-verify": "node scripts/media-verify.mjs",
+    "media:sync": "node scripts/media-sync.mjs",
     "db:enable-rls": "node scripts/enable-rls.mjs",
     "db:seed-admin": "node scripts/seed-admin.mjs",
     "test": "node --experimental-transform-types --test \"src/**/*.test.ts\""

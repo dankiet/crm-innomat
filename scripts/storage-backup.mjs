@@ -2,6 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { StorageClient } from "@supabase/storage-js";
 
+import { loadEnv } from "./lib/env.mjs";
+
+loadEnv();
+
 const url = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
 const key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
 const bucket = (process.env.SUPABASE_STORAGE_BUCKET ?? "crm-images").trim();

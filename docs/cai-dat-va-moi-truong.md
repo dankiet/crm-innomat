@@ -90,6 +90,7 @@ lưu hình local vào `public/images/`. Xem [hinh-anh-va-thu-vien.md](hinh-anh-v
 | `npm run db:seed-admin`   | Tạo/đặt lại admin, hash scrypt                                                           |
 | `npm run db:media-backfill` | Backfill `media_assets` + usage từ 5 nguồn ref (idempotent) — chạy **sau** `db:migrate` |
 | `npm run db:media-verify` | Verify backfill MediaAsset                                                              |
+| `npm run media:sync`      | Reconcile MediaAsset ↔ Storage, xoá file mồ côi                                         |
 | `npm run storage:backup`  | Mirror bucket Supabase → `public/images`                                                 |
 | `npm run clean:generated` | Xoá output build/generated                                                               |
 
