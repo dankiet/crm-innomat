@@ -684,7 +684,7 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
       {/* Floating Chat / Consultation Widget */}
       <ChatWidget />
 
-      {/* Cổng đồng thuận cho GTM — chặn trang cho tới khi khách chọn */}
+      {/* Thanh đồng thuận GTM — neo đáy, không chặn trang */}
       <ConsentBanner />
     </div>
   );

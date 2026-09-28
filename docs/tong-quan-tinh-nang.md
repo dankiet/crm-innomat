@@ -147,17 +147,15 @@ lúc dựng `<head>` — không phải chặn bằng JS phía client (chặn cli
 - `lpHead()` (`src/routes/-lp-route.ts`) đọc cookie: chỉ khi `granted` mới phát snippet GTM
   vào `<head>`. Thẻ `<noscript>` của GTM nằm ở `RootShell` (`src/routes/__root.tsx`), cũng chỉ
   khi `granted` **và** đang ở phạm vi landing (`/` hoặc `/lp/*`) — route CRM không dính GTM.
-- `ConsentBanner` (`src/components/landing/ConsentBanner.tsx`) là **cổng chặn toàn màn hình**
-  (`z-index: 300`, trên cả tray 90 / menu mobile 100 / modal thư viện 200), hiện khi cookie chưa
-  có: khoá cuộn trang và đặt `inert` lên mọi phần tử anh em cho tới khi khách chọn. Nút "Đổi lựa
-  chọn cookie" ở footer xoá cookie để cổng trở lại.
+- `ConsentBanner` (`src/components/landing/ConsentBanner.tsx`) là **thanh neo đáy, KHÔNG chặn**
+  (`z-index: 95`): khách vẫn cuộn và dùng trang bình thường, thanh chỉ chiếm một dải ở đáy. Hiện
+  khi cookie chưa có; nút "Đổi lựa chọn cookie" ở footer xoá cookie để thanh trở lại.
+  - Đánh đổi có chủ đích: không ai bị buộc phải bấm, nên khách bỏ qua thì GTM không nạp và không có
+    số liệu. Muốn chắc chắn có dữ liệu thì phải dùng cổng chặn (đã cân nhắc và bỏ).
   - Snapshot server của `useSyncExternalStore` là chính `readConsent`, tức server đọc cookie của
-    request y như `lpHead()` đã đọc để quyết định chèn GTM — khách đã chọn rồi không thấy cổng loé
+    request y như `lpHead()` đã đọc để quyết định chèn GTM — khách đã chọn rồi không thấy thanh loé
     lên ở lần render đầu.
-  - Cổng nằm trong component con riêng (`ConsentGate`) chứ không phải chính `ConsentBanner`:
-    `ConsentBanner` vẫn ở trong cây sau khi khách chọn (nó chỉ render `null`), nên hiệu ứng khoá
-    trang đặt ở đó sẽ không bao giờ chạy phần dọn dẹp và trang kẹt ở trạng thái bị chặn.
-  - Khách tắt JS: cổng là SSR nên sẽ chặn vĩnh viễn — đã kèm `<noscript><style>` ẩn cổng đi.
+  - Khách tắt JS: `<noscript><style>` ẩn thanh đi vì hai nút sẽ không làm gì được.
 - `trackEvent` (`src/lib/lp-tracking.ts`) tự chặn nếu chưa `granted`, nên bất biến không phụ
   thuộc vào việc GTM có tình cờ định nghĩa `gtag`/`fbq` hay không.
 - Rút lại đồng thuận ⇒ `stopGtm()` **nạp lại trang**: gỡ thẻ `<script>` không dừng được

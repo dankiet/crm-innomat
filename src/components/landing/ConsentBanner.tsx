@@ -1,15 +1,19 @@
 /**
- * Cổng đồng thuận cookie cho GTM.
+ * Thanh đồng thuận cookie cho GTM — neo đáy, KHÔNG chặn.
  *
- * Là cổng CHẶN toàn màn hình: khách phải chọn "Đồng ý" hoặc "Từ chối" mới xem được
- * nội dung. Hai lựa chọn mở cổng như nhau — không lựa chọn nào bị phạt.
+ * Khác hẳn bản cổng chặn trước đó: không khoá cuộn, không `inert`, không `aria-modal`.
+ * Khách vẫn cuộn và dùng trang bình thường phía sau; thanh chỉ nằm ở đáy màn hình.
+ *
+ * Đánh đổi có chủ đích: không ai bị buộc phải bấm, nên khách bỏ qua thì GTM không
+ * nạp và không có số liệu. Muốn chắc chắn có dữ liệu thì phải quay lại cổng chặn.
  *
  * Chỉ hiện khi khách CHƯA chọn (`undefined`). Bấm "Đồng ý" → ghi cookie + nạp GTM
  * ngay tại chỗ (không reload). Bấm "Từ chối" → ghi cookie, không bao giờ nạp GTM.
+ * Hai lựa chọn giá trị như nhau — không lựa chọn nào bị phạt.
  *
  * Snapshot server CŨNG là `readConsent`: server đọc cookie của request y như `lpHead()`
- * đã đọc để quyết định chèn snippet GTM. Nhờ vậy khách đã chọn rồi không thấy cổng này
- * loé lên ở lần render đầu — HTML của server và lần hydrate đầu khớp nhau.
+ * đã đọc để quyết định chèn snippet GTM. Nhờ vậy khách đã chọn rồi không thấy thanh
+ * này loé lên ở lần render đầu — HTML của server và lần hydrate đầu khớp nhau.
  */
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
@@ -23,44 +27,26 @@ import {
 
 export function ConsentBanner() {
   const consent = useSyncExternalStore(subscribeConsent, readConsent, readConsent);
+  const barRef = useRef<HTMLElement>(null);
+
+  // Chiều cao thanh phụ thuộc độ dài chữ và bề rộng viewport (mobile cao gấp đôi
+  // desktop vì chữ xuống dòng). Shortlist tray cũng neo đáy, nên phải biết chiều cao
+  // thật để nâng nó lên — dùng số cố định là đoán mò và vỡ ở màn hẹp.
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el || consent !== undefined) return;
+    const root = document.documentElement;
+    const sync = () => root.style.setProperty("--consent-bar-h", `${el.offsetHeight}px`);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--consent-bar-h");
+    };
+  }, [consent]);
 
   if (consent !== undefined) return null;
-  return <ConsentGate />;
-}
-
-/**
- * Tách riêng để hiệu ứng khoá trang gắn liền vòng đời của cổng: `ConsentBanner` vẫn
- * nằm trong cây sau khi khách chọn (nó chỉ render `null`), nên nếu để hiệu ứng ở đó
- * thì phần dọn dẹp không bao giờ chạy và trang kẹt ở trạng thái bị chặn.
- */
-function ConsentGate() {
-  const gateRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  // Cổng đang mở = trang phía sau bị vô hiệu: khoá cuộn, và đánh dấu `inert` mọi
-  // phần tử anh em để bàn phím/trình đọc màn hình cũng không lách qua được.
-  useEffect(() => {
-    const gate = gateRef.current;
-    const parent = gate?.parentElement;
-    if (!gate || !parent) return;
-
-    const behind = Array.from(parent.children).filter(
-      (el): el is HTMLElement => el instanceof HTMLElement && el !== gate,
-    );
-    const wasInert = behind.map((el) => el.hasAttribute("inert"));
-    behind.forEach((el) => el.setAttribute("inert", ""));
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    cardRef.current?.focus();
-
-    return () => {
-      behind.forEach((el, i) => {
-        if (!wasInert[i]) el.removeAttribute("inert");
-      });
-      document.body.style.overflow = prevOverflow;
-    };
-  }, []);
 
   const applyConsent = (value: ConsentValue) => {
     setConsent(value);
@@ -70,52 +56,42 @@ function ConsentGate() {
 
   return (
     <>
-      {/* Khách tắt JS thì hai nút không làm gì được — cổng sẽ chặn vĩnh viễn. Cổng là
-          thứ chỉ có nghĩa khi JS chạy, nên tắt JS là ẩn nó đi. */}
+      {/* Khách tắt JS thì hai nút không làm gì được — để lại chỉ là thanh chết. */}
       <noscript>
-        <style>{".consent-gate{display:none !important}"}</style>
+        <style>{".consent-bar{display:none !important}"}</style>
       </noscript>
-      <div
-        className="consent-gate"
-        ref={gateRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="consent-gate-title"
-        aria-describedby="consent-gate-lead"
+      <aside
+        className="consent-bar"
+        ref={barRef}
+        role="region"
+        aria-label="Đồng thuận cookie"
+        aria-live="polite"
       >
-        <div className="consent-card" ref={cardRef} tabIndex={-1}>
+        <div className="consent-bar-copy">
           <p className="consent-kicker">QUYỀN RIÊNG TƯ</p>
-          <h2 className="consent-title" id="consent-gate-title">
-            Em xin phép đo lường truy cập
-          </h2>
-          <p className="consent-lead" id="consent-gate-lead">
+          <p className="consent-lead">
             Em dùng Google Tag Manager để ghi nhận lượt xem trang, những mã gạch bạn lưu vào
-            shortlist, và lượt gửi brief. Nhìn vào đó em biết phần nào của thư viện đang hữu ích để
-            xếp lại cho dễ tra hơn.
+            shortlist, và lượt gửi brief — để biết phần nào của thư viện đang hữu ích. Chọn
+            &ldquo;Từ chối&rdquo; thì trang vẫn dùng đủ như thường.
           </p>
-          <p className="consent-note">
-            Chọn &ldquo;Đồng ý&rdquo; hay &ldquo;Từ chối&rdquo; thì nội dung vẫn mở đầy đủ như nhau
-            — em chỉ cần biết ý bạn trước khi xem tiếp. Đổi ý bất cứ lúc nào bằng nút &ldquo;Đổi lựa
-            chọn cookie&rdquo; ở chân trang.
-          </p>
-          <div className="consent-actions">
-            <button
-              type="button"
-              className="consent-btn consent-accept"
-              onClick={() => applyConsent("granted")}
-            >
-              Đồng ý
-            </button>
-            <button
-              type="button"
-              className="consent-btn consent-decline"
-              onClick={() => applyConsent("denied")}
-            >
-              Từ chối
-            </button>
-          </div>
         </div>
-      </div>
+        <div className="consent-actions">
+          <button
+            type="button"
+            className="consent-btn consent-accept"
+            onClick={() => applyConsent("granted")}
+          >
+            Đồng ý
+          </button>
+          <button
+            type="button"
+            className="consent-btn consent-decline"
+            onClick={() => applyConsent("denied")}
+          >
+            Từ chối
+          </button>
+        </div>
+      </aside>
     </>
   );
 }
