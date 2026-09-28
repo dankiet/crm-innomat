@@ -75,9 +75,8 @@ export function ConsentBanner() {
         <div className="consent-bar-copy">
           <p className="consent-kicker">QUYỀN RIÊNG TƯ</p>
           <p className="consent-lead">
-            Em muốn ghi nhận lượt xem trang, những mã gạch bạn lưu vào shortlist, và lượt gửi brief
-            — để biết phần nào của thư viện đang hữu ích. Chọn &ldquo;Từ chối&rdquo; thì trang vẫn
-            dùng đủ như thường.
+            Em muốn ghi nhận lượt xem trang và những mã gạch bạn lưu — để cải thiện thư viện. Chọn
+            &ldquo;Từ chối&rdquo; thì trang vẫn dùng đủ như thường.
           </p>
         </div>
         <div className="consent-actions">

@@ -308,8 +308,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Thanh đang mở thì nút "Đổi lựa chọn cookie" ở footer là thừa — nó chỉ có nghĩa
    SAU khi khách đã chọn. Ẩn đi để không có hai lối vào cùng một câu hỏi. */
 .architect-landing-wrapper:has(.consent-bar) .footer-consent-btn { display:none; }
-/* Thanh là overlay cố định ở đáy nên khi cuộn tới cuối trang nó che dòng bản quyền.
-   Chừa chỗ ở đáy footer — dùng chiều cao đo được, vì thanh cao gấp đôi trên mobile. */
+/* Chừa chỗ ở đáy trang bằng CHÍNH chiều cao thanh. Thanh là `position:fixed` nên nó
+   không đẩy nội dung lên — không chừa thì dải đáy viewport thành "vùng chết": phần tử
+   nằm đó (vd chip "Kích thước" trong thư viện) bị thanh đè và tap trúng thanh thay vì
+   trúng phần tử. Đây là padding cho cả trang, không chỉ footer. */
+.architect-landing-wrapper:has(.consent-bar) .architect-landing,
+.architect-landing-wrapper:has(.consent-bar) .material-library-page { padding-bottom: var(--consent-bar-h, 72px); }
+/* Footer vẫn cần thêm khoảng thở riêng của nó, cộng thêm chiều cao thanh. */
 .architect-landing-wrapper:has(.consent-bar) .landing-footer { padding-bottom: calc(92px + var(--consent-bar-h, 72px)); }
 /* Shortlist tray cũng neo đáy — nâng nó lên trên thanh để không chồng nhau.
    `--consent-bar-h` do component đo bằng ResizeObserver (chiều cao thanh đổi theo
@@ -452,12 +457,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .shortlist-tray { right: 0; bottom: 0; left: 0; justify-content: space-between; border-right: 0; border-bottom: 0; border-left: 0; padding: 12px 6vw; }
   .landing-footer { grid-template-columns: 1fr; gap: 24px; padding: 38px 6vw 74px; }
   .footer-contact { justify-self: start; align-items: flex-start; gap: 9px; }
-  /* Thanh neo đáy: trên mobile xếp dọc (chữ trên, nút dưới) để không bị bóp ngang.
-     Tray được nâng bằng `--consent-bar-h` đo ở component, không cần số cứng ở đây. */
-  .consent-bar { flex-direction: column; align-items: stretch; gap: 12px; padding: 13px 6vw calc(13px + env(safe-area-inset-bottom, 0px)); }
-  .consent-lead { font-size: 12px; }
+  /* Thanh neo đáy trên mobile phải GỌN: mỗi px chiều cao là một px nội dung bị che
+     (thanh là `position:fixed`, không đẩy nội dung lên). Ẩn kicker, thu chữ và nút để
+     chiều cao xuống ~1/2 — nếu không, dải đáy thành vùng chết không bấm được. */
+  .consent-bar { flex-direction: column; align-items: stretch; gap: 9px; padding: 10px 5vw calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .consent-kicker { display: none; }
+  .consent-lead { font-size: 11px; line-height: 1.45; }
   .consent-actions { justify-content: stretch; }
-  .consent-btn { flex: 1; padding: 12px 16px; text-align: center; }
+  .consent-btn { flex: 1; padding: 10px 12px; font-size: 11.5px; text-align: center; }
 }
 /* ==========================================================================
    ARCHITECTURAL JOURNAL & EM BAN GACH COMPONENTS EXTENSION STYLES
