@@ -290,16 +290,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .landing-footer { display:grid; grid-template-columns:1fr 1fr 1fr; align-items:end; gap:25px; padding:47px 8vw 92px; background:#1f2b33; color:#fffaf3; }.footer-brand { font-size:20px; }.footer-brand .brand-mark { width:42px; height:42px; }.landing-footer > p { margin:0; color:#c5cbc6; font-family:var(--serif); font-size:24px; font-weight:500; letter-spacing:-.03em; line-height:1.02; }.landing-footer > p.footer-tagline { font-style:italic; font-weight:400; color:#ddd7cb; letter-spacing:-.015em; line-height:1.18; text-shadow:0 0 26px rgba(221,215,203,.28); }.footer-contact { justify-self:end; display:flex; flex-direction:column; align-items:flex-end; gap:8px; color:#98a39f; font-size:11px; }.footer-contact-link, .footer-social-link { display:inline-flex; align-items:center; gap:6px; color:#98a39f; font-size:11px; font-weight:400; text-decoration:none; border-bottom:none; padding-bottom:0; transition:color 150ms ease; }.footer-contact-link:hover, .footer-social-link:hover { color:#fffaf3; }.footer-ext-arrow { opacity:.6; transition:transform 150ms ease, opacity 150ms ease; }.footer-contact-link:hover .footer-ext-arrow { opacity:1; transform:translate(1px,-1px); }.footer-socials { display:inline-flex; align-items:center; gap:8px; margin:2px 0; }.footer-divider { color:#606e68; font-size:10px; user-select:none; }.footer-cta { display:inline-flex; gap:6px; align-items:center; color:#fffaf3; font-size:11px; font-weight:700; text-decoration:none; border-bottom:1px solid #c1b5a3; padding-bottom:4px; margin-top:4px; transition:border-color 150ms ease, color 150ms ease; }.footer-cta:hover { color:var(--terracotta); border-bottom-color:var(--terracotta); }.footer-copyright { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:18px; padding-top:22px; border-top:1px solid rgba(193,181,163,.18); color:#98a39f; font-size:10px; letter-spacing:.02em; }.footer-copyright-line { font-family:var(--serif); font-style:italic; font-size:15px; letter-spacing:.005em; color:#b3bdb8; text-shadow:0 0 22px rgba(179,189,184,.22); }.footer-consent-btn { background:none; border:none; padding:0; color:#98a39f; font-size:10px; letter-spacing:.02em; text-decoration:underline; text-underline-offset:3px; cursor:pointer; transition:color 150ms ease; }.footer-consent-btn:hover { color:#fffaf3; }
 
-/* Banner xin đồng thuận cookie (GTM). Góc dưới-trái để chừa chỗ cho shortlist tray / chat widget ở bên phải. */
-.consent-banner { position:fixed; z-index:80; bottom:24px; left:24px; max-width:390px; padding:16px 18px; background:rgba(31,43,51,.96); color:#fffaf3; border:1px solid rgba(217,209,195,.22); box-shadow:0 18px 40px rgba(17,27,31,.35); backdrop-filter:blur(12px); animation:slip-in 220ms ease-out both; }.consent-body { display:flex; flex-direction:column; gap:5px; }.consent-kicker { margin:0; color:var(--terracotta); font-size:9px; font-weight:700; letter-spacing:.14em; }.consent-body > p:not(.consent-kicker) { margin:0; color:#c5cbc6; font-size:12px; line-height:1.5; }.consent-actions { display:flex; align-items:center; gap:8px; margin-top:13px; }.consent-btn { border-radius:0; font-size:11px; font-weight:700; letter-spacing:.02em; cursor:pointer; padding:6px 14px; transition:background 150ms ease, border-color 150ms ease, color 150ms ease; }.consent-accept { background:var(--terracotta); color:#fffaf3; border:1px solid var(--terracotta); }.consent-accept:hover { background:var(--terracotta-dark); border-color:var(--terracotta-dark); }.consent-decline { background:transparent; color:#98a39f; border:1px solid rgba(255,250,243,.25); }.consent-decline:hover { color:#fffaf3; border-color:rgba(255,250,243,.5); }
-/* Banner đang mở thì nút "Đổi lựa chọn cookie" ở footer là thừa — nó chỉ có nghĩa
+/* Cổng đồng thuận cookie (GTM) — chặn toàn màn hình cho tới khi khách chọn.
+   Cổng phải nằm trên MỌI lớp overlay khác của landing: tray 90, menu mobile 100,
+   modal thư viện 200. Vì cổng phủ kín màn hình nên footer không cần chừa chỗ nữa. */
+.consent-gate { position:fixed; z-index:300; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(17,27,31,.72); backdrop-filter:blur(10px); animation:consent-veil-in 240ms ease-out both; }
+.consent-card { position:relative; width:100%; max-width:600px; padding:40px 42px 34px; background:#1f2b33; color:#fffaf3; border:1px solid rgba(217,209,195,.22); box-shadow:0 30px 70px rgba(9,16,19,.5); outline:none; animation:consent-card-in 280ms var(--ease-out) both; }
+.consent-card::before { content:""; position:absolute; top:0; right:42px; left:42px; height:1px; background:linear-gradient(90deg, transparent, rgba(217,209,195,.4), transparent); }
+.consent-kicker { margin:0; color:var(--terracotta); font-size:10px; font-weight:700; letter-spacing:.2em; }
+.consent-title { margin:14px 0 0; font-family:var(--serif); font-size:34px; font-weight:600; letter-spacing:-.03em; line-height:1.05; }
+.consent-lead { margin:18px 0 0; color:#c5cbc6; font-size:14px; line-height:1.65; }
+.consent-note { margin:14px 0 0; padding-top:14px; border-top:1px solid rgba(217,209,195,.14); color:#98a39f; font-size:12px; line-height:1.6; }
+.consent-actions { display:flex; align-items:center; gap:12px; margin-top:26px; }
+.consent-btn { border-radius:0; font-size:13px; font-weight:700; letter-spacing:.02em; cursor:pointer; padding:13px 30px; transition:background 150ms ease, border-color 150ms ease, color 150ms ease; }
+.consent-accept { background:var(--terracotta); color:#fffaf3; border:1px solid var(--terracotta); }
+.consent-accept:hover { background:var(--terracotta-dark); border-color:var(--terracotta-dark); }
+.consent-decline { background:transparent; color:#c5cbc6; border:1px solid rgba(255,250,243,.3); }
+.consent-decline:hover { color:#fffaf3; border-color:rgba(255,250,243,.6); }
+@keyframes consent-veil-in { from { opacity:0; } to { opacity:1; } }
+@keyframes consent-card-in { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+/* Cổng đang mở thì nút "Đổi lựa chọn cookie" ở footer là thừa — nó chỉ có nghĩa
    SAU khi khách đã chọn. Ẩn đi để không có hai lối vào cùng một câu hỏi. */
-.architect-landing-wrapper:has(.consent-banner) .footer-consent-btn { display:none; }
-/* Banner là overlay cố định ở đáy-trái (cao ~150px, cách đáy 24px) nên khi khách
-   cuộn tới cuối trang nó sẽ che dòng bản quyền. Chừa chỗ ở đáy footer — CHỈ trong
-   lúc banner còn hiện; khách chọn xong thì footer trở lại nhịp bình thường. */
-.architect-landing-wrapper:has(.consent-banner) .landing-footer { padding-bottom:186px; }
-@keyframes slip-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.architect-landing-wrapper:has(.consent-gate) .footer-consent-btn { display:none; }
 
 .shortlist-tray { position:fixed; z-index:30; right:20px; bottom:20px; display:flex; align-items:center; gap:14px; border:1px solid rgba(255,250,243,.35); padding:10px 10px 10px 13px; background:rgba(31,43,51,.94); color:#fffaf3; box-shadow:0 14px 35px rgba(17,27,31,.25); opacity:0; pointer-events:none; transform:translateY(16px); transition:opacity 200ms var(--ease-out), transform 200ms var(--ease-out); backdrop-filter:blur(12px); }.shortlist-tray.is-visible { opacity:1; pointer-events:auto; transform:translateY(0); }.tray-count { display:flex; align-items:center; gap:8px; font-size:11px; cursor:pointer; }.tray-count svg { color:#d6b398; }.tray-count b { color:#d6b398; }
 
@@ -402,11 +413,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .landing-footer { grid-template-columns: 1fr 1fr; padding: 45px 7vw 80px; }
   .footer-contact { grid-column: 1 / -1; justify-self: start; align-items: flex-start; margin-top: 10px; }
   .footer-copyright { flex-direction: column; align-items: flex-start; gap: 8px; }
-  /* Dưới 980px, shortlist tray (cao ~56-58px, sát đáy phải) chạm banner góc trái.
-     Nâng banner lên trên tray khi tray đang hiện. Trên 980px hai bên đủ xa, không cần. */
-  .consent-banner.is-raised { bottom: 90px; }
-  /* Banner cao hơn ở dải này (chữ xuống dòng) — chừa nhiều hơn desktop. */
-  .architect-landing-wrapper:has(.consent-banner) .landing-footer { padding-bottom:252px; }
 }
 
 @media (max-width: 620px) {
@@ -442,12 +448,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .shortlist-tray { right: 0; bottom: 0; left: 0; justify-content: space-between; border-right: 0; border-bottom: 0; border-left: 0; padding: 12px 6vw; }
   .landing-footer { grid-template-columns: 1fr; gap: 24px; padding: 38px 6vw 74px; }
   .footer-contact { justify-self: start; align-items: flex-start; gap: 9px; }
-  .consent-banner { left: 0; right: 0; bottom: 0; max-width: 100%; border-right: none; border-bottom: none; border-left: none; padding: 14px 6vw calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 95; }
-  /* Shortlist tray cũng nằm sát đáy khi lên mobile — nâng banner lên để không đè.
-     Tray cao ~58px và cách đáy 24px (xem `.shortlist-tray` ở khối ≤620px phía trên). */
-  .consent-banner.is-raised { bottom: 90px; padding-bottom: 14px; }
-  /* Banner full-width ở đây, và khi nâng lên (is-raised) nó ăn sâu vào footer hơn. */
-  .architect-landing-wrapper:has(.consent-banner) .landing-footer { padding-bottom:256px; }
+  /* Cổng là hộp thoại giữa màn hình; trên mobile thu padding và cỡ chữ để vẫn thấy
+     trọn hai nút mà không phải cuộn trong hộp. */
+  .consent-gate { padding: 16px; }
+  .consent-card { padding: 28px 22px 24px; }
+  .consent-card::before { right: 22px; left: 22px; }
+  .consent-title { font-size: 26px; }
+  .consent-lead { font-size: 13px; }
+  .consent-actions { flex-direction: column; align-items: stretch; gap: 10px; margin-top: 22px; }
+  .consent-btn { padding: 14px 20px; text-align: center; }
 }
 /* ==========================================================================
    ARCHITECTURAL JOURNAL & EM BAN GACH COMPONENTS EXTENSION STYLES

@@ -138,6 +138,36 @@ Ba nguồn trên độc lập nhau. Git **không** giữ dữ liệu và ảnh �
 Gần như luôn do mã nội bộ chưa được map vào sản phẩm. Chạy tab `mapping` trước tab `stock`
 ([san-pham-ton-kho-import.md](san-pham-ton-kho-import.md)).
 
+### GTM không bắn / nghi ngờ Tag Manager chưa chạy
+
+Kiểm tra theo thứ tự — mỗi bước loại trừ một tầng:
+
+1. **Cổng đồng thuận đã chọn chưa?** Chưa chọn ⇒ server không chèn snippet nào vào HTML, và
+   `trackEvent` cũng tự chặn. Đây là hành vi đúng, không phải lỗi. Xem
+   [tong-quan-tinh-nang.md §9](tong-quan-tinh-nang.md).
+2. **Snippet có trong HTML không?** `curl -H "Cookie: ebg_gtm_consent=granted" <url>` phải thấy
+   `googletagmanager.com/gtm.js`. Không thấy ⇒ lỗi ở `lpHead()` / `readConsent()`.
+3. **Container có tồn tại không?** `curl -s "https://www.googletagmanager.com/gtm.js?id=GTM-P4SQ7HBB"`
+   phải trả `200` kèm payload cỡ vài trăm KB. Đây chỉ chứng minh **container tồn tại và đang publish**.
+4. **Container có TAG chưa?** Đây là bẫy hay gặp: container publish nhưng **rỗng tag** thì snippet
+   vẫn nạp, `dataLayer` vẫn có entry `gtm.js`, `window.google_tag_manager["GTM-P4SQ7HBB"]` vẫn tồn
+   tại — nhưng **không có request nào bay tới GA/Pixel**. Phân biệt bằng payload:
+
+   ```
+   curl -s "https://www.googletagmanager.com/gtm.js?id=<ID>" | grep -o '"tags":\[[^]]*\]'
+   ```
+
+   - `"tags":[]` (kèm `"predicates":[]`, `"rules":[]`) ⇒ **container rỗng**. Lỗi nằm ở GTM UI, không
+     phải ở code: vào GTM → container → thêm tag (GA4 / Meta Pixel) → **Submit → Publish**.
+   - `"tags":[…]` có phần tử ⇒ đã có tag, kiểm tra tiếp bước 5.
+
+   Đo ngày **2026-09-28**: `GTM-P4SQ7HBB` trả `200`, payload **332 KB**, nhưng `"tags":[]` — tức
+   hạ tầng phía code đã đúng hết mà vẫn chưa có dữ liệu nào về GA/Pixel.
+
+5. **Trong trình duyệt:** sau khi bấm "Đồng ý", `window.dataLayer` phải có entry `gtm.js`, và
+   `window.google_tag_manager["GTM-P4SQ7HBB"]` phải tồn tại. Không có ⇒ script bị chặn (adblock,
+   CSP) hoặc mạng.
+
 ## Quy trình sửa code an toàn
 
 Theo `AGENTS.md` (GitNexus, index `crm-innomat`):

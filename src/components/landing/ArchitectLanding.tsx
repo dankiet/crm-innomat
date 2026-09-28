@@ -684,8 +684,8 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
       {/* Floating Chat / Consultation Widget */}
       <ChatWidget />
 
-      {/* Cookie consent cho GTM — chỉ hiện khi khách chưa chọn */}
-      <ConsentBanner raised={selectedIds.length > 0} />
+      {/* Cổng đồng thuận cho GTM — chặn trang cho tới khi khách chọn */}
+      <ConsentBanner />
     </div>
   );
 }

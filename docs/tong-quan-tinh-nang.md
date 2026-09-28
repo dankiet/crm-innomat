@@ -147,8 +147,17 @@ lúc dựng `<head>` — không phải chặn bằng JS phía client (chặn cli
 - `lpHead()` (`src/routes/-lp-route.ts`) đọc cookie: chỉ khi `granted` mới phát snippet GTM
   vào `<head>`. Thẻ `<noscript>` của GTM nằm ở `RootShell` (`src/routes/__root.tsx`), cũng chỉ
   khi `granted` **và** đang ở phạm vi landing (`/` hoặc `/lp/*`) — route CRM không dính GTM.
-- `ConsentBanner` (`src/components/landing/ConsentBanner.tsx`) hiện khi cookie chưa có; nút
-  "Đổi lựa chọn cookie" ở footer xoá cookie để banner trở lại.
+- `ConsentBanner` (`src/components/landing/ConsentBanner.tsx`) là **cổng chặn toàn màn hình**
+  (`z-index: 300`, trên cả tray 90 / menu mobile 100 / modal thư viện 200), hiện khi cookie chưa
+  có: khoá cuộn trang và đặt `inert` lên mọi phần tử anh em cho tới khi khách chọn. Nút "Đổi lựa
+  chọn cookie" ở footer xoá cookie để cổng trở lại.
+  - Snapshot server của `useSyncExternalStore` là chính `readConsent`, tức server đọc cookie của
+    request y như `lpHead()` đã đọc để quyết định chèn GTM — khách đã chọn rồi không thấy cổng loé
+    lên ở lần render đầu.
+  - Cổng nằm trong component con riêng (`ConsentGate`) chứ không phải chính `ConsentBanner`:
+    `ConsentBanner` vẫn ở trong cây sau khi khách chọn (nó chỉ render `null`), nên hiệu ứng khoá
+    trang đặt ở đó sẽ không bao giờ chạy phần dọn dẹp và trang kẹt ở trạng thái bị chặn.
+  - Khách tắt JS: cổng là SSR nên sẽ chặn vĩnh viễn — đã kèm `<noscript><style>` ẩn cổng đi.
 - `trackEvent` (`src/lib/lp-tracking.ts`) tự chặn nếu chưa `granted`, nên bất biến không phụ
   thuộc vào việc GTM có tình cờ định nghĩa `gtag`/`fbq` hay không.
 - Rút lại đồng thuận ⇒ `stopGtm()` **nạp lại trang**: gỡ thẻ `<script>` không dừng được
