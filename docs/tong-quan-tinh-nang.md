@@ -156,6 +156,12 @@ lúc dựng `<head>` — không phải chặn bằng JS phía client (chặn cli
     request y như `lpHead()` đã đọc để quyết định chèn GTM — khách đã chọn rồi không thấy thanh loé
     lên ở lần render đầu.
   - Khách tắt JS: `<noscript><style>` ẩn thanh đi vì hai nút sẽ không làm gì được.
+  - Nội dung cố ý KHÔNG nêu tên công cụ thu thập (Google Tag Manager) — chỉ nói mục đích. Về mặt
+    kỹ thuật, `lp-tracking.ts` bắn cả `fbq` (Meta Pixel) lẫn `gtag`, nên nêu đích danh một cái là
+    vừa thừa vừa dễ sai.
+  - Component dùng `<div>` chứ không `<aside>`: `src/styles.css` (CSS app CRM, cũng nạp ở landing)
+    có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, đè mất màu nút. Đổi thẻ
+    là sửa gốc, không phải thêm `!important` ngược lại.
 - `trackEvent` (`src/lib/lp-tracking.ts`) tự chặn nếu chưa `granted`, nên bất biến không phụ
   thuộc vào việc GTM có tình cờ định nghĩa `gtag`/`fbq` hay không.
 - Rút lại đồng thuận ⇒ `stopGtm()` **nạp lại trang**: gỡ thẻ `<script>` không dừng được

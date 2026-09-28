@@ -14,6 +14,11 @@
  * Snapshot server CŨNG là `readConsent`: server đọc cookie của request y như `lpHead()`
  * đã đọc để quyết định chèn snippet GTM. Nhờ vậy khách đã chọn rồi không thấy thanh
  * này loé lên ở lần render đầu — HTML của server và lần hydrate đầu khớp nhau.
+ *
+ * LÀ `<div>` chứ KHÔNG phải `<aside>`: `src/styles.css` (CSS app CRM, cũng được nạp ở
+ * landing) có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, và
+ * `!important` đè hết màu nút của thanh này (chữ "Đồng ý" thành xám đậm trên nền cam).
+ * Đổi thẻ là cách sửa gốc; thêm `!important` ngược lại chỉ đẩy cuộc chiến specificity đi xa.
  */
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
@@ -27,7 +32,7 @@ import {
 
 export function ConsentBanner() {
   const consent = useSyncExternalStore(subscribeConsent, readConsent, readConsent);
-  const barRef = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
 
   // Chiều cao thanh phụ thuộc độ dài chữ và bề rộng viewport (mobile cao gấp đôi
   // desktop vì chữ xuống dòng). Shortlist tray cũng neo đáy, nên phải biết chiều cao
@@ -60,7 +65,7 @@ export function ConsentBanner() {
       <noscript>
         <style>{".consent-bar{display:none !important}"}</style>
       </noscript>
-      <aside
+      <div
         className="consent-bar"
         ref={barRef}
         role="region"
@@ -70,9 +75,9 @@ export function ConsentBanner() {
         <div className="consent-bar-copy">
           <p className="consent-kicker">QUYỀN RIÊNG TƯ</p>
           <p className="consent-lead">
-            Em dùng Google Tag Manager để ghi nhận lượt xem trang, những mã gạch bạn lưu vào
-            shortlist, và lượt gửi brief — để biết phần nào của thư viện đang hữu ích. Chọn
-            &ldquo;Từ chối&rdquo; thì trang vẫn dùng đủ như thường.
+            Em muốn ghi nhận lượt xem trang, những mã gạch bạn lưu vào shortlist, và lượt gửi brief
+            — để biết phần nào của thư viện đang hữu ích. Chọn &ldquo;Từ chối&rdquo; thì trang vẫn
+            dùng đủ như thường.
           </p>
         </div>
         <div className="consent-actions">
@@ -91,7 +96,7 @@ export function ConsentBanner() {
             Từ chối
           </button>
         </div>
-      </aside>
+      </div>
     </>
   );
 }
