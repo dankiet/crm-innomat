@@ -219,7 +219,7 @@ cho điều này.
 | Schema DB | `src/db/schema-pg.sql` | 25 bảng; `npm run db:migrate` áp cả file trong 1 transaction |
 | Domain model | `src/lib/types.ts` | Product, Customer, Quote, Order, Payment, Note… |
 | Type landing/lead | `src/lib/lp-types.ts` | Nguồn chuẩn của `CrmConcept*` sau cleanup |
-| Luật của repo | `AGENTS.md` | `CLAUDE.md` bị gitignore, không được track |
+| Luật của repo | `AGENTS.md` | Nguồn luật duy nhất — không tạo file luật thứ hai |
 | Bản đồ tính năng | `docs/tong-quan-tinh-nang.md` | Điểm vào của bộ tài liệu tính năng |
 | Quy mô (số file/dòng) | `docs/tong-quan-tinh-nang.md` §16 | Nơi **duy nhất** giữ số liệu quy mô |
 | Số dòng từng bảng | `docs/audit-2026-09-19.md` §G0b | Nơi **duy nhất** giữ số liệu row count |

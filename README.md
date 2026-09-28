@@ -25,7 +25,7 @@ hình ảnh ở **Supabase Storage**, triển khai trên **Vercel** (preset `nit
 | [docs/audit-2026-09-19.md](docs/audit-2026-09-19.md)               | Audit: code chết, trùng lặp, file quá lớn, tài liệu lệch |
 
 Quy ước bắt buộc khi sửa code (delete 2 bước, không `router.invalidate()` khi lưu,
-workflow GitNexus, luật deploy) nằm ở [AGENTS.md](AGENTS.md) — docs không lặp lại.
+luật deploy) nằm ở [AGENTS.md](AGENTS.md) — docs không lặp lại.
 
 ## Bắt đầu nhanh
 

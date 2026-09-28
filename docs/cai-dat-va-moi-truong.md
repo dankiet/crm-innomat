@@ -103,7 +103,7 @@ workspace — an toàn khi chạy lại.
 | ----------------------------------------------------- | ------------------------------------------------------- |
 | `.env`, `.env.local`                                  | Bí mật                                                  |
 | `public/images/`                                      | Hình runtime, chỉ local; nguồn thật là Supabase Storage |
-| `.vercel/`, `data/exports/`, `Stock.xlsx`, `.claude/` | Sản phẩm phụ khi làm việc                               |
+| `.vercel/`, `data/exports/`, `Stock.xlsx`          | Sản phẩm phụ khi làm việc                               |
 
 Vì `public/images/` không có trong git, sau khi clone máy mới hãy chạy
 `npm run storage:backup` nếu muốn có hình để xem offline.

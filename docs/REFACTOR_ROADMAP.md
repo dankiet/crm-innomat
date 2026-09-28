@@ -274,7 +274,7 @@ Những thứ **đang ổn và không đáng động vào**. Mỗi mục kèm l�
 | D8 | **Hai mô hình server-state (loader + useQuery)** | Loader đúng cho route; `useQuery` hợp lý cho 2 trang admin. Hợp nhất là thay đổi lớn, lợi ích mờ. Chỉ cần **ghi luật** để không sinh mô hình thứ tư (đã ghi). |
 | D9 | **`src/data/mockData.ts`** | Phần lớn là nội dung biên tập tĩnh của landing (không có nguồn DB). Riêng `curatedMaterials` là scaffolding chết — xem NEEDS REVIEW ở CLEANUP_REPORT, cần bạn quyết vì xoá là đổi UI. |
 | D10 | **`src/routes/_app.thu-vien.tsx` history/DnD orchestration** | Phần monolith còn lại là điều phối history layer + DnD + nạp chi tiết — thuộc về một chỗ. Tách ra sẽ rủi ro đúng cái invariant tinh tế nhất của trang (Back semantics) mà không có test. |
-| D11 | **`AGENTS.md` / `CLAUDE.md`** | `AGENTS.md` là nguồn luật; `CLAUDE.md` bị gitignore (gitnexus tự sinh). Không track. |
+| D11 | **`AGENTS.md`** | Nguồn luật duy nhất, file chỉ dẫn duy nhất trong git. `CLAUDE.md` từng bị gitignore vì GitNexus tự sinh — GitNexus đã gỡ (2026-09-28), không còn file đó. |
 
 ---
 

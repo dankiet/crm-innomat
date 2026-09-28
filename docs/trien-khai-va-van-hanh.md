@@ -170,15 +170,15 @@ Kiểm tra theo thứ tự — mỗi bước loại trừ một tầng:
 
 ## Quy trình sửa code an toàn
 
-Theo `AGENTS.md` (GitNexus, index `crm-innomat`):
+1. **Trước khi sửa một symbol dùng chung** (hàm export, component được nhiều nơi import), tìm
+   hết callsite bằng `grep`/`lsp references`. Đây là bước thay cho impact analysis tự động.
+2. Đổi tên symbol bằng công cụ hiểu call graph (`lsp` rename), **không** find-and-replace mù.
+3. `git diff` trước khi commit để xác nhận phạm vi ảnh hưởng đúng như dự kiến.
+4. `npx tsc --noEmit` (bất biến **0 lỗi**), `npm run lint`, và build thử trước khi push — vì push
+   là deploy.
 
-1. `impact({ target: "symbolName", direction: "upstream" })` **trước khi** sửa một symbol; cảnh báo
-   nếu risk HIGH/CRITICAL.
-2. Đổi tên bằng `rename` (hiểu call graph), **không** find-and-replace.
-3. `detect_changes()` **trước khi commit** để xác nhận phạm vi ảnh hưởng đúng như dự kiến.
-4. `npm run lint` và build thử trước khi push — vì push là deploy.
-
-Index cũ thì chạy `node .gitnexus/run.cjs analyze` ở gốc project.
+> GitNexus đã được gỡ khỏi dự án (2026-09-28) — không còn `.gitnexus/`, `.claude/skills/gitnexus`,
+> hay `CLAUDE.md` tự sinh. Các bước trên thay thế nó.
 
 ## Dọn dẹp
 
