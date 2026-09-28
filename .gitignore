@@ -49,3 +49,7 @@ Stock.xlsx
 # Temporary pipeline outputs, logs & dev drafts
 tmp/
 em-ban-gach/
+
+# GitNexus index — tool đã gỡ (2026-09-28). Giữ dòng này để nếu ai chạy lại
+# `gitnexus analyze`, index 89 MB không lọt vào `git status` của project.
+.gitnexus/
