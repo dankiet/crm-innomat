@@ -155,33 +155,45 @@ lại: [routes-va-ui.md](routes-va-ui.md).
 
 ### Đồng thuận cookie & Google Tag Manager
 
-GTM (`GTM-P4SQ7HBB`) **chỉ hoạt động sau khi khách đồng ý**. Cổng chặn nằm ở **server**, ngay
-lúc dựng `<head>` — không phải chặn bằng JS phía client (chặn client vẫn kịp bắn request).
+GTM (`GTM-P4SQ7HBB`) **nạp cho MỌI khách trên landing** — kể cả người bấm "Từ chối". Lựa chọn
+của khách chỉ quyết định (a) thanh hỏi còn hiện hay không, và (b) cờ đẩy vào `dataLayer`.
+
+> **Đánh đổi có chủ đích.** Bản trước chặn ở server: chưa đồng ý thì không nạp GTM. Nhưng thanh
+> là loại **không chặn** (khách cuộn qua, phần lớn không bấm), nên nhóm đông nhất không có số
+> liệu nào — mất tracking đúng chỗ cần nhất. Giờ ưu tiên có số liệu; khách từ chối được ghi
+> nhận bằng cờ để lọc về sau.
+>
+> ⚠️ Hệ quả: đây là mô hình **tự khai báo rồi loại trừ**, KHÔNG phải chặn theo đồng thuận.
+> Cookie theo dõi được đặt TRƯỚC khi khách chọn. Nếu sau này cần chặt hơn (Nghị định 13/2023,
+> hoặc có khách EU), phải quay lại gate ở `lpHead()` và chấp nhận mất số liệu nhóm không bấm.
 
 - Cookie `ebg_gtm_consent` (`granted` | `denied`, `Max-Age` 1 năm, `SameSite=Lax`) là nguồn
   sự thật. Giá trị lạ ⇒ coi như chưa chọn.
-- `lpHead()` (`src/routes/-lp-route.ts`) đọc cookie: chỉ khi `granted` mới phát snippet GTM
-  vào `<head>`. Thẻ `<noscript>` của GTM nằm ở `RootShell` (`src/routes/__root.tsx`), cũng chỉ
-  khi `granted` **và** đang ở phạm vi landing (`/` hoặc `/lp/*`) — route CRM không dính GTM.
+- `gtmHeadSnippet()` (`src/lib/lp-consent.ts`) đẩy cờ `ebg_consent` (`granted` / `denied` /
+  `unknown`) vào `dataLayer` **trước** khi nạp container — nếu đẩy sau thì trigger đã bắn xong
+  trước khi GTM biết khách từ chối, mất khả năng lọc.
+- Thẻ `<noscript>` của GTM nằm ở `RootShell` (`src/routes/__root.tsx`), chỉ trong phạm vi landing
+  (`/` hoặc `/lp/*`) — route CRM không dính GTM.
 - `ConsentBanner` (`src/components/landing/ConsentBanner.tsx`) là **thanh neo đáy, KHÔNG chặn**
   (`z-index: 95`): khách vẫn cuộn và dùng trang bình thường, thanh chỉ chiếm một dải ở đáy. Hiện
   khi cookie chưa có; nút "Đổi lựa chọn cookie" ở footer xoá cookie để thanh trở lại.
-  - Đánh đổi có chủ đích: không ai bị buộc phải bấm, nên khách bỏ qua thì GTM không nạp và không có
-    số liệu. Muốn chắc chắn có dữ liệu thì phải dùng cổng chặn (đã cân nhắc và bỏ).
-  - Snapshot server của `useSyncExternalStore` là chính `readConsent`, tức server đọc cookie của
-    request y như `lpHead()` đã đọc để quyết định chèn GTM — khách đã chọn rồi không thấy thanh loé
-    lên ở lần render đầu.
-  - Khách tắt JS: `<noscript><style>` ẩn thanh đi vì hai nút sẽ không làm gì được.
-  - Nội dung cố ý KHÔNG nêu tên công cụ thu thập (Google Tag Manager) — chỉ nói mục đích. Về mặt
-    kỹ thuật, `lp-tracking.ts` bắn cả `fbq` (Meta Pixel) lẫn `gtag`, nên nêu đích danh một cái là
-    vừa thừa vừa dễ sai.
-  - Component dùng `<div>` chứ không `<aside>`: `src/styles.css` (CSS app CRM, cũng nạp ở landing)
-    có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, đè mất màu nút. Đổi thẻ
-    là sửa gốc, không phải thêm `!important` ngược lại.
-- `trackEvent` (`src/lib/lp-tracking.ts`) tự chặn nếu chưa `granted`, nên bất biến không phụ
-  thuộc vào việc GTM có tình cờ định nghĩa `gtag`/`fbq` hay không.
-- Rút lại đồng thuận ⇒ `stopGtm()` **nạp lại trang**: gỡ thẻ `<script>` không dừng được
-  container đã nằm trong RAM, chỉ reload mới thật sự về trạng thái "chưa đồng ý".
+
+**Trong GTM cần dựng:** biến đọc `ebg_consent` + audience/trigger lọc `denied` cho các tag đo
+lường. Không có bước này thì "từ chối" không có tác dụng gì.
+
+- Snapshot server của `useSyncExternalStore` là chính `readConsent`, tức server đọc cookie của
+  request y như `lpHead()` đã đọc để ghi cờ vào snippet — khách đã chọn rồi không thấy thanh loé
+  lên ở lần render đầu.
+- Khách tắt JS: `<noscript><style>` ẩn thanh đi vì hai nút sẽ không làm gì được (GTM `noscript`
+  vẫn chạy — đó là iframe, không cần JS của ta).
+- Nội dung cố ý KHÔNG nêu tên công cụ thu thập (Google Tag Manager) — chỉ nói mục đích. Về mặt
+  kỹ thuật, `lp-tracking.ts` bắn cả `fbq` (Meta Pixel) lẫn `gtag`, nên nêu đích danh một cái là
+  vừa thừa vừa dễ sai.
+- Component dùng `<div>` chứ không `<aside>`: `src/styles.css` (CSS app CRM, cũng nạp ở landing)
+  có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, đè mất màu nút. Đổi thẻ
+  là sửa gốc, không phải thêm `!important` ngược lại.
+- `trackEvent` (`src/lib/lp-tracking.ts`) **không còn** tự chặn theo cờ đồng thuận — sự kiện bắn
+  cho mọi khách, việc lọc nằm ở audience trong GTM (đúng theo mô hình tự khai báo rồi loại trừ).
 
 > Khác với `consent_marketing` trên form lead (`lp_leads`) — đó là đồng ý **nhận email
 > marketing**, không liên quan tới cookie theo dõi.

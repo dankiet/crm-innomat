@@ -1,18 +1,30 @@
 /**
  * Đồng thuận cookie cho Google Tag Manager (container `GTM-P4SQ7HBB`).
  *
- * Luật: CHƯA đồng ý → KHÔNG nạp GTM. Đã đồng ý → nạp GTM.
+ * Luật hiện hành: **GTM nạp cho MỌI khách**, kể cả người bấm "Từ chối". Lựa chọn
+ * chỉ quyết định (a) ẩn/hiện thanh hỏi, và (b) giá trị đẩy vào `dataLayer` để GTM
+ * dựng audience loại trừ.
+ *
+ * Đánh đổi có chủ đích, đã cân nhắc: trước đây "chưa chọn = không nạp", nên khách
+ * không bấm gì thì không có số liệu nào — mất tracking đúng ở nhóm đông nhất.
+ * Giờ ưu tiên có số liệu; khách từ chối được ghi nhận bằng cờ trong `dataLayer`
+ * (`CONSENT_DATALAYER_KEY`) để lọc ra về sau.
+ *
+ * ⚠️ Hệ quả phải nhớ: đây là mô hình "tự khai báo rồi loại trừ", KHÔNG phải mô
+ * hình chặn theo đồng thuận. Về mặt tuân thủ (Nghị định 13/2023, GDPR nếu có khách
+ * EU), cookie theo dõi được đặt TRƯỚC khi khách chọn — nếu sau này cần chặt hơn thì
+ * phải quay lại gate ở server (`lpHead`) và chấp nhận mất số liệu của nhóm không bấm.
  *
  * Vì sao cookie chứ không phải localStorage: snippet GTM nằm trong `<head>` do
  * server dựng, nên server phải đọc được lựa chọn NGAY ở lần render đầu. localStorage
- * chỉ sống ở client → không gate được. Cookie thì `getCookie()` đọc được trong
+ * chỉ sống ở client → không đọc được. Cookie thì `getCookie()` đọc được trong
  * `head()` và `document.cookie` đọc được ở client, nên hai bên luôn khớp nhau
  * (không lệch hydration).
  *
  * Cookie KHÔNG `httpOnly`: client phải tự ghi để đổi lựa chọn mà không cần round-trip.
  *
  * KHÁC HẲN `consent_marketing` của form lead (`src/lib/lp-types.ts`) — đó là đồng ý
- * nhận email marketing, lưu trong `lp_leads`. Cookie này chỉ quyết định GTM.
+ * nhận email marketing, lưu trong `lp_leads`. Cookie này chỉ nói về GTM.
  */
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
@@ -105,30 +117,58 @@ export function clearConsent(): void {
 }
 
 /**
- * Dừng GTM khi khách rút lại đồng thuận.
+ * Trước đây dùng để dừng GTM khi khách rút lại đồng thuận.
  *
- * Gỡ thẻ `<script>` KHÔNG dừng được container: mã GTM đã nạp vẫn sống trong RAM và
- * tiếp tục bắn. Nạp lại trang là cách duy nhất thật sự đưa về trạng thái "chưa đồng ý",
- * vì lúc đó cổng chặn ở server (`lpHead`) quyết định lại từ đầu.
- *
- * Chỉ nạp lại khi GTM đang thật sự chạy — nếu chưa từng nạp thì không cần.
+ * Không còn cần: GTM nạp cho mọi khách nên không có gì để dừng, và rút lại lựa
+ * chọn giờ chỉ đổi cờ trong `dataLayer` (`pushConsentToDataLayer`) để GTM lọc về
+ * sau. Đã xoá hàm này cùng hai caller — xem `reopenConsent` ở footer LP.
  */
-export function stopGtm(): void {
-  if (typeof window === "undefined") return;
-  if (document.querySelector('script[src*="googletagmanager.com/gtm.js"]')) {
-    window.location.reload();
-  }
-}
 
-/** Snippet `<head>` — chỉ chèn vào HTML khi đã đồng ý (server quyết định ở `head()`). */
-export const GTM_HEAD_SNIPPET =
-  `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':` +
-  `new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],` +
-  `j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=` +
-  `'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);` +
-  `})(window,document,'script','dataLayer','${GTM_ID}');`;
+/**
+ * Snippet `<head>` — nay chèn cho MỌI khách (server quyết định ở `head()`).
+ *
+ * Đẩy lựa chọn vào `dataLayer` TRƯỚC khi nạp container, để GTM đọc được ngay ở
+ * lần load đầu. Nếu đẩy sau thì trigger trong GTM đã bắn xong trước khi biết khách
+ * từ chối — mất luôn khả năng lọc.
+ *
+ * `consent === undefined` (khách chưa bấm gì) vẫn đẩy cờ `"unknown"` để trong GTM
+ * phân biệt được ba nhóm: granted / denied / unknown.
+ */
+export function gtmHeadSnippet(consent: ConsentValue | undefined): string {
+  const flag = consent ?? "unknown";
+  return (
+    `window.dataLayer=window.dataLayer||[];` +
+    `window.dataLayer.push({${JSON.stringify(CONSENT_DATALAYER_KEY)}:${JSON.stringify(flag)}});` +
+    `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':` +
+    `new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],` +
+    `j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=` +
+    `'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);` +
+    `})(window,document,'script','dataLayer','${GTM_ID}');`
+  );
+}
 
 /** Nội dung `<noscript>` — iframe dự phòng khi khách tắt JS. */
 export const GTM_NOSCRIPT_HTML =
   `<iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}" ` +
   `height="0" width="0" style="display:none;visibility:hidden"></iframe>`;
+
+/** Tên biến đẩy vào `dataLayer` để GTM biết lựa chọn của khách. */
+export const CONSENT_DATALAYER_KEY = "ebg_consent";
+
+/**
+ * Đẩy lựa chọn cookie vào `dataLayer` để GTM đọc được.
+ *
+ * Vì sao cần: GTM nạp cho MỌI khách (kể cả người bấm "Từ chối") — đánh đổi có chủ
+ * đích để không mất số liệu tracking. Bù lại, lựa chọn phải đi vào `dataLayer` để
+ * trong GTM dựng được biến/audience, từ đó loại trừ những người đã từ chối.
+ * Không có bước này thì không ai biết ai đã từ chối — cookie chỉ nằm trong trình
+ * duyệt khách, server không đọc được.
+ *
+ * Idempotent: gọi nhiều lần chỉ ghi giá trị mới nhất.
+ */
+export function pushConsentToDataLayer(value: ConsentValue): void {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as { dataLayer?: unknown[] };
+  w.dataLayer = w.dataLayer ?? [];
+  w.dataLayer.push({ [CONSENT_DATALAYER_KEY]: value });
+}

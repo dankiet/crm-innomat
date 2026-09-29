@@ -10,8 +10,6 @@
  *   ViewContent → vào trang | AddToCart → lưu mã | Lead → gửi form
  */
 
-import { readConsent } from "@/lib/lp-consent";
-
 type Params = Record<string, string | number | boolean | string[] | undefined>;
 
 type FbqFn = (cmd: string, event: string, params?: Params) => void;
@@ -22,14 +20,10 @@ export type LpEvent = "ViewContent" | "AddToCart" | "Lead" | "UnlockLibrary";
 export function trackEvent(event: LpEvent, params: Params = {}): void {
   if (typeof window === "undefined") return;
 
-  // Chưa đồng ý thì không bắn gì. GTM cũng không được nạp (xem `lp-consent.ts`),
-  // nên `fbq`/`gtag` sẽ không tồn tại — nhưng chặn tường minh ở đây để bất biến
-  // không phụ thuộc vào việc GTM có tình cờ định nghĩa `gtag` hay không.
-  if (readConsent() !== "granted") {
-    if (import.meta.env.DEV) console.info(`[lp-track] (chưa đồng ý) ${event}`, params);
-    return;
-  }
-
+  // KHÔNG chặn theo cờ đồng thuận: GTM nạp cho mọi khách (xem `lp-consent.ts`),
+  // nên sự kiện cũng bắn cho mọi khách. Việc loại trừ nhóm "Từ chối" nằm ở
+  // audience trong GTM, dựa trên cờ `ebg_consent` trong `dataLayer` — chặn ở đây
+  // sẽ khiến GTM không nhận được gì để mà lọc, và mất luôn số liệu nhóm chưa bấm.
   const w = window as unknown as { fbq?: FbqFn; gtag?: GtagFn };
 
   try {

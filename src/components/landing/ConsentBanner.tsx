@@ -4,16 +4,17 @@
  * Khác hẳn bản cổng chặn trước đó: không khoá cuộn, không `inert`, không `aria-modal`.
  * Khách vẫn cuộn và dùng trang bình thường phía sau; thanh chỉ nằm ở đáy màn hình.
  *
- * Đánh đổi có chủ đích: không ai bị buộc phải bấm, nên khách bỏ qua thì GTM không
- * nạp và không có số liệu. Muốn chắc chắn có dữ liệu thì phải quay lại cổng chặn.
+ * GTM nạp cho MỌI khách (snippet ở `head()`) — kể cả người bấm "Từ chối". Đánh đổi
+ * có chủ đích: giữ được số liệu của nhóm không bấm, đổi lại phải tự loại trừ nhóm
+ * từ chối bằng audience trong GTM. Lựa chọn đi vào `dataLayer` qua
+ * `pushConsentToDataLayer` để GTM đọc được.
  *
- * Chỉ hiện khi khách CHƯA chọn (`undefined`). Bấm "Đồng ý" → ghi cookie + nạp GTM
- * ngay tại chỗ (không reload). Bấm "Từ chối" → ghi cookie, không bao giờ nạp GTM.
- * Hai lựa chọn giá trị như nhau — không lựa chọn nào bị phạt.
+ * Chỉ hiện khi khách CHƯA chọn (`undefined`). Bấm nút nào cũng chỉ ghi cookie +
+ * cập nhật cờ `dataLayer`; không reload, không dừng container.
  *
  * Snapshot server CŨNG là `readConsent`: server đọc cookie của request y như `lpHead()`
- * đã đọc để quyết định chèn snippet GTM. Nhờ vậy khách đã chọn rồi không thấy thanh
- * này loé lên ở lần render đầu — HTML của server và lần hydrate đầu khớp nhau.
+ * đã đọc để ghi cờ vào snippet. Nhờ vậy khách đã chọn rồi không thấy thanh này loé
+ * lên ở lần render đầu — HTML của server và lần hydrate đầu khớp nhau.
  *
  * LÀ `<div>` chứ KHÔNG phải `<aside>`: `src/styles.css` (CSS app CRM, cũng được nạp ở
  * landing) có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, và
@@ -23,9 +24,9 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
   loadGtm,
+  pushConsentToDataLayer,
   readConsent,
   setConsent,
-  stopGtm,
   subscribeConsent,
   type ConsentValue,
 } from "@/lib/lp-consent";
@@ -55,8 +56,13 @@ export function ConsentBanner() {
 
   const applyConsent = (value: ConsentValue) => {
     setConsent(value);
-    if (value === "granted") loadGtm();
-    else stopGtm();
+    // GTM đã nạp sẵn cho mọi khách (snippet ở `head()`), nên KHÔNG nạp lại và
+    // cũng KHÔNG dừng. Việc duy nhất cần làm là cập nhật cờ trong `dataLayer`
+    // để GTM biết khách vừa chọn gì — nền tảng cho tệp loại trừ.
+    pushConsentToDataLayer(value);
+    // Chưa có container (khách chọn trước khi snippet kịp chạy, hoặc bị chặn):
+    // nạp bù để không mất phiên này.
+    loadGtm();
   };
 
   return (
@@ -75,8 +81,8 @@ export function ConsentBanner() {
         <div className="consent-bar-copy">
           <p className="consent-kicker">QUYỀN RIÊNG TƯ</p>
           <p className="consent-lead">
-            Em muốn ghi nhận lượt xem trang và những mã gạch bạn lưu — để cải thiện thư viện. Chọn
-            &ldquo;Từ chối&rdquo; thì trang vẫn dùng đủ như thường.
+            Em dùng cookie để đo lượt xem và những mã gạch bạn lưu. Chọn &ldquo;Từ chối&rdquo; thì
+            em ghi nhận để <b>loại bạn khỏi báo cáo quảng cáo</b> về sau.
           </p>
         </div>
         <div className="consent-actions">

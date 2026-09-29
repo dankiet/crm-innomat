@@ -7,7 +7,7 @@
  * ảnh hero là giống hệt nhau nên gom về đây để không trôi lệch.
  */
 import { fetchLpHeroImageFn, fetchLpHeroImage2Fn } from "@/api/lp";
-import { GTM_HEAD_SNIPPET, readConsent } from "@/lib/lp-consent";
+import { gtmHeadSnippet, readConsent } from "@/lib/lp-consent";
 import lpCss from "../styles-lp.css?url";
 
 /**
@@ -95,7 +95,7 @@ export function lpHead(ctx?: { loaderData?: { heroImage?: string } }) {
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&display=swap",
       },
     ],
-    scripts: consent === "granted" ? [{ children: GTM_HEAD_SNIPPET }] : [],
+    scripts: [{ children: gtmHeadSnippet(consent) }],
   };
 }
 

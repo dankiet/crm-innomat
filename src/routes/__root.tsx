@@ -128,10 +128,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  // Chỉ trang landing mới gắn GTM (khớp với snippet ở `head()`), và chỉ khi đã đồng ý.
+  // Chỉ trang landing mới gắn GTM (khớp với snippet ở `head()`).
+  // Nay GTM nạp cho MỌI khách nên `noscript` cũng luôn có trên LP — khách tắt JS
+  // không còn bị loại khỏi số liệu.
   // Đặt trong `shellComponent` vì đây là chỗ DUY NHẤT dựng thẻ `<body>`.
-  const showGtmNoscript =
-    (pathname === "/" || pathname.startsWith("/lp/")) && readConsent() === "granted";
+  const showGtmNoscript = pathname === "/" || pathname.startsWith("/lp/");
 
   return (
     <html lang="vi">
