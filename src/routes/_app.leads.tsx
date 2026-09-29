@@ -124,6 +124,9 @@ function LeadsPage() {
       }
       toast.success("Đã xoá file đính kèm");
       setConfirmDeleteToken(null);
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không xoá được file");
@@ -136,6 +139,9 @@ function LeadsPage() {
     setBusyId(lead.id);
     try {
       await setLpLeadStatusFn({ data: { id: lead.id, status: next } });
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không đổi được trạng thái");
@@ -153,6 +159,9 @@ function LeadsPage() {
         return;
       }
       toast.success(`Đã tạo khách hàng #${res.customer_id}`);
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không chuyển được lead");
@@ -166,6 +175,9 @@ function LeadsPage() {
     try {
       await deleteLpLeadFn({ data: { id: lead.id } });
       setPendingDelete(null);
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không xóa được");
@@ -181,15 +193,18 @@ function LeadsPage() {
         title="Hộp thư Lead"
         description="Lead do quảng cáo & KTS gửi về, chưa nằm trong pipeline. Xác minh rồi chuyển thành khách hàng."
       />
-      {/* Dung lượng file brief — biết khi nào cần dọn (sweep dọn rác tự động) */}
-      {attachmentStats.totalFiles > 0 ? (
+      {/* Dung lượng file brief — số lấy từ BUCKET (chính xác), không phải từ DB:
+          cột `file_size` chỉ có sau khi xác thực magic bytes, nên row đang chờ
+          mang 0 byte và con số trong DB thiếu đúng phần rác đang tích. */}
+      {attachmentStats.bucketObjects !== null && attachmentStats.bucketObjects > 0 ? (
         <p className="mb-3 text-xs text-muted-foreground">
-          File brief đang lưu: <b>{attachmentStats.totalFiles}</b> file ·{" "}
-          <b>{formatBytes(attachmentStats.totalBytes)}</b>
+          File brief trên storage: <b>{attachmentStats.bucketObjects}</b> file ·{" "}
+          <b>{formatBytes(attachmentStats.bucketBytes ?? 0)}</b>
           {attachmentStats.orphanCount > 0 ? (
             <>
               {" "}
-              · {attachmentStats.orphanCount} file chưa gắn lead (sweep sẽ dọn sau 24h)
+              · {attachmentStats.orphanCount} file chưa gắn lead (dọn bằng{" "}
+              <code className="rounded bg-surface-strong px-1">npm run lp:attachments-sweep</code>)
             </>
           ) : null}
         </p>

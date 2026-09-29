@@ -205,8 +205,13 @@ hoặc chạy định kỳ bằng scheduler ngoài (GitHub Actions). Chạy tay:
 npm run lp:attachments-sweep                    # mặc định quá 24h
 npm run lp:attachments-sweep -- --dry-run       # CHỈ in ra, không xoá (nên chạy trước)
 npm run lp:attachments-sweep -- --hours 6 --limit 200
-npm run lp:attachments-sweep -- --hours 0       # dọn ngay, không chờ
+npm run lp:attachments-sweep -- --hours 0       # ⚠️ xem cảnh báo bên dưới
 ```
+
+> ⚠️ **`--hours 0` xoá bỏ hoàn toàn grace period.** Mọi object chưa có row đều thành
+> candidate ngay lập tức — kể cả file khách vừa tải lên xong mà row chưa kịp insert (có độ
+> trễ vài trăm ms giữa PUT và `verifyBriefUpload`). Dùng khi cần dọn tay, **tuyệt đối không
+> đưa vào cron**. Lịch chạy định kỳ phải để mặc định 24h.
 
 Script dọn **hai loại rác**:
 

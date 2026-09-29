@@ -277,8 +277,9 @@ export const deleteLeadAttachmentFn = createServerFn({ method: "POST" })
         user: me,
         action: "lp_attachment.delete",
         entity_type: "lp_lead_attachment",
-        entity_id: 0,
-        summary: `Xoá file đính kèm brief (${data.token})`,
+        // Gắn vào lead chứa file, không phải `0` — audit phải truy được về hồ sơ nào.
+        entity_id: res.leadId,
+        summary: `Xoá file đính kèm brief của lead #${res.leadId}`,
       });
     }
     return res;
@@ -288,8 +289,13 @@ export const deleteLeadAttachmentFn = createServerFn({ method: "POST" })
 export const fetchAttachmentStatsFn = createServerFn({ method: "GET" }).handler(async () => {
   const { requireUser } = await import("@/db/auth.server");
   await requireUser();
-  const { attachmentStats } = await import("@/db/brief-attachments.server");
-  return await attachmentStats();
+  const { attachmentStats, bucketAttachmentStats } = await import(
+    "@/db/brief-attachments.server"
+  );
+  // Gộp cả hai: số trong DB (đã xác thực) và số THẬT trên bucket. Chênh lệch
+  // giữa hai con số chính là rác đang chờ sweep.
+  const [db, bucket] = await Promise.all([attachmentStats(), bucketAttachmentStats()]);
+  return { ...db, bucketObjects: bucket?.objectCount ?? null, bucketBytes: bucket?.objectBytes ?? null };
 });
 
 // ─── CRM Admin: Leads ───────────────────────────────────────

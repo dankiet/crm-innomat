@@ -37,6 +37,7 @@ import {
   readBriefObjectHead,
   writeBriefObjectLocal,
 } from "@/lib/brief-storage.server";
+import { BRIEF_BUCKET, supabaseStorageClient } from "@/lib/storage.server";
 
 /** Số token tối đa cấp cho một IP trong một cửa sổ — chặn dò / lạm dụng. */
 const UPLOAD_TOKENS_PER_WINDOW = 12;
@@ -313,11 +314,11 @@ export async function deleteAttachmentObject(token: string): Promise<boolean> {
  */
 export async function deleteLeadAttachment(
   token: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; leadId: number | null } | { ok: false; error: string }> {
   const db = getDb();
   const row = await db
-    .prepare(`SELECT token FROM lp_lead_attachments WHERE token = ?`)
-    .get<{ token: string }>(token);
+    .prepare(`SELECT token, lead_id FROM lp_lead_attachments WHERE token = ?`)
+    .get<{ token: string; lead_id: number | null }>(token);
   if (!row) return { ok: false, error: "Không tìm thấy file." };
 
   const gone = await deleteBriefObject(token);
@@ -326,7 +327,7 @@ export async function deleteLeadAttachment(
   }
 
   await db.prepare(`DELETE FROM lp_lead_attachments WHERE token = ?`).run(token);
-  return { ok: true };
+  return { ok: true, leadId: row.lead_id };
 }
 
 /** Thống kê dung lượng file brief — để biết khi nào cần dọn. */
@@ -358,6 +359,44 @@ export async function attachmentStats(): Promise<{
     orphanCount: Number(orphan?.n ?? 0),
     oldestCreatedAt: row?.oldest ?? "",
   };
+}
+
+/**
+ * Thống kê CHÍNH XÁC từ bucket: đếm object + cộng dung lượng thật.
+ *
+ * Khác `attachmentStats` (cộng `file_size` trong DB): cột đó chỉ được ghi sau khi
+ * `verifyBriefUpload` xác thực magic bytes, nên row `pending` mang `file_size = 0`
+ * và con số trong DB **thiếu hụt đúng phần rác đang tích**. Đây là con số dùng
+ * để trả lời "bucket có phình không".
+ */
+export async function bucketAttachmentStats(): Promise<{
+  objectCount: number;
+  objectBytes: number;
+} | null> {
+  const storage = await supabaseStorageClient();
+  if (!storage) return null;
+
+  let objectCount = 0;
+  let objectBytes = 0;
+
+  // `list()` không đệ quy → tự đi xuống. Chỉ entry có `id` là file thật.
+  const walk = async (prefix: string): Promise<boolean> => {
+    const { data, error } = await storage.from(BRIEF_BUCKET).list(prefix, { limit: 1000 });
+    if (error) return false;
+    for (const entry of data ?? []) {
+      const full = `${prefix}/${entry.name}`;
+      if (entry.id) {
+        objectCount += 1;
+        objectBytes += Number(entry.metadata?.size ?? 0);
+        continue;
+      }
+      if (!(await walk(full))) return false;
+    }
+    return true;
+  };
+
+  const ok = await walk("brief");
+  return ok ? { objectCount, objectBytes } : null;
 }
 
 // ─── Local mode (dev, thiếu cấu hình Supabase) ───────────────
