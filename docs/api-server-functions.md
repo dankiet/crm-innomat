@@ -128,6 +128,26 @@ Thao tác không hoàn tác được — UI dùng confirm 2 bước theo quy ư�
 
 `fetchDashboard` → KPI + số liệu pipeline cho `/tong-quan`.
 
+### Landing page — file đính kèm brief
+
+Ba bước tách rời, vì file tối đa 10MB mà trần body request của Vercel thấp hơn — bytes
+**không** đi qua server app:
+
+| Endpoint                  | Auth   | Việc nó làm                                                                 |
+| ------------------------- | ------ | --------------------------------------------------------------------------- |
+| `startBriefUploadFn`      | công khai | Cấp `token` + signed URL để browser PUT thẳng lên bucket riêng tư. Honeypot + time-trap + rate limit `upload:{ipHash}` (8/10 phút) |
+| `verifyBriefUploadFn`     | công khai | Đọc lại object, suy định dạng từ **magic bytes**, chốt `kind`. Không đạt thì xoá object ngay |
+| `getBriefAttachmentUrlFn` | đăng nhập | Signed URL tải xuống TTL 300s, kèm `Content-Disposition: attachment`       |
+| `fetchLeadAttachmentsFn`  | đăng nhập | Danh sách file đã gắn của một lead                                          |
+
+`submitLpLeadFn` nhận thêm `attachment_tokens`; server đối chiếu DB rồi gắn vào lead
+(`claimBriefUploads`). Token lạ hoặc chưa xác thực bị **bỏ qua im lặng** — không bao giờ để
+mất lead vì lỗi đính kèm.
+
+> Vì sao phải kiểm magic bytes: bucket có `allowed_mime_types` nhưng chỉ đọc **header client
+> khai**. Đã kiểm chứng thực tế — đẩy bytes SVG kèm header `application/pdf` thì bucket nhận.
+> Danh sách trắng hẹp: PNG, JPEG, WEBP, PDF; **không** có `image/svg+xml` (stored XSS).
+
 ### Import / Export
 
 | Endpoint                      | Việc nó làm                                                            |

@@ -159,6 +159,109 @@ export const submitLpLeadFn = createServerFn({ method: "POST" })
     });
   });
 
+// ─── File đính kèm brief ────────────────────────────────────
+//
+// Ba bước tách rời, mỗi bước có lớp chặn riêng:
+//   1. xin token + signed URL  → honeypot + time-trap + rate limit riêng
+//   2. PUT thẳng lên bucket    → không qua server (file 10MB không đụng trần Vercel)
+//   3. xác thực magic bytes    → lá chắn thật, bucket chỉ tin header client khai
+
+/** Xin token + URL để browser tải một file lên bucket riêng tư. */
+export const startBriefUploadFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      fileName: string;
+      declaredMime: string;
+      /** Honeypot — bot điền, người thật không thấy. */
+      hp?: string;
+      /** Thời điểm form render (ms). Submit < 2s = bot. */
+      rendered_at?: number;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { getRequestIP } = await import("@tanstack/react-start/server");
+    const { checkRateLimit, hashIp } = await import("@/db/lp.server");
+    const { startBriefUpload } = await import("@/db/brief-attachments.server");
+
+    if (data.hp && data.hp.trim()) return { ok: false as const, error: "Yêu cầu không hợp lệ." };
+    if (typeof data.rendered_at === "number" && Date.now() - data.rendered_at < 2000) {
+      return { ok: false as const, error: "Yêu cầu không hợp lệ." };
+    }
+
+    const ipHash = hashIp(getRequestIP({ xForwardedFor: true }) ?? "unknown");
+
+    // Ngân sách chặt hơn form lead: mỗi lượt là một object thật trên bucket.
+    const allowed = await checkRateLimit(`upload:${ipHash}`, {
+      windowMs: 10 * 60 * 1000,
+      maxHits: 8,
+    });
+    if (!allowed) {
+      return {
+        ok: false as const,
+        error: "Bạn đã tải lên khá nhiều lần. Vui lòng thử lại sau ít phút.",
+      };
+    }
+
+    return await startBriefUpload({
+      declaredMime: data.declaredMime,
+      fileName: data.fileName,
+      ipHash,
+    });
+  });
+
+/** Xác thực file vừa tải lên bằng magic bytes; từ chối thì xoá luôn object. */
+export const verifyBriefUploadFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { token: string }) => data)
+  .handler(async ({ data }) => {
+    const { getRequestIP } = await import("@tanstack/react-start/server");
+    const { hashIp } = await import("@/db/lp.server");
+    const { verifyBriefUpload } = await import("@/db/brief-attachments.server");
+
+    const ipHash = hashIp(getRequestIP({ xForwardedFor: true }) ?? "unknown");
+    const res = await verifyBriefUpload({ token: data.token, ipHash });
+    if (!res.ok) return { ok: false as const, error: res.error };
+    return { ok: true as const, token: res.token, fileName: res.fileName, size: res.size };
+  });
+
+/**
+ * Signed URL tải một file đính kèm (CRM, yêu cầu đăng nhập).
+ *
+ * TTL ngắn và có `Content-Disposition: attachment` — link lộ ra ngoài cũng hết
+ * hạn nhanh, và file không bao giờ được render trong ngữ cảnh trang.
+ */
+export const getBriefAttachmentUrlFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { token: string }) => data)
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { attachmentLeadId } = await import("@/db/brief-attachments.server");
+    const { createBriefDownloadUrl } = await import("@/lib/brief-storage.server");
+
+    // Chỉ ký URL cho token đã gắn vào một lead — token mồ côi không tải được.
+    const leadId = await attachmentLeadId(data.token);
+    if (leadId === null) return { ok: false as const, error: "Không tìm thấy file." };
+
+    const { getDb } = await import("@/db/index.server");
+    const row = await getDb()
+      .prepare(`SELECT file_name FROM lp_lead_attachments WHERE token = ?`)
+      .get<{ file_name: string }>(data.token);
+    const fileName = row?.file_name || "file-dinh-kem";
+
+    const url = await createBriefDownloadUrl(data.token, fileName, 300);
+    if (!url) return { ok: false as const, error: "Không tạo được link tải." };
+    return { ok: true as const, url };
+  });
+
+/** Danh sách file đã gắn của một lead (CRM). */
+export const fetchLeadAttachmentsFn = createServerFn({ method: "GET" })
+  .inputValidator((data: { leadId: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { listLeadAttachments } = await import("@/db/brief-attachments.server");
+    return await listLeadAttachments(data.leadId);
+  });
+
 // ─── CRM Admin: Leads ───────────────────────────────────────
 
 export const fetchLpLeadsFn = createServerFn({ method: "GET" })

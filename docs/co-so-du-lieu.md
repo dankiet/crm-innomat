@@ -3,14 +3,15 @@
 Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:migrate`
 (idempotent — mọi lệnh đều `IF NOT EXISTS` / `IF EXISTS`, chạy lại an toàn).
 
-## 26 bảng
+## 27 bảng
 
 > Số dòng thật của từng bảng: xem [audit-2026-09-19](audit-2026-09-19.md) §G0b — **không
 > chép lại ở đây** để tránh hai bản số liệu trôi lệch nhau. Mốc đó đo 25 bảng; từ 2026-09-21
 > có thêm `image_assets` → 26, đã gỡ 2 bảng gallery (2026-09-24) → 24, gỡ luôn
 > `image_assets` (2026-09-24, bỏ tầng registry/GC) → 23, rồi thêm lại đúng 3 bảng
 > registry theo **Option 2 (1 file ảnh = 1 MediaAsset): `media_assets`,
-> `mapping_media_usages`, `landing_page_media_usages`** (2026-09-25) → **26 bảng**.
+> `mapping_media_usages`, `landing_page_media_usages`** (2026-09-25) → **26 bảng**;
+> thêm `lp_lead_attachments` (file brief khách gửi, 2026-09-29) → **27 bảng**.
 
 ### Catalog sản phẩm
 
@@ -95,16 +96,22 @@ dấu vết khi user bị xoá. Có `action`, `entity_type`, `entity_id`, `summa
 
 ### Landing công khai (LP)
 
-Năm bảng phục vụ trang `/lp/$slug` và khách vãng lai — **không** dùng chung `users`/`sessions`
+Sáu bảng phục vụ trang `/lp/$slug` và khách vãng lai — **không** dùng chung `users`/`sessions`
 của CRM:
 
-| Bảng             | Ghi chú                                                                                                    |
-| ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| `lp_settings`    | Key/value cấu hình landing (ảnh hero, nội dung khối)                                                        |
-| `lp_leads`       | Lead từ form: `full_name`, `phone` + `phone_norm` (để chống trùng), `need`, `shortlist_codes`, `utm_source`, `status`, `customer_id` (gắn sau khi chuyển đổi) |
-| `lp_rate_limits` | Chống spam form: `bucket`, `hits`, `window_start`                                                           |
-| `public_users`   | Danh tính khách vãng lai (`supabase_id`, `email`, `first_seen_at`, `last_seen_at`) — tách khỏi `users`       |
-| `public_sessions`| Session của `public_users`, song song với `sessions` của CRM                                                |
+| Bảng                     | Ghi chú                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `lp_settings`            | Key/value cấu hình landing (ảnh hero, nội dung khối)                                                        |
+| `lp_leads`               | Lead từ form: `full_name`, `phone` + `phone_norm` (để chống trùng), `need`, `shortlist_codes`, `utm_source`, `status`, `customer_id` (gắn sau khi chuyển đổi) |
+| `lp_lead_attachments`    | File brief khách gửi: `token` (đồng thời là tên object trên bucket riêng tư), `lead_id`, `status` (`pending`→`uploaded`→`claimed`), `kind`/`mime_type`/`file_size` suy từ **magic bytes** |
+| `lp_rate_limits`         | Chống spam form: `bucket`, `hits`, `window_start` — ngân sách theo tham số, form lead 5/10 phút, upload 8/10 phút |
+| `public_users`           | Danh tính khách vãng lai (`supabase_id`, `email`, `first_seen_at`, `last_seen_at`) — tách khỏi `users`       |
+| `public_sessions`        | Session của `public_users`, song song với `sessions` của CRM                                                |
+
+**File đính kèm không nằm trong DB.** `lp_lead_attachments` chỉ giữ metadata; bytes ở bucket
+riêng tư `SUPABASE_BRIEF_BUCKET` (`crm-brief-files`, `public: false`). Không dùng bucket ảnh
+`crm-images` vì bucket đó `public: true` trả URL vĩnh viễn — mặt bằng của khách là dữ liệu dự án.
+Row `pending`/`uploaded` quá 24h bị `npm run lp:attachments-sweep` xoá cả row lẫn object.
 
 Nghiệp vụ: [tong-quan-tinh-nang](tong-quan-tinh-nang.md) §9–§11.
 

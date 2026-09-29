@@ -38,7 +38,7 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
   chưa từng chạy ở production**, không phải code chết. Xem
   [audit-2026-09-19](audit-2026-09-19.md) §G3.
 
-**Toàn bộ 26 bảng đều đang dùng** — `public` có đúng 26 bảng, khớp 100% với `schema-pg.sql`,
+**Toàn bộ 27 bảng đều đang dùng** — `public` có đúng 27 bảng, khớp 100% với `schema-pg.sql`,
 **0 bảng mồ côi** (bằng chứng: [audit-2026-09-19](audit-2026-09-19.md) §G0; đã gỡ 2 bảng gallery
 và `image_assets` ngày 2026-09-24, rồi thêm lại `media_assets`, `mapping_media_usages`,
 `landing_page_media_usages` ngày 2026-09-25 theo Option 2). Không có bảng nào nên xoá.
@@ -130,10 +130,18 @@ Trang public cho khách vãng lai (không cần đăng nhập), nội dung lấy
 | `fetchLpHeroImageFn` / `setLpHeroImageFn`                       | Ảnh hero 1 (section 1)                      |
 | `fetchLpHeroImage2Fn` / `setLpHeroImage2Fn`                     | Ảnh hero 2 (section 4)                      |
 | `submitLpLeadFn`                                                | Nhận form liên hệ → `lp_leads`              |
+| `startBriefUploadFn` / `verifyBriefUploadFn`                    | Cấp signed URL + xác thực file brief (magic bytes) |
+| `getBriefAttachmentUrlFn` / `fetchLeadAttachmentsFn`            | Signed URL tải file (TTL 300s) + danh sách file của lead |
 | `fetchFeaturedSlotsFn` / `setFeaturedSlotFn`                    | 12 vị trí "Tuyển chọn Trang chủ"            |
 
-**Bảng**: `lp_settings` (key/value), `lp_leads`, `lp_rate_limits` (chống spam form),
-`public_users` + `public_sessions` (danh tính khách vãng lai).
+**Bảng**: `lp_settings` (key/value), `lp_leads`, `lp_lead_attachments` (file khách gửi),
+`lp_rate_limits` (chống spam form), `public_users` + `public_sessions` (danh tính khách vãng lai).
+
+**File đính kèm brief** đi đường riêng: browser PUT thẳng lên bucket **riêng tư**
+(`SUPABASE_BRIEF_BUCKET`, mặc định `crm-brief-files`) qua signed URL — không qua server app
+(trần body Vercel thấp hơn 10MB), và không nằm trong bucket ảnh public. Định dạng chốt bằng
+magic bytes ở server; chỉ nhận PDF/PNG/JPEG/WEBP. Row mồ côi quá 24h bị
+`npm run lp:attachments-sweep` dọn.
 
 Ảnh dùng cho LP được bật/tắt bằng `toggleProductPublicFn` / `bulkSetProductsPublicFn` /
 `setConceptImagePublicFn` — tức là từ CRM chứ không sửa trực tiếp trên LP.
@@ -179,6 +187,11 @@ UTM).
 - `setLpLeadStatusFn` — đổi trạng thái xử lý.
 - `convertLpLeadFn` — **chuyển lead thành khách hàng** trong CRM.
 - `deleteLpLeadFn` — xoá.
+
+**File khách đính kèm** hiện thành nút tải ngay trong thẻ lead (nhãn "File đính kèm"). Bấm nút
+mới xin signed URL TTL 300s — link không nhúng sẵn vào DOM vì sẽ hết hạn, và token không nằm
+trong HTML. Lead cũ (trước khi có tính năng) vẫn hiện dòng "Khách nói sẽ gửi file: …" vì khi đó
+chỉ lưu được tên.
 
 ## 11. Lookbook / Concept — `/khong-gian` (redirect)
 
@@ -286,9 +299,9 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 | Ảnh sản phẩm          | `product_images`, `product_image_room_tags` + `media_assets`, `mapping_media_usages`, `landing_page_media_usages` |
 | Khách hàng & bán hàng | `customers`, `quotes`, `quote_items`, `orders`, `payments`, `notes`, `customer_product_samples`      |
 | Đề xuất vật liệu      | `customer_mappings`, `customer_mapping_items`, `customer_mapping_quote_links`                        |
-| Landing công khai     | `lp_settings`, `lp_leads`, `lp_rate_limits`, `public_users`, `public_sessions`                       |
+| Landing công khai     | `lp_settings`, `lp_leads`, `lp_lead_attachments`, `lp_rate_limits`, `public_users`, `public_sessions` |
 
-Tổng **26 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
+Tổng **27 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 15. Quy mô code
 
@@ -313,4 +326,4 @@ RPC: **72** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/ap
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
 
 `npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
-[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **104 test pass**.
+[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **115 test pass**.

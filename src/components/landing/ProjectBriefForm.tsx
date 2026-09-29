@@ -10,9 +10,14 @@ import {
   Clock,
   ShieldCheck,
 } from "lucide-react";
-import { submitLpLeadFn } from "@/api/lp";
+import { startBriefUploadFn, submitLpLeadFn, verifyBriefUploadFn } from "@/api/lp";
 import { trackEvent } from "@/lib/lp-tracking";
 import { LP_PROJECT_STAGES, LP_PROJECT_TYPES } from "@/lib/lp-types";
+import {
+  BRIEF_FILE_ACCEPT,
+  BRIEF_FILE_MAX_BYTES,
+  BRIEF_FILE_MAX_COUNT,
+} from "@/lib/brief-files";
 import { getToneDisplay } from "@/lib/color-palette";
 import { useShortlistedMaterials } from "./useShortlistedMaterials";
 type ProjectBriefFormProps = {
@@ -28,10 +33,17 @@ type AttachedFile = {
   type: string;
   previewUrl?: string;
   progress: number;
+  /** Token do server cấp sau khi xác thực magic bytes. Chỉ có khi status='done'. */
+  token?: string;
+  /** 'uploading' khi đang PUT lên storage; 'error' khi bị từ chối. */
+  status: "uploading" | "done" | "error";
+  error?: string;
 };
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_FILES = 4;
+// Lấy từ module dùng chung với server — trần dung lượng và số file phải khớp
+// tuyệt đối, lệch một bên là khách chọn được file mà server từ chối.
+const MAX_FILE_SIZE = BRIEF_FILE_MAX_BYTES;
+const MAX_FILES = BRIEF_FILE_MAX_COUNT;
 
 export function ProjectBriefForm({
   intent,
@@ -59,6 +71,49 @@ export function ProjectBriefForm({
     useShortlistedMaterials(shortlistMaterialIds);
   const shortlistMissingCount = shortlistMissingIds.length;
 
+  /**
+   * Tải một file lên: xin token → PUT thẳng lên storage → xác thực magic bytes.
+   *
+   * File KHÔNG đi qua server app (trần body của Vercel thấp hơn 10MB), nên
+   * đây là ba bước tách rời. Bước 3 mới là bước quyết định: server đọc lại
+   * bytes và tự suy định dạng, không tin `file.type` của trình duyệt.
+   */
+  const uploadFile = async (file: File, id: string) => {
+    try {
+      const started = await startBriefUploadFn({
+        data: {
+          fileName: file.name,
+          declaredMime: file.type,
+          rendered_at: renderedAtRef.current,
+        },
+      });
+      if (!started.ok) throw new Error(started.error);
+
+      const put = await fetch(started.uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+      });
+      if (!put.ok) throw new Error("Tải file lên thất bại. Vui lòng thử lại.");
+
+      const verified = await verifyBriefUploadFn({ data: { token: started.token } });
+      if (!verified.ok) throw new Error(verified.error);
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === id
+            ? { ...f, status: "done", token: verified.token, name: verified.fileName }
+            : f,
+        ),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Tải file lên thất bại.";
+      setFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status: "error", error: message } : f)),
+      );
+    }
+  };
+
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const inputFiles = Array.from(e.target.files ?? []);
     if (!inputFiles.length) return;
@@ -85,11 +140,19 @@ export function ProjectBriefForm({
         type: file.type,
         previewUrl: isImg ? URL.createObjectURL(file) : undefined,
         progress: 100,
+        status: "uploading" as const,
       };
     });
 
     setFiles((prev) => [...prev, ...newAttached].slice(0, MAX_FILES));
     e.target.value = "";
+
+    // Tải lên ngay khi chọn: khách biết file có hợp lệ không trước khi bấm Gửi,
+    // thay vì gửi xong mới nhận lỗi.
+    inputFiles.forEach((file, idx) => {
+      const attached = newAttached[idx];
+      if (attached) void uploadFile(file, attached.id);
+    });
   };
 
   const removeFile = (id: string) => {
@@ -110,6 +173,21 @@ export function ProjectBriefForm({
 
     setError("");
     setSubmitting(true);
+
+    // Chặn gửi khi còn file đang tải hoặc tải lỗi: gửi lúc này là mất file mà
+    // khách không biết.
+    const pending = files.filter((f) => f.status === "uploading");
+    if (pending.length) {
+      setError("Vui lòng đợi file tải lên xong.");
+      setSubmitting(false);
+      return;
+    }
+    const failed = files.filter((f) => f.status === "error");
+    if (failed.length) {
+      setError(`File "${failed[0]!.name}" không tải lên được. Vui lòng bỏ file đó hoặc chọn file khác.`);
+      setSubmitting(false);
+      return;
+    }
 
     const renderedAt = renderedAtRef.current;
     let utm = {};
@@ -144,6 +222,9 @@ export function ProjectBriefForm({
           lp_slug: "em-ban-gach",
           shortlist_codes: shortlistMaterialIds,
           attachment_names: files.map((f) => f.name),
+          attachment_tokens: files
+            .map((f) => f.token)
+            .filter((t): t is string => Boolean(t)),
           form_kind: "lp",
           rendered_at: renderedAt,
           utm,
@@ -408,7 +489,7 @@ export function ProjectBriefForm({
       {/* Row 7: File Attachment */}
       <div className="form-field">
         <span className="form-label">
-          Đính kèm mặt bằng, phối cảnh hoặc moodboard (tối đa 4 file, &lt;10MB)
+          Đính kèm mặt bằng, phối cảnh hoặc moodboard (tối đa 4 file, &lt;10MB — PDF, PNG, JPG)
         </span>
 
         <div className="file-upload-box">
@@ -418,7 +499,7 @@ export function ProjectBriefForm({
             className="hidden-file-input"
             onChange={onFileChange}
             multiple
-            accept="image/*,application/pdf"
+            accept={BRIEF_FILE_ACCEPT}
           />
           <label htmlFor="brief-file-input" className="file-upload-label">
             <Paperclip size={18} className="text-[#B94A2E]" />
@@ -441,9 +522,20 @@ export function ProjectBriefForm({
                   )}
                   <div className="min-w-0">
                     <span className="file-item-name">{file.name}</span>
-                    <span className="file-item-size">{file.size}</span>
+                    <span className="file-item-size">
+                      {file.status === "uploading" ? "Đang tải lên…" : file.size}
+                    </span>
+                    {file.status === "error" ? (
+                      <span className="file-item-size text-[#B94A2E]">{file.error}</span>
+                    ) : null}
                   </div>
                 </div>
+
+                {file.status === "done" ? (
+                  <span className="text-[11px] text-[#657151]" title="Đã tải lên">
+                    ✓
+                  </span>
+                ) : null}
 
                 <button
                   type="button"

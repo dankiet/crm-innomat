@@ -12,7 +12,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { fetchLpLeadsFn, setLpLeadStatusFn, convertLpLeadFn, deleteLpLeadFn } from "@/api/lp";
+import {
+  fetchLpLeadsFn,
+  setLpLeadStatusFn,
+  convertLpLeadFn,
+  deleteLpLeadFn,
+  getBriefAttachmentUrlFn,
+} from "@/api/lp";
 import {
   LP_FORM_KIND_LABEL,
   LP_LEAD_STATUS_LABEL,
@@ -30,6 +36,32 @@ const STATUS_CLS: Record<LpLeadStatus, string> = {
   converted: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20",
   spam: "bg-muted text-muted-foreground ring-black/5",
 };
+
+/** Dung lượng dễ đọc cho tooltip. */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+/**
+ * Tải file đính kèm: xin signed URL TTL ngắn rồi mở tab mới.
+ *
+ * Link không được nhúng sẵn vào DOM vì nó hết hạn sau 5 phút — lấy tại thời
+ * điểm bấm thì link luôn còn hiệu lực, và token không nằm trong HTML.
+ */
+async function downloadAttachment(token: string, fileName: string) {
+  try {
+    const res = await getBriefAttachmentUrlFn({ data: { token } });
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    window.open(res.url, "_blank", "noopener,noreferrer");
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : `Không tải được ${fileName}`);
+  }
+}
 
 export const Route = createFileRoute("/_app/leads")({
   head: () => ({
@@ -226,12 +258,33 @@ function LeadsPage() {
                         <strong>Diện tích:</strong> {lead.area}
                       </span>
                     ) : null}
-                    {lead.attachment_names ? (
-                      <span className="text-amber-700">
-                        <strong>File:</strong> {lead.attachment_names}
-                      </span>
-                    ) : null}
                   </div>
+                </div>
+              ) : null}
+
+              {/* File đính kèm — tải qua signed URL TTL ngắn, không phải link công khai */}
+              {lead.attachments?.length ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    File đính kèm:
+                  </span>
+                  {lead.attachments.map((file) => (
+                    <button
+                      key={file.token}
+                      type="button"
+                      onClick={() => void downloadAttachment(file.token, file.file_name)}
+                      className="rounded-lg bg-surface-strong px-2 py-0.5 text-[11px] font-medium text-foreground ring-1 ring-black/5 hover:bg-surface-strong/70"
+                      title={`${file.mime_type} · ${formatBytes(file.file_size)}`}
+                    >
+                      {file.file_name}
+                    </button>
+                  ))}
+                </div>
+              ) : lead.attachment_names ? (
+                <div className="mt-2">
+                  <span className="text-[11px] text-amber-700">
+                    Khách nói sẽ gửi file: {lead.attachment_names} (chưa tải lên được)
+                  </span>
                 </div>
               ) : null}
 

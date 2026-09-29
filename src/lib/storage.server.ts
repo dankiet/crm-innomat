@@ -18,30 +18,55 @@ import { StorageClient } from "@supabase/storage-js";
 let storageClient: StorageClient | null = null;
 let supabaseUrl: string | null = null;
 
-function config(): { url: string; key: string; bucket: string } | null {
+/** Thông tin kết nối Supabase Storage (không gắn bucket cụ thể). */
+export function supabaseCredentials(): { url: string; key: string } | null {
   const url = (process.env.SUPABASE_URL ?? "").trim();
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
   if (!url || !key) return null;
+  return { url: url.replace(/\/+$/, ""), key };
+}
+
+function config(): { url: string; key: string; bucket: string } | null {
+  const creds = supabaseCredentials();
+  if (!creds) return null;
   return {
-    url: url.replace(/\/+$/, ""),
-    key,
+    ...creds,
     bucket: (process.env.SUPABASE_STORAGE_BUCKET ?? "crm-images")
       .replace(/^\//, "")
       .replace(/\/+$/, ""),
   };
 }
 
-async function loadStorage(): Promise<StorageClient | null> {
-  const cfg = config();
-  if (!cfg) return null;
-  if (!storageClient || supabaseUrl !== cfg.url) {
-    storageClient = new StorageClient(`${cfg.url}/storage/v1`, {
-      apikey: cfg.key,
-      Authorization: `Bearer ${cfg.key}`,
+/**
+ * Bucket RIÊNG TƯ cho file đính kèm brief (mặt bằng, phối cảnh, moodboard).
+ *
+ * Cố ý tách khỏi bucket ảnh: bucket ảnh là `public: true`, trả URL vĩnh viễn.
+ * Bản vẽ mặt bằng của khách là dữ liệu dự án, không được để lộ công khai.
+ */
+export const BRIEF_BUCKET = (process.env.SUPABASE_BRIEF_BUCKET ?? "crm-brief-files")
+  .replace(/^\//, "")
+  .replace(/\/+$/, "");
+
+/**
+ * Storage client dùng chung. `null` = chế độ local (thiếu cấu hình Supabase),
+ * caller tự ghi ra đĩa.
+ */
+export async function supabaseStorageClient(): Promise<StorageClient | null> {
+  const creds = supabaseCredentials();
+  if (!creds) return null;
+  if (!storageClient || supabaseUrl !== creds.url) {
+    storageClient = new StorageClient(`${creds.url}/storage/v1`, {
+      apikey: creds.key,
+      Authorization: `Bearer ${creds.key}`,
     });
-    supabaseUrl = cfg.url;
+    supabaseUrl = creds.url;
   }
   return storageClient;
+}
+
+async function loadStorage(): Promise<StorageClient | null> {
+  if (!config()) return null;
+  return await supabaseStorageClient();
 }
 
 const STORAGE_PREFIX = (process.env.SUPABASE_STORAGE_PREFIX ?? "crm").replace(/\/+$/, "");
