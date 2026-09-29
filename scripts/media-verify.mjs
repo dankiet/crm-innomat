@@ -52,7 +52,7 @@ try {
       UNION SELECT substring(p.image_path from '([^/]+)$') FROM products p WHERE p.image_path IS NOT NULL AND p.image_path <> ''
       UNION SELECT substring(m.image_path from '([^/]+)$') FROM customer_mapping_items m WHERE m.image_path IS NOT NULL AND m.image_path <> ''
       UNION SELECT substring(m.custom_product_image_path from '([^/]+)$') FROM customer_mapping_items m WHERE m.custom_product_image_path IS NOT NULL AND m.custom_product_image_path <> ''
-      UNION SELECT substring(s.value from '([^/]+)$') FROM lp_settings s WHERE s.key = 'hero_image' AND s.value IS NOT NULL AND s.value <> ''
+      UNION SELECT substring(s.value from '([^/]+)$') FROM lp_settings s WHERE s.key IN ('hero_image', 'hero_image_2') AND s.value IS NOT NULL AND s.value <> ''
     ) t WHERE key IS NOT NULL AND key <> ''`),
     await scalar(`SELECT COUNT(*) n FROM media_assets`),
   ];
@@ -89,8 +89,8 @@ try {
   ok = cmp("#6 Featured slots (1..12)", featuredLegacy, featuredNew) && ok;
 
   const [heroLegacy, heroNew] = [
-    await scalar(`SELECT COUNT(*) n FROM lp_settings WHERE key = 'hero_image' AND value <> ''`),
-    await scalar(`SELECT COUNT(*) n FROM landing_page_media_usages WHERE setting_key = 'hero_image'`),
+    await scalar(`SELECT COUNT(*) n FROM lp_settings WHERE key IN ('hero_image', 'hero_image_2') AND value <> ''`),
+    await scalar(`SELECT COUNT(*) n FROM landing_page_media_usages WHERE setting_key IN ('hero_image', 'hero_image_2')`),
   ];
   ok = cmp("#7 Hero usages", heroLegacy, heroNew) && ok;
 
@@ -165,8 +165,8 @@ try {
       0,
       await scalar(`SELECT COUNT(*) n FROM landing_page_media_usages u
         JOIN media_assets a ON a.id = u.media_asset_id
-        WHERE u.setting_key = 'hero_image'
-          AND (SELECT substring(s.value from '([^/]+)$') FROM lp_settings s WHERE s.key = 'hero_image')
+        WHERE u.setting_key IN ('hero_image', 'hero_image_2')
+          AND (SELECT substring(s.value from '([^/]+)$') FROM lp_settings s WHERE s.key = u.setting_key)
               IS DISTINCT FROM a.storage_key`),
     ) && ok;
 
@@ -196,10 +196,10 @@ try {
           LEFT JOIN media_assets a ON a.storage_key = substring(m.custom_product_image_path from '([^/]+)$')
          WHERE m.custom_product_image_path <> '' AND a.id IS NULL
         UNION ALL
-        SELECT 'hero', s.value
+        SELECT 'hero', s.key || ' = ' || s.value
           FROM lp_settings s
           LEFT JOIN media_assets a ON a.storage_key = substring(s.value from '([^/]+)$')
-         WHERE s.key = 'hero_image' AND s.value <> '' AND a.id IS NULL
+         WHERE s.key IN ('hero_image', 'hero_image_2') AND s.value <> '' AND a.id IS NULL
       `)
     ).rows;
     console.log(`\n  → ref KHÔNG có row media_assets (${offenders.length}):`);

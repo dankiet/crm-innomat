@@ -6,7 +6,7 @@
  * (mặc định → redirect 301 về `/`; slug lạ → 404). Toàn bộ `head()` và phần nạp
  * ảnh hero là giống hệt nhau nên gom về đây để không trôi lệch.
  */
-import { fetchLpHeroImageFn } from "@/api/lp";
+import { fetchLpHeroImageFn, fetchLpHeroImage2Fn } from "@/api/lp";
 import { GTM_HEAD_SNIPPET, readConsent } from "@/lib/lp-consent";
 import lpCss from "../styles-lp.css?url";
 
@@ -49,11 +49,11 @@ export function lpHead() {
 }
 
 /** Nạp ảnh hero từ `lp_settings`; lỗi mạng rơi về `undefined` để trang vẫn dựng được. */
-export async function loadLpHeroImage(): Promise<{ heroImage?: string }> {
+export async function loadLpHeroImage(): Promise<{ heroImage?: string; heroImage2?: string }> {
   try {
-    const res = await fetchLpHeroImageFn();
-    return { heroImage: res?.heroImage };
+    const [hero, hero2] = await Promise.all([fetchLpHeroImageFn(), fetchLpHeroImage2Fn()]);
+    return { heroImage: hero?.heroImage, heroImage2: hero2?.heroImage2 };
   } catch {
-    return { heroImage: undefined };
+    return { heroImage: undefined, heroImage2: undefined };
   }
 }

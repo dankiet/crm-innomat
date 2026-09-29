@@ -883,6 +883,10 @@ async function setLpSetting(key: string, value: string): Promise<void> {
     .run(key, value, ts);
 }
 
+/**
+ * Ảnh bìa Hero 1 — section 1 (đầu trang landing). Khách đặt trong `/luu-tru`.
+ * Key `hero_image` giữ nguyên (không đổi tên) để không phá dữ liệu đã có.
+ */
 export async function getHeroImageSetting(): Promise<string> {
   const defaultHero =
     "https://sbphnbtbetilifomsysa.supabase.co/storage/v1/object/public/crm-images/crm/fe2aef755acdc0f9b7e1911403a8ff4d79eff43cb8862b97e86977dea4e679ad.webp";
@@ -893,5 +897,19 @@ export async function setHeroImageSetting(imagePath: string): Promise<void> {
   const trimmed = imagePath.trim();
   await setLpSetting("hero_image", trimmed);
   // Media asset registry: đồng bộ landing_page_media_usages (delete + re-insert).
-  await syncHeroUsage(getDb(), trimmed);
+  await syncHeroUsage(getDb(), trimmed, "hero_image");
+}
+
+/**
+ * Ảnh bìa Hero 2 — section 4 ("Khi bạn đã có shortlist"). Cùng cơ chế với Hero 1,
+ * chỉ khác `setting_key`. Mặc định rỗng: section 4 tự ẩn ảnh nếu chưa ai đặt.
+ */
+export async function getHeroImage2Setting(): Promise<string> {
+  return await getLpSetting("hero_image_2", "");
+}
+
+export async function setHeroImage2Setting(imagePath: string): Promise<void> {
+  const trimmed = imagePath.trim();
+  await setLpSetting("hero_image_2", trimmed);
+  await syncHeroUsage(getDb(), trimmed, "hero_image_2");
 }

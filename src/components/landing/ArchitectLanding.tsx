@@ -29,14 +29,7 @@ import { useShortlistStorage } from "./useShortlistStorage";
 import { clearConsent, stopGtm } from "@/lib/lp-consent";
 import { useShortlistedMaterials } from "./useShortlistedMaterials";
 import { trackEvent } from "@/lib/lp-tracking";
-import {
-  tileLines,
-  deliverables,
-  heroImage,
-  fnbCollectionImage,
-  type Material,
-  type TileLine,
-} from "@/data/mockData";
+import { tileLines, deliverables, heroImage, type Material, type TileLine } from "@/data/mockData";
 import { fetchLpMaterialsFn } from "@/api/lp";
 
 /** TikTok không có trong lucide-react nên vẽ tay. */
@@ -59,7 +52,10 @@ function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: string } = {}) {
+export function ArchitectLanding({
+  heroImage: customHeroImage,
+  heroImage2: customHeroImage2,
+}: { heroImage?: string; heroImage2?: string } = {}) {
   const activeHeroImage = customHeroImage || heroImage;
   const [currentView, setCurrentView] = useState<"home" | "library">("home");
   const {
@@ -457,10 +453,11 @@ export function ArchitectLanding({ heroImage: customHeroImage }: { heroImage?: s
               aria-labelledby="deliverables-title"
             >
               <div className="deliverables-visual">
-                <img
-                  src={fnbCollectionImage}
-                  alt="Bề mặt gạch trong không gian F&B có ánh sáng tự nhiên"
-                />
+                {/* Hero 2 — đặt trong /luu-tru. Chưa đặt thì ẩn ảnh, chỉ còn nền tối;
+                    trước đây dùng ảnh hardcoded đã mất khỏi storage (404). */}
+                {customHeroImage2 ? (
+                  <img src={customHeroImage2} alt="Bề mặt gạch trong không gian thực tế" />
+                ) : null}
                 <span className="visual-note">
                   VẬT LIỆU CẦN ĐƯỢC
                   <br />

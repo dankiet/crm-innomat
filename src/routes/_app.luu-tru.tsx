@@ -41,6 +41,8 @@ import {
 import {
   fetchLpHeroImageFn,
   setLpHeroImageFn,
+  fetchLpHeroImage2Fn,
+  setLpHeroImage2Fn,
   setFeaturedSlotFn,
   fetchFeaturedSlotsFn,
   toggleProductPublicFn,
@@ -672,6 +674,7 @@ function MediaStoragePage() {
   const [collectionOptions, setCollectionOptions] = useState<{ value: string; label: string }[]>([]);
   const [search, setSearch] = useState(() => searchParams.q ?? "");
   const [currentHeroImage, setCurrentHeroImage] = useState<string>("");
+  const [currentHeroImage2, setCurrentHeroImage2] = useState<string>("");
 
   // Load danh mục filter options scoped chính xác theo nhóm danh mục đang chọn (category)
   useEffect(() => {
@@ -706,14 +709,31 @@ function MediaStoragePage() {
         }
       })
       .catch(() => {});
+    fetchLpHeroImage2Fn()
+      .then((res) => {
+        if (res && res.heroImage2) {
+          setCurrentHeroImage2(res.heroImage2);
+        }
+      })
+      .catch(() => {});
   }, []);
   async function handleSetHeroImage(imagePath: string) {
     try {
       await setLpHeroImageFn({ data: { imagePath } });
       setCurrentHeroImage(imagePath);
-      toast.success("Đã đặt làm ảnh bìa Hero Trang chủ thành công!");
+      toast.success("Đã đặt làm ảnh bìa Hero 1 (section 1) thành công!");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật ảnh Hero");
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật ảnh Hero 1");
+    }
+  }
+
+  async function handleSetHeroImage2(imagePath: string) {
+    try {
+      await setLpHeroImage2Fn({ data: { imagePath } });
+      setCurrentHeroImage2(imagePath);
+      toast.success("Đã đặt làm ảnh bìa Hero 2 (section 4) thành công!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật ảnh Hero 2");
     }
   }
 
@@ -1867,12 +1887,18 @@ function MediaStoragePage() {
                     )}
                   </button>
 
-                  {/* Badge (top-right) — Hero / Thư viện / MAP / Concept */}
+                  {/* Badge (top-right) — Hero 1 / Hero 2 / Thư viện / MAP / Concept */}
                   <div className="absolute right-1.5 top-1.5 z-10 flex flex-col items-end gap-1">
                     {img.path === currentHeroImage ? (
                       <span className="inline-flex items-center gap-1 rounded-md bg-terracotta px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
                         <Sparkles className="size-2.5" />
-                        Hero
+                        Hero 1
+                      </span>
+                    ) : null}
+                    {img.path === currentHeroImage2 ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-[#1f2b33] px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                        <Sparkles className="size-2.5" />
+                        Hero 2
                       </span>
                     ) : null}
                     {img.featured_rank != null && img.featured_rank >= 1 && img.featured_rank <= 12 ? (
@@ -2242,11 +2268,11 @@ function MediaStoragePage() {
                             </>
                           ) : tab === "concept" ? (
                             <>
-                              {/* 1. Hero icon button (Terracotta on, Gray off) */}
+                              {/* 1. Hero 1 icon button (Terracotta on, Gray off) */}
                               <button
                                 type="button"
                                 onClick={() => handleSetHeroImage(img.path === currentHeroImage ? "" : img.path)}
-                                title={img.path === currentHeroImage ? "Đang là ảnh bìa Hero Trang chủ (Bấm để tắt)" : "Đặt làm ảnh bìa Hero Trang chủ"}
+                                title={img.path === currentHeroImage ? "Đang là ảnh bìa Hero 1 — section 1 (Bấm để tắt)" : "Đặt làm ảnh bìa Hero 1 — section 1"}
                                 className={cn(
                                   "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition-all cursor-pointer border",
                                   img.path === currentHeroImage
@@ -2255,7 +2281,23 @@ function MediaStoragePage() {
                                 )}
                               >
                                 <Sparkles className="size-3.5" />
-                                <span>{img.path === currentHeroImage ? "★ Hero" : "Hero"}</span>
+                                <span>{img.path === currentHeroImage ? "★ Hero 1" : "Hero 1"}</span>
+                              </button>
+
+                              {/* 1b. Hero 2 icon button — ảnh bìa section 4 */}
+                              <button
+                                type="button"
+                                onClick={() => handleSetHeroImage2(img.path === currentHeroImage2 ? "" : img.path)}
+                                title={img.path === currentHeroImage2 ? "Đang là ảnh bìa Hero 2 — section 4 (Bấm để tắt)" : "Đặt làm ảnh bìa Hero 2 — section 4"}
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition-all cursor-pointer border",
+                                  img.path === currentHeroImage2
+                                    ? "bg-[#1f2b33] text-white border-[#1f2b33] shadow-2xs"
+                                    : "bg-surface-strong/60 border-border/80 text-muted-foreground/60 hover:text-[#1f2b33] hover:border-[#1f2b33]/30",
+                                )}
+                              >
+                                <Sparkles className="size-3.5" />
+                                <span>{img.path === currentHeroImage2 ? "★ Hero 2" : "Hero 2"}</span>
                               </button>
 
                               {/* 2. Toggle Concept icon button (Amber on, Click to turn off) */}

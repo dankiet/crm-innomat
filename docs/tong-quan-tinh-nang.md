@@ -127,7 +127,8 @@ Trang public cho khách vãng lai (không cần đăng nhập), nội dung lấy
 | -------------------------------------------------------------- | ------------------------------------------- |
 | `fetchLpMaterialsFn`, `fetchPublicCatalogFn`                    | Vật liệu + catalog công khai                 |
 | `fetchPublicSpaceCollectionsFn`, `fetchCrmConceptImagesFn`      | Bộ sưu tập không gian, ảnh Concept          |
-| `fetchLpHeroImageFn` / `setLpHeroImageFn`                       | Ảnh hero                                    |
+| `fetchLpHeroImageFn` / `setLpHeroImageFn`                       | Ảnh hero 1 (section 1)                      |
+| `fetchLpHeroImage2Fn` / `setLpHeroImage2Fn`                     | Ảnh hero 2 (section 4)                      |
 | `submitLpLeadFn`                                                | Nhận form liên hệ → `lp_leads`              |
 | `fetchFeaturedSlotsFn` / `setFeaturedSlotFn`                    | 12 vị trí "Tuyển chọn Trang chủ"            |
 
@@ -249,7 +250,7 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
   mở AssetUsageDialog.
 - **Sắp xếp** (mặc định `Tên SP (A-Z)`): `Tên SP (A-Z/Z-A)` · `Mã SP (A-Z/Z-A)` · `Mới nhất` ·
   `Cũ nhất` · `Ưu tiên (#1—#12)`. Tab MAP tự đẩy ảnh Tuyển chọn #1–#12 lên đầu; tab Lookbook đẩy
-  ảnh đang làm Hero lên đầu.
+  ảnh đang làm Hero (1 hoặc 2) lên đầu.
 - **Tuyển chọn Trang chủ (#1–#12)**: tab `featured` trực tiếp trên thanh tab chính; hỗ trợ lọc secondary (`selected` = `yes`/`no`) trong popover Trạng thái; sort `priority` xếp #1→#12→chưa chọn.
 - **Bộ lọc (đồng bộ với `/san-pham`)**: chip `Nhóm` · `Tông màu` · `Bề mặt` · `Kiểu dáng` ·
   `Hiệu ứng vân` · `Bộ sưu tập` (+ `Bối cảnh` khi ở tab Lookbook). **Tông màu gộp 8 nhóm**

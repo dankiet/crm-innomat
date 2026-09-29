@@ -16,11 +16,7 @@
 import { type AsyncDb } from "@/db/driver";
 
 export type ImageReferenceRole =
-  | "product_image"
-  | "product"
-  | "mapping"
-  | "custom_mapping_product"
-  | "lp_hero";
+  "product_image" | "product" | "mapping" | "custom_mapping_product" | "lp_hero";
 
 export interface ImageReferenceSource {
   role: ImageReferenceRole;
@@ -81,10 +77,10 @@ const SOURCES: ImageReferenceSource[] = [
   {
     role: "lp_hero",
     col: "s.value",
-    pre: "s.key = 'hero_image' AND ",
+    pre: "s.key IN ('hero_image', 'hero_image_2') AND ",
     sql: `SELECT 1 AS id, s.value AS path
             FROM lp_settings s
-           WHERE s.key = 'hero_image' AND s.value LIKE ?`,
+           WHERE s.key IN ('hero_image', 'hero_image_2') AND s.value LIKE ?`,
   },
 ];
 function hrefFor(

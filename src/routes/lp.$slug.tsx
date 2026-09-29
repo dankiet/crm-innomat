@@ -25,6 +25,6 @@ export const Route = createFileRoute("/lp/$slug")({
 });
 
 function LandingPageRoute() {
-  const data = Route.useLoaderData() as { heroImage?: string };
-  return <ArchitectLanding heroImage={data?.heroImage} />;
+  const data = Route.useLoaderData() as { heroImage?: string; heroImage2?: string };
+  return <ArchitectLanding heroImage={data?.heroImage} heroImage2={data?.heroImage2} />;
 }

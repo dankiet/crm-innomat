@@ -27,7 +27,7 @@ const MEDIA_REF_SQL = `
     UNION ALL
       SELECT substring(s.value from '([^/]+)$'), s.value
         FROM lp_settings s
-       WHERE s.key = 'hero_image' AND s.value IS NOT NULL AND s.value <> ''
+       WHERE s.key IN ('hero_image', 'hero_image_2') AND s.value IS NOT NULL AND s.value <> ''
   ) t WHERE key IS NOT NULL AND key <> ''
   GROUP BY key
 `;
@@ -171,18 +171,24 @@ export async function reconcileMediaKeys(client, keyToPath) {
 
   // 4. hero — `setting_key` là UNIQUE nên phải REPLACE chứ không DO NOTHING:
   //    hero đổi sang ảnh khác thì row cũ phải trỏ lại asset mới, nếu không
-  //    asset mới thiếu usage còn asset cũ giữ usage ma.
-  const hero = await client.query(
-    `INSERT INTO landing_page_media_usages (media_asset_id, setting_key, created_at, updated_at)
-     SELECT a.id, 'hero_image', now(), now()
-       FROM lp_settings s
-       JOIN media_assets a ON substring(s.value from '([^/]+)$') = a.storage_key
-      WHERE s.key = 'hero_image' AND s.value IS NOT NULL AND s.value <> ''
-     ON CONFLICT (setting_key) DO UPDATE
-       SET media_asset_id = EXCLUDED.media_asset_id, updated_at = EXCLUDED.updated_at
-     WHERE landing_page_media_usages.media_asset_id IS DISTINCT FROM EXCLUDED.media_asset_id`,
-  );
-  stats.heroUsages = hero.rowCount ?? 0;
+  //    asset mới thiếu usage còn asset cũ giữ usage ma. Làm cho CẢ HAI hero
+  //    (Hero 1 = section 1, Hero 2 = section 4) — cùng một luật.
+  let heroCount = 0;
+  for (const key of ["hero_image", "hero_image_2"]) {
+    const hero = await client.query(
+      `INSERT INTO landing_page_media_usages (media_asset_id, setting_key, created_at, updated_at)
+       SELECT a.id, $2, now(), now()
+         FROM lp_settings s
+         JOIN media_assets a ON substring(s.value from '([^/]+)$') = a.storage_key
+        WHERE s.key = $1 AND s.value IS NOT NULL AND s.value <> ''
+       ON CONFLICT (setting_key) DO UPDATE
+         SET media_asset_id = EXCLUDED.media_asset_id, updated_at = EXCLUDED.updated_at
+       WHERE landing_page_media_usages.media_asset_id IS DISTINCT FROM EXCLUDED.media_asset_id`,
+      [key, key],
+    );
+    heroCount += hero.rowCount ?? 0;
+  }
+  stats.heroUsages = heroCount;
 
   return stats;
 }

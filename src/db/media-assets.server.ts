@@ -230,18 +230,22 @@ export async function syncMappingItemUsage(
   }
 }
 
-/** Đồng bộ hero usage (lp_settings 'hero_image'). */
-export async function syncHeroUsage(db: AsyncDb, path: string): Promise<void> {
-  await db.prepare("DELETE FROM landing_page_media_usages WHERE setting_key = 'hero_image'").run();
+/** Đồng bộ hero usage (lp_settings 'hero_image' / 'hero_image_2'). */
+export async function syncHeroUsage(
+  db: AsyncDb,
+  path: string,
+  settingKey: string = "hero_image",
+): Promise<void> {
+  await db.prepare("DELETE FROM landing_page_media_usages WHERE setting_key = ?").run(settingKey);
   const key = storageKeyOf(path);
   if (!key) return;
   const asset = await ensureMediaAsset(db, path);
   await db
     .prepare(
       `INSERT OR IGNORE INTO landing_page_media_usages (media_asset_id, setting_key, created_at, updated_at)
-       VALUES (?, 'hero_image', ?, ?)`,
+       VALUES (?, ?, ?, ?)`,
     )
-    .run(asset.id, nowUtc(), nowUtc());
+    .run(asset.id, settingKey, nowUtc(), nowUtc());
 }
 
 /**
@@ -466,6 +470,9 @@ export async function applyMediaBackfill(db: AsyncDb, sources: BackfillSource[])
       if (res.changes) customMappingUsages++;
     }
   }
+  // Hero usage: plan chỉ mang storage key (không mang setting_key). Backfill lịch sử
+  // chỉ có 1 hero nên gán 'hero_image'; hero_image_2 do reconcile/`setHeroImage2Setting`
+  // quản lý (setting_key UNIQUE nên không thể suy ra từ key đơn thuần).
   for (const key of plan.heroUsageKeys) {
     const asset = await db.prepare("SELECT id FROM media_assets WHERE storage_key = ?").get<{ id: number }>(key);
     if (!asset) continue;
@@ -726,9 +733,9 @@ export async function listMediaAssets(
        WHERE pi.media_asset_id = ma.id ORDER BY (pi.kind = 'map') DESC, pi.is_primary DESC, pi.id ASC LIMIT 1)`;
   const repNameSql = `(SELECT p.name FROM product_images pi JOIN products p ON p.id = pi.product_id
        WHERE pi.media_asset_id = ma.id ORDER BY (pi.kind = 'map') DESC, pi.is_primary DESC, pi.id ASC LIMIT 1)`;
-  // Hero usage (LP) — asset đang làm ảnh bìa trang chủ.
+  // Hero usage (LP) — asset đang làm ảnh bìa trang chủ (Hero 1 hoặc Hero 2).
   const isHeroSql = `EXISTS (SELECT 1 FROM landing_page_media_usages lu
-       WHERE lu.media_asset_id = ma.id AND lu.setting_key = 'hero_image')`;
+       WHERE lu.media_asset_id = ma.id AND lu.setting_key IN ('hero_image', 'hero_image_2'))`;
   // Tuyển chọn #1–#12 — sản phẩm đang giữ vị trí.
   const isFeaturedSql = `EXISTS (SELECT 1 FROM product_images pi JOIN products p ON p.id = pi.product_id
        WHERE pi.media_asset_id = ma.id AND p.featured_rank IS NOT NULL AND p.featured_rank BETWEEN 1 AND 12)`;

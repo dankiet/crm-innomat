@@ -92,6 +92,23 @@ export const setLpHeroImageFn = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+/** Hero 2 — ảnh bìa section 4 ("Khi bạn đã có shortlist"). */
+export const fetchLpHeroImage2Fn = createServerFn({ method: "GET" }).handler(async () => {
+  const { getHeroImage2Setting } = await import("@/db/lp.server");
+  const heroImage2 = await getHeroImage2Setting();
+  return { heroImage2 };
+});
+
+export const setLpHeroImage2Fn = createServerFn({ method: "POST" })
+  .inputValidator((data: { imagePath: string }) => data)
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    await requireUser();
+    const { setHeroImage2Setting } = await import("@/db/lp.server");
+    await setHeroImage2Setting(data.imagePath);
+    return { ok: true as const };
+  });
+
 export const toggleProductPublicFn = createServerFn({ method: "POST" })
   .inputValidator((data: { productId: number; isPublic: number }) => data)
   .handler(async ({ data }) => {
