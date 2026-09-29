@@ -147,6 +147,12 @@ magic bytes ở server; chỉ nhận PDF/PNG/JPEG/WEBP. Row mồ côi quá 24h b
 Ảnh dùng cho LP được bật/tắt bằng `toggleProductPublicFn` / `bulkSetProductsPublicFn` /
 `setConceptImagePublicFn` — tức là từ CRM chứ không sửa trực tiếp trên LP.
 
+**Ảnh xem trước khi chia sẻ link** (`/og-image`) — LP khai `og:image` trỏ về route này, không trỏ
+thẳng vào hero. Lý do: hero là `.webp` mà bộ thu thập OG của Facebook không nhận WebP. Route tải
+hero, cắt 1200×630, xuất JPEG; hero lỗi thì rơi về logo em bán gạch trên nền thương hiệu. Route
+nằm trong `src/server.ts` (entry), **không** phải file route. Chi tiết + cách ép Facebook quét
+lại: [routes-va-ui.md](routes-va-ui.md).
+
 ### Đồng thuận cookie & Google Tag Manager
 
 GTM (`GTM-P4SQ7HBB`) **chỉ hoạt động sau khi khách đồng ý**. Cổng chặn nằm ở **server**, ngay

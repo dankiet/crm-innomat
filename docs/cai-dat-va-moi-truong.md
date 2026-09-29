@@ -58,6 +58,16 @@ lưu hình local vào `public/images/`. Xem [hinh-anh-va-thu-vien.md](hinh-anh-v
 File brief ở chế độ local ghi vào `.local-brief-files/` — **cố ý ngoài** `public/`, để dev
 cũng không phục vụ file brief như tài nguyên tĩnh.
 
+### Landing page (tuỳ chọn)
+
+| Biến             | Mặc định                | Ý nghĩa                                                                 |
+| ---------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `VITE_SITE_URL`  | `https://embangach.com` | Gốc URL **tuyệt đối** của LP, dùng cho `og:image` / `og:url`. Facebook **không nhận** đường dẫn tương đối. |
+
+Chỉ biến `VITE_*` mới lộ ra client. Mặc định đã hardcode trong `siteOrigin()`
+(`src/routes/-lp-route.ts`) nên clone mới không cần khai vẫn chạy đúng — chỉ đặt biến khi
+đổi domain. Chi tiết ảnh xem trước: [routes-va-ui.md](routes-va-ui.md).
+
 ### Migration & bootstrap
 
 | Biến                    | Ý nghĩa                                                                                             |
