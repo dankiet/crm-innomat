@@ -554,19 +554,59 @@ export async function createLpLead(
   const recent = dedupeVal
     ? await db
         .prepare(
-          `SELECT id FROM lp_leads
+          `SELECT id, ip_hash FROM lp_leads
             WHERE ${dedupeCol} = ? AND lp_slug = ? AND form_kind = ?
               AND created_at > ?
             LIMIT 1`,
         )
-        .get<{ id: number }>(
+        .get<{ id: number; ip_hash: string }>(
           dedupeVal,
           clip(input.lp_slug, 64),
           formKind,
           new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace("T", " "),
         )
     : null;
-  if (recent) return { ok: true, duplicate: true };
+  if (recent) {
+    // Khách gửi lại (đã có lead trong 24h): KHÔNG ghi lead mới, nhưng file họ
+    // vừa tải lên vẫn phải gắn vào lead cũ. Bỏ qua bước này thì file thành mồ
+    // côi và bị sweep xoá sau 24h — khách tưởng đã gửi kèm mà thực ra mất.
+    //
+    // CHỈ gắn khi người gửi ĐÚNG LÀ chủ lead cũ. Dedupe khoá theo SĐT/email,
+    // mà ai cũng biết SĐT của người khác: không chặn ở đây thì kẻ xấu chỉ cần
+    // submit trùng SĐT nạn nhân là gắn được file của mình vào bản ghi thật, và
+    // sale mở lead thật để tải nội dung do kẻ tấn công cung cấp.
+    const sameSubmitter = recent.ip_hash !== "" && recent.ip_hash === meta.ipHash;
+    if (sameSubmitter && input.attachment_tokens?.length) {
+      try {
+        const { claimBriefUploads } = await import("./brief-attachments.server");
+        const labels = await claimBriefUploads({
+          tokens: input.attachment_tokens,
+          leadId: recent.id,
+        });
+        if (labels.length) {
+          const existing = await db
+            .prepare(`SELECT attachment_names FROM lp_leads WHERE id = ?`)
+            .get<{ attachment_names: string }>(recent.id);
+          const merged = [...new Set(
+            [existing?.attachment_names ?? "", labels.join(", ")]
+              .filter(Boolean)
+              .join(", ")
+              .split(", ")
+              .map((s) => s.trim())
+              .filter(Boolean),
+          )]
+            .slice(0, 4)
+            .join(", ");
+          await db
+            .prepare(`UPDATE lp_leads SET attachment_names = ? WHERE id = ?`)
+            .run(merged as SqlValue, recent.id as SqlValue);
+        }
+      } catch (err) {
+        console.error("[lp] gắn file vào lead trùng thất bại:", err);
+      }
+    }
+    return { ok: true, duplicate: true };
+  }
 
   const ts = nowUtc();
   const consent = input.consent_marketing ? 1 : 0;
@@ -647,7 +687,6 @@ export async function createLpLead(
       const labels = await claimBriefUploads({
         tokens: input.attachment_tokens,
         leadId,
-        ipHash: meta.ipHash,
       });
       // Tên file do SERVER đọc từ DB ghi đè tên client khai — nhãn hiển thị
       // phải khớp đúng file đã xác thực, không phải thứ browser tự nhận.

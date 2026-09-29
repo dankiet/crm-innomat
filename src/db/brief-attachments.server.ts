@@ -134,9 +134,12 @@ export async function verifyBriefUpload(input: {
     .get<{ token: string; status: string; ip_hash: string; file_name: string }>(input.token);
 
   if (!row) return { ok: false, error: "Phiên tải lên không tồn tại." };
-  // Chỉ chủ phiên mới xác thực được token của mình.
-  if (row.ip_hash !== input.ipHash) return { ok: false, error: "Phiên tải lên không hợp lệ." };
   if (row.status !== "pending") return { ok: false, error: "Phiên tải lên đã được xử lý." };
+
+  // KHÔNG chặn theo ip_hash: token 122-bit CSPRNG không đoán được, nên sở hữu
+  // token CHÍNH LÀ quyền — giống mọi presigned URL. Ràng buộc IP ở đây từng làm
+  // khách mất file khi mạng di động đổi IP giữa lúc chọn file và lúc gửi.
+  // (Bản ghi vẫn lưu ip_hash để đối soát và tính rate limit.)
 
   const fail = async (error: string): Promise<VerifyResult> => {
     await deleteBriefObject(input.token);
@@ -185,13 +188,16 @@ export async function verifyBriefUpload(input: {
  * Gắn các token đã xác thực vào lead vừa ghi. Trả về nhãn tên file để lưu vào
  * `lp_leads.attachment_names` (cột đó chỉ là nhãn hiển thị, không phải nơi lưu file).
  *
- * Token lạ / chưa xác thực / của người khác bị BỎ QUA im lặng: khách gửi lead
- * vẫn phải thành công, cùng lắm là mất phần đính kèm — không được để mất lead.
+ * Token lạ / chưa xác thực bị BỎ QUA im lặng: khách gửi lead vẫn phải thành
+ * công, cùng lắm là mất phần đính kèm — không được để mất lead.
+ *
+ * KHÔNG lọc theo `ip_hash`: token không đoán được nên sở hữu token là đủ điều
+ * kiện, và IP khách có thể đổi giữa lúc chọn file và lúc bấm gửi (mạng di động,
+ * đổi Wi-Fi). Lọc theo IP ở đây từng làm mất sạch file mà không ai báo.
  */
 export async function claimBriefUploads(input: {
   tokens: string[];
   leadId: number;
-  ipHash: string;
 }): Promise<string[]> {
   const db = getDb();
   const labels: string[] = [];
@@ -201,9 +207,9 @@ export async function claimBriefUploads(input: {
     const row = await db
       .prepare(
         `SELECT file_name FROM lp_lead_attachments
-          WHERE token = ? AND status = 'uploaded' AND ip_hash = ?`,
+          WHERE token = ? AND status = 'uploaded'`,
       )
-      .get<{ file_name: string }>(token, input.ipHash);
+      .get<{ file_name: string }>(token);
     if (!row) continue;
 
     await db

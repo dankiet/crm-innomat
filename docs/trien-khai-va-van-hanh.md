@@ -188,6 +188,28 @@ npm run clean:generated    # xoá output build/generated
 
 Cả `clean-generated.mjs` và `prune-deploy-backup.mjs` đều **từ chối xoá** đường dẫn ngoài workspace.
 
+## File brief khách gửi — CẦN LỊCH CHẠY
+
+`npm run lp:attachments-sweep` xoá file đính kèm brief mồ côi (`pending`/`uploaded` quá 24h),
+cả row trong `lp_lead_attachments` lẫn object trên bucket `SUPABASE_BRIEF_BUCKET`.
+
+> **Chưa có gì chạy script này tự động.** `vercel.json` hiện **không** có khoá `crons`, và
+> `lp:attachments-sweep` là script Node chạy tay — khác hẳn `db:migrate` (chạy một lần khi
+> triển khai). Vì endpoint upload là **công khai, không đăng nhập**, mỗi khách xin token rồi bỏ
+> ngang đều để lại một object; không dọn thì bucket phình theo traffic rác.
+
+Cách gắn: thêm `crons` vào `vercel.json` (Vercel Cron gọi một route) rồi route đó gọi sweep —
+hoặc chạy định kỳ bằng scheduler ngoài (GitHub Actions). Chạy tay:
+
+```bash
+npm run lp:attachments-sweep              # mặc định quá 24h
+npm run lp:attachments-sweep -- --hours 6 --limit 200
+```
+
+Script xoá object **trước**, row **sau**: object xoá lỗi thì row còn lại để lần sau thử tiếp.
+Ngược lại sẽ để lại object mồ côi vĩnh viễn mà không ai biết. Row `claimed` (đã thuộc một lead
+thật) **không bao giờ** bị đụng tới.
+
 ## Xoá ảnh / MediaAsset
 
 **Không có tiến trình dọn dẹp tự động.** Không có cron, không có biến môi trường retention.
