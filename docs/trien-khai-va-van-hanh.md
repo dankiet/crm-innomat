@@ -202,13 +202,38 @@ Cách gắn: thêm `crons` vào `vercel.json` (Vercel Cron gọi một route) r�
 hoặc chạy định kỳ bằng scheduler ngoài (GitHub Actions). Chạy tay:
 
 ```bash
-npm run lp:attachments-sweep              # mặc định quá 24h
+npm run lp:attachments-sweep                    # mặc định quá 24h
+npm run lp:attachments-sweep -- --dry-run       # CHỈ in ra, không xoá (nên chạy trước)
 npm run lp:attachments-sweep -- --hours 6 --limit 200
+npm run lp:attachments-sweep -- --hours 0       # dọn ngay, không chờ
 ```
+
+Script dọn **hai loại rác**:
+
+1. **Row mồ côi** — `pending` (khách xin token rồi bỏ) hoặc `uploaded` (khách chọn file rồi
+   không bấm Gửi) quá hạn. Xoá cả object lẫn row.
+2. **Object mồ côi** — object nằm trên bucket mà không row nào trỏ tới. Sinh ra khi row bị
+   xoá cascade trước khi object kịp xoá, hoặc khi lần xoá object trước đó thất bại.
+
+Lượt 2 **xoá theo suy đoán**, nên có ba chốt an toàn: `list()` không đệ quy (phải tự đi
+xuống, chỉ coi entry có `id` là file), **grace period** (bỏ qua object mới hơn cutoff — object
+vừa upload mà row chưa insert xong cũng "không có row"), và **tra DB lỗi thì bỏ qua toàn bộ
+lượt**, không xoá gì. Script in rõ số lượng đã quét để "báo 0" phân biệt được với "không quét
+tới nơi".
 
 Script xoá object **trước**, row **sau**: object xoá lỗi thì row còn lại để lần sau thử tiếp.
 Ngược lại sẽ để lại object mồ côi vĩnh viễn mà không ai biết. Row `claimed` (đã thuộc một lead
 thật) **không bao giờ** bị đụng tới.
+
+### Xoá thủ công
+
+Khi bucket phình ra và muốn dọn ngay, không cần chờ sweep:
+
+- **Từng file**: nút thùng rác cạnh tên file trong `/leads` → "Xóa vĩnh viễn" (xác nhận hai
+  bước inline). Xoá object trước, row sau; báo lỗi nếu Storage từ chối.
+- **Cả lead**: nút xoá lead — `deleteLpLead` xoá object của mọi file thuộc lead trước khi xoá
+  row, nên không để lại rác.
+- **Xem dung lượng**: dòng tổng ở đầu `/leads` (số file · dung lượng · số file chưa gắn lead).
 
 ## Xoá ảnh / MediaAsset
 

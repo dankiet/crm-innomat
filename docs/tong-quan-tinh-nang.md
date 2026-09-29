@@ -132,6 +132,7 @@ Trang public cho khách vãng lai (không cần đăng nhập), nội dung lấy
 | `submitLpLeadFn`                                                | Nhận form liên hệ → `lp_leads`              |
 | `startBriefUploadFn` / `verifyBriefUploadFn`                    | Cấp signed URL + xác thực file brief (magic bytes) |
 | `getBriefAttachmentUrlFn` / `fetchLeadAttachmentsFn`            | Signed URL tải file (TTL 300s) + danh sách file của lead |
+| `deleteLeadAttachmentFn` / `fetchAttachmentStatsFn`             | Xoá file thủ công + thống kê dung lượng      |
 | `fetchFeaturedSlotsFn` / `setFeaturedSlotFn`                    | 12 vị trí "Tuyển chọn Trang chủ"            |
 
 **Bảng**: `lp_settings` (key/value), `lp_leads`, `lp_lead_attachments` (file khách gửi),
@@ -190,8 +191,9 @@ UTM).
 
 **File khách đính kèm** hiện thành nút tải ngay trong thẻ lead (nhãn "File đính kèm"). Bấm nút
 mới xin signed URL TTL 300s — link không nhúng sẵn vào DOM vì sẽ hết hạn, và token không nằm
-trong HTML. Lead cũ (trước khi có tính năng) vẫn hiện dòng "Khách nói sẽ gửi file: …" vì khi đó
-chỉ lưu được tên.
+trong HTML. Cạnh mỗi file có nút thùng rác để **xoá thủ công** (xác nhận hai bước inline);
+đầu trang hiện tổng số file + dung lượng. Lead cũ (trước khi có tính năng) vẫn hiện dòng
+"Khách nói sẽ gửi file: …" vì khi đó chỉ lưu được tên.
 
 ## 11. Lookbook / Concept — `/khong-gian` (redirect)
 

@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { getDb, type SqlValue } from "./index.server";
 import { createCustomer } from "./crm.server";
 import { syncHeroUsage } from "./media-assets.server";
+import { deleteBriefObject } from "@/lib/brief-storage.server";
 import { normalizePhone, isPhoneMatchable } from "@/lib/phone";
 import { COLOR_PALETTES, matchColorPalette } from "@/lib/color-palette";
 import { SURFACE_FINISHES, FORMAT_FAMILIES } from "@/lib/material-taxonomy";
@@ -836,8 +837,30 @@ export async function setLpLeadStatus(
   return { ok: true };
 }
 
+/**
+ * Xoá lead + file đính kèm của nó.
+ *
+ * Phải xoá OBJECT trên storage TRƯỚC khi xoá row lead: `lp_lead_attachments` có
+ * `ON DELETE CASCADE`, nên xoá lead là mất luôn row — và mất luôn manh mối về
+ * object còn nằm trên bucket. Khi đó file thành rác vĩnh viễn: sweep cũng không
+ * thấy vì nó chỉ quét row `pending`/`uploaded`, mà row thì đã biến mất.
+ */
 export async function deleteLpLead(id: number): Promise<{ ok: true }> {
-  await getDb().prepare("DELETE FROM lp_leads WHERE id = ?").run(id);
+  const db = getDb();
+  const attachments = await db
+    .prepare(`SELECT token FROM lp_lead_attachments WHERE lead_id = ?`)
+    .all<{ token: string }>(id);
+
+  for (const a of attachments) {
+    const gone = await deleteBriefObject(a.token);
+    if (!gone) {
+      // Vẫn xoá row: giữ lại chỉ tạo row mồ côi trỏ vào lead đã biến mất.
+      // Sweep sẽ dọn object còn sót (quét theo tiền tố, xem script).
+      console.error(`[lp] xoá object ${a.token} thất bại khi xoá lead #${id}`);
+    }
+  }
+
+  await db.prepare("DELETE FROM lp_leads WHERE id = ?").run(id);
   return { ok: true };
 }
 

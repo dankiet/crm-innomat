@@ -262,6 +262,36 @@ export const fetchLeadAttachmentsFn = createServerFn({ method: "GET" })
     return await listLeadAttachments(data.leadId);
   });
 
+/** Xoá thủ công một file đính kèm (CRM). Ghi audit vì đây là xoá dữ liệu khách gửi. */
+export const deleteLeadAttachmentFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { token: string }) => data)
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    const me = await requireUser();
+    const { deleteLeadAttachment } = await import("@/db/brief-attachments.server");
+    const { writeAudit } = await import("@/db/audit.server");
+
+    const res = await deleteLeadAttachment(data.token);
+    if (res.ok) {
+      await writeAudit({
+        user: me,
+        action: "lp_attachment.delete",
+        entity_type: "lp_lead_attachment",
+        entity_id: 0,
+        summary: `Xoá file đính kèm brief (${data.token})`,
+      });
+    }
+    return res;
+  });
+
+/** Thống kê dung lượng file brief — biết khi nào bucket phình ra. */
+export const fetchAttachmentStatsFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser } = await import("@/db/auth.server");
+  await requireUser();
+  const { attachmentStats } = await import("@/db/brief-attachments.server");
+  return await attachmentStats();
+});
+
 // ─── CRM Admin: Leads ───────────────────────────────────────
 
 export const fetchLpLeadsFn = createServerFn({ method: "GET" })

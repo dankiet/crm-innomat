@@ -9,6 +9,7 @@
  */
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
@@ -18,6 +19,8 @@ import {
   convertLpLeadFn,
   deleteLpLeadFn,
   getBriefAttachmentUrlFn,
+  deleteLeadAttachmentFn,
+  fetchAttachmentStatsFn,
 } from "@/api/lp";
 import {
   LP_FORM_KIND_LABEL,
@@ -83,22 +86,51 @@ export const Route = createFileRoute("/_app/leads")({
     q: search.q?.trim() ?? "",
   }),
   loader: async ({ deps }) => {
-    const leads = await fetchLpLeadsFn({
-      data: { status: deps.status, search: deps.q || undefined, limit: 300 },
-    });
-    return { leads, status: deps.status, q: deps.q };
+    const [leads, attachmentStats] = await Promise.all([
+      fetchLpLeadsFn({
+        data: { status: deps.status, search: deps.q || undefined, limit: 300 },
+      }),
+      fetchAttachmentStatsFn(),
+    ]);
+    return { leads, status: deps.status, q: deps.q, attachmentStats };
   },
   component: LeadsPage,
 });
 
 function LeadsPage() {
-  const { leads, status, q } = Route.useLoaderData();
+  const { leads, status, q, attachmentStats } = Route.useLoaderData();
   const router = useRouter();
   const navigate = Route.useNavigate();
 
   const [search, setSearch] = useState(q);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  /** Token đang chờ xác nhận xoá (hai bước, inline). */
+  const [confirmDeleteToken, setConfirmDeleteToken] = useState<string | null>(null);
+  /** Token đang xoá — chặn bấm hai lần. */
+  const [deletingToken, setDeletingToken] = useState<string | null>(null);
+
+  /**
+   * Xoá một file đính kèm. Chỉ báo "đã xoá" khi server xác nhận Storage đã xoá
+   * thật — nuốt lỗi ở đây là cách file mồ côi sinh ra trong khi UI nói đã xoá.
+   */
+  async function handleDeleteAttachment(token: string) {
+    setDeletingToken(token);
+    try {
+      const res = await deleteLeadAttachmentFn({ data: { token } });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Đã xoá file đính kèm");
+      setConfirmDeleteToken(null);
+      await router.invalidate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không xoá được file");
+    } finally {
+      setDeletingToken(null);
+    }
+  }
 
   async function onStatus(lead: LpLead, next: LpLeadStatus) {
     setBusyId(lead.id);
@@ -149,6 +181,19 @@ function LeadsPage() {
         title="Hộp thư Lead"
         description="Lead do quảng cáo & KTS gửi về, chưa nằm trong pipeline. Xác minh rồi chuyển thành khách hàng."
       />
+      {/* Dung lượng file brief — biết khi nào cần dọn (sweep dọn rác tự động) */}
+      {attachmentStats.totalFiles > 0 ? (
+        <p className="mb-3 text-xs text-muted-foreground">
+          File brief đang lưu: <b>{attachmentStats.totalFiles}</b> file ·{" "}
+          <b>{formatBytes(attachmentStats.totalBytes)}</b>
+          {attachmentStats.orphanCount > 0 ? (
+            <>
+              {" "}
+              · {attachmentStats.orphanCount} file chưa gắn lead (sweep sẽ dọn sau 24h)
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {STATUS_TABS.map((s) => (
           <button
@@ -269,15 +314,45 @@ function LeadsPage() {
                     File đính kèm:
                   </span>
                   {lead.attachments.map((file) => (
-                    <button
-                      key={file.token}
-                      type="button"
-                      onClick={() => void downloadAttachment(file.token, file.file_name)}
-                      className="rounded-lg bg-surface-strong px-2 py-0.5 text-[11px] font-medium text-foreground ring-1 ring-black/5 hover:bg-surface-strong/70"
-                      title={`${file.mime_type} · ${formatBytes(file.file_size)}`}
-                    >
-                      {file.file_name}
-                    </button>
+                    <span key={file.token} className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void downloadAttachment(file.token, file.file_name)}
+                        className="rounded-lg bg-surface-strong px-2 py-0.5 text-[11px] font-medium text-foreground ring-1 ring-black/5 hover:bg-surface-strong/70"
+                        title={`${file.mime_type} · ${formatBytes(file.file_size)}`}
+                      >
+                        {file.file_name}
+                      </button>
+                      {/* Xoá hai bước, xác nhận ngay tại chỗ (không dùng window.confirm) */}
+                      {confirmDeleteToken === file.token ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={deletingToken === file.token}
+                            onClick={() => void handleDeleteAttachment(file.token)}
+                            className="rounded-lg bg-red-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {deletingToken === file.token ? "Đang xoá…" : "Xóa vĩnh viễn"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteToken(null)}
+                            className="rounded-lg bg-surface-strong px-2 py-0.5 text-[11px] font-medium text-foreground ring-1 ring-black/5"
+                          >
+                            Không xóa
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteToken(file.token)}
+                          className="rounded-lg px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-red-500/10 hover:text-red-700"
+                          title="Xoá file này"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </span>
                   ))}
                 </div>
               ) : lead.attachment_names ? (

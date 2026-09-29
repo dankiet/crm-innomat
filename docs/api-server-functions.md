@@ -139,6 +139,8 @@ Ba bước tách rời, vì file tối đa 10MB mà trần body request của Ve
 | `verifyBriefUploadFn`     | công khai | Đọc lại object, suy định dạng từ **magic bytes**, chốt `kind`. Không đạt thì xoá object ngay |
 | `getBriefAttachmentUrlFn` | đăng nhập | Signed URL tải xuống TTL 300s, kèm `Content-Disposition: attachment`       |
 | `fetchLeadAttachmentsFn`  | đăng nhập | Danh sách file đã gắn của một lead                                          |
+| `deleteLeadAttachmentFn`  | đăng nhập | Xoá thủ công một file (object + row), có ghi audit                          |
+| `fetchAttachmentStatsFn`  | đăng nhập | Số file + tổng dung lượng + số file chưa gắn lead                          |
 
 `submitLpLeadFn` nhận thêm `attachment_tokens`; server đối chiếu DB rồi gắn vào lead
 (`claimBriefUploads`). Token lạ hoặc chưa xác thực bị **bỏ qua im lặng** — không bao giờ để
@@ -147,6 +149,19 @@ mất lead vì lỗi đính kèm.
 > Vì sao phải kiểm magic bytes: bucket có `allowed_mime_types` nhưng chỉ đọc **header client
 > khai**. Đã kiểm chứng thực tế — đẩy bytes SVG kèm header `application/pdf` thì bucket nhận.
 > Danh sách trắng hẹp: PNG, JPEG, WEBP, PDF; **không** có `image/svg+xml` (stored XSS).
+
+**Quản trị file đã nhận:**
+
+- **Xoá từng file**: nút thùng rác cạnh tên file trong `/leads`, xác nhận hai bước inline
+  (luật UI: không dùng `window.confirm`). Xoá object trước, row sau.
+- **Xem dung lượng**: dòng tổng ở đầu `/leads` (số file · dung lượng · số file chưa gắn lead).
+- **Xoá cả lead**: `deleteLpLead` xoá object của mọi file thuộc lead TRƯỚC khi xoá row, vì
+  `lp_lead_attachments` cascade theo `lead_id` — xoá row trước là mất manh mối về object,
+  để lại rác vĩnh viễn.
+- **Dọn rác tự động**: `npm run lp:attachments-sweep` (xem
+  [trien-khai-va-van-hanh](trien-khai-va-van-hanh.md) — **cần gắn lịch chạy**). Script dọn
+  hai loại: row `pending`/`uploaded` quá hạn, và object không còn row nào trỏ tới. Có
+  `--dry-run` để xem trước, và `--hours 0` để dọn ngay.
 
 ### Import / Export
 

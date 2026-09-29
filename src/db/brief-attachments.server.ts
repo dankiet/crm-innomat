@@ -141,9 +141,16 @@ export async function verifyBriefUpload(input: {
   // khách mất file khi mạng di động đổi IP giữa lúc chọn file và lúc gửi.
   // (Bản ghi vẫn lưu ip_hash để đối soát và tính rate limit.)
 
-  const fail = async (error: string): Promise<VerifyResult> => {
-    await deleteBriefObject(input.token);
-    await db.prepare(`DELETE FROM lp_lead_attachments WHERE token = ?`).run(input.token);
+  // Chỉ xoá khi ĐÃ đọc được bytes thật và bytes đó sai định dạng. Từ khi bỏ
+  // ràng buộc ip_hash, ai có token cũng gọi được hàm này — nếu xoá cả khi
+  // không đọc nổi object thì một lần dò token là phá được file đang chờ của
+  // khách. Trường hợp không đọc được (thiếu object, lỗi mạng) chỉ trả lỗi và
+  // để sweep dọn row, không phá dữ liệu.
+  const fail = async (error: string, opts?: { deleteObject?: boolean }): Promise<VerifyResult> => {
+    if (opts?.deleteObject) {
+      await deleteBriefObject(input.token);
+      await db.prepare(`DELETE FROM lp_lead_attachments WHERE token = ?`).run(input.token);
+    }
     return { ok: false, error };
   };
 
@@ -154,7 +161,8 @@ export async function verifyBriefUpload(input: {
   const size = await briefObjectSize(input.token);
   if (size === null) return await fail("Không đọc được file đã tải lên.");
   if (size > BRIEF_FILE_MAX_BYTES) {
-    return await fail("File vượt quá 10MB.");
+    // Biết chắc là quá lớn vì đã đọc được size → xoá luôn cho khỏi tốn chỗ.
+    return await fail("File vượt quá 10MB.", { deleteObject: true });
   }
 
   // 12 byte đủ cho mọi định dạng trong danh sách trắng (WEBP cần tới byte 12).
@@ -163,7 +171,10 @@ export async function verifyBriefUpload(input: {
 
   const kind = detectBriefFileKind(head);
   if (!kind) {
-    return await fail("File không đúng định dạng PDF, PNG, JPG hoặc WEBP.");
+    // Bytes có thật và sai định dạng → xoá ngay, không để payload nằm lại.
+    return await fail("File không đúng định dạng PDF, PNG, JPG hoặc WEBP.", {
+      deleteObject: true,
+    });
   }
 
   const mimeType = BRIEF_MIME_BY_KIND[kind];
@@ -289,6 +300,64 @@ export async function deleteAttachmentRow(token: string): Promise<void> {
 /** Xoá object của một attachment. Trả `true` khi object đã không còn. */
 export async function deleteAttachmentObject(token: string): Promise<boolean> {
   return await deleteBriefObject(token);
+}
+
+/**
+ * Xoá thủ công một file đính kèm (CRM bấm nút xoá).
+ *
+ * Xoá object TRƯỚC, row SAU — giống sweep và `deleteLpLead`. Ngược lại thì row
+ * biến mất trong khi object còn nằm trên bucket, và không còn gì trỏ tới nó.
+ *
+ * Trả về `{ ok: false }` khi Storage từ chối xoá, để UI không báo "đã xoá" trong
+ * khi file vẫn còn (cùng nguyên tắc với `deleteMediaAssetFn`).
+ */
+export async function deleteLeadAttachment(
+  token: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const db = getDb();
+  const row = await db
+    .prepare(`SELECT token FROM lp_lead_attachments WHERE token = ?`)
+    .get<{ token: string }>(token);
+  if (!row) return { ok: false, error: "Không tìm thấy file." };
+
+  const gone = await deleteBriefObject(token);
+  if (!gone) {
+    return { ok: false, error: "Storage từ chối xoá file. Vui lòng thử lại." };
+  }
+
+  await db.prepare(`DELETE FROM lp_lead_attachments WHERE token = ?`).run(token);
+  return { ok: true };
+}
+
+/** Thống kê dung lượng file brief — để biết khi nào cần dọn. */
+export async function attachmentStats(): Promise<{
+  totalFiles: number;
+  totalBytes: number;
+  orphanCount: number;
+  oldestCreatedAt: string;
+}> {
+  const db = getDb();
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(file_size), 0) AS bytes,
+              MIN(created_at) AS oldest
+         FROM lp_lead_attachments`,
+    )
+    .get<{ n: number; bytes: number; oldest: string | null }>();
+
+  // Row chưa gắn lead nào = đang chờ hoặc khách bỏ ngang; sẽ bị sweep dọn.
+  const orphan = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM lp_lead_attachments WHERE status IN ('pending', 'uploaded')`,
+    )
+    .get<{ n: number }>();
+
+  return {
+    totalFiles: Number(row?.n ?? 0),
+    totalBytes: Number(row?.bytes ?? 0),
+    orphanCount: Number(orphan?.n ?? 0),
+    oldestCreatedAt: row?.oldest ?? "",
+  };
 }
 
 // ─── Local mode (dev, thiếu cấu hình Supabase) ───────────────
