@@ -11,7 +11,7 @@
 | DB            | PostgreSQL (Supabase) qua `pg` Pool, facade `src/db/driver.ts`                                                                |
 | Storage       | Supabase Storage (bucket public) hoặc `public/images` khi chạy local                                                          |
 | Ảnh           | `sharp` (server) / canvas + `createImageBitmap` (client) → WebP                                                               |
-| Excel         | `xlsx` (SheetJS)                                                                                                              |
+| Excel         | `xlsx-js-style` (SheetJS + cell style)                                                                                                              |
 | Build         | Vite 8, `lightningcss`, nitro 3 beta (`preset: "vercel"`), TypeScript 5.8                                                     |
 
 ## Sơ đồ luồng
