@@ -194,9 +194,51 @@ async function handleLocalBriefRoute(request: Request): Promise<Response | null>
   return null;
 }
 
+/**
+ * `/og-image` — ảnh xem trước khi chia sẻ link (Open Graph).
+ *
+ * Vì sao cần route riêng thay vì trỏ `og:image` vào hero: hero là `.webp`, mà bộ
+ * thu thập OG của Facebook **không nhận WebP**. Route này tải hero về, cắt
+ * 1200×630 và xuất JPEG — đúng định dạng OG chấp nhận.
+ *
+ * Đặt ở đây (entry server) chứ không phải `createServerFn` vì đây là tài nguyên
+ * HTTP thuần: crawler của Facebook chỉ GET, không gọi RPC.
+ */
+async function handleOgImageRoute(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (url.pathname !== "/og-image") return null;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  try {
+    const { getHeroImageSetting } = await import("./db/lp.server");
+    const { buildOgImage } = await import("./lib/og-image.server");
+    const heroUrl = await getHeroImageSetting();
+    const jpeg = await buildOgImage(heroUrl);
+
+    return new Response(request.method === "HEAD" ? null : new Uint8Array(jpeg), {
+      status: 200,
+      headers: {
+        "Content-Type": "image/jpeg",
+        "Content-Length": String(jpeg.byteLength),
+        // Ảnh chỉ đổi khi admin đổi hero; cho cache dài nhưng vẫn `revalidate`.
+        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    });
+  } catch (error) {
+    console.error("[og-image] dựng ảnh thất bại:", error);
+    // Không trả 500: crawler gặp lỗi sẽ bỏ ảnh, nhưng trang vẫn phải phục vụ.
+    return new Response("Không dựng được ảnh", { status: 500 });
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const ogRes = await handleOgImageRoute(request);
+      if (ogRes) return ogRes;
+
       const briefRes = await handleLocalBriefRoute(request);
       if (briefRes) return briefRes;
 

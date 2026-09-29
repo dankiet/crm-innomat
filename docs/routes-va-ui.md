@@ -21,6 +21,7 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 | `/leads`                  | `_app.leads.tsx`                                   | **Hộp thư Lead** — lead từ landing, chuyển thành khách hàng               |
 | `/khong-gian`             | `_app.khong-gian.tsx`                              | **Lookbook** — ảnh Concept, bật/tắt công khai trên LP                     |
 | `/lp/$slug`               | `lp.$slug.tsx`                                     | **Công khai** — trang landing cho khách vãng lai (không qua cổng auth)    |
+| `/og-image`               | `src/server.ts` (entry, không phải file route)     | **Công khai** — ảnh xem trước khi chia sẻ link (JPEG 1200×630)           |
 | `/nguoi-dung`             | `_app.nguoi-dung.tsx`                              | **Admin** — quản lý user                                                 |
 | `/nhat-ky`                | `_app.nhat-ky.tsx`                                 | **Admin** — nhật ký thao tác                                             |
 
@@ -29,6 +30,28 @@ render sidebar, topbar, `<Toaster richColors position="top-center" />`.
 
 Hai route admin có thêm `beforeLoad` kiểm tra `context.user.role`. Nhưng đó **chỉ là UX** — endpoint
 tương ứng vẫn tự gọi `requireAdmin()`.
+
+### Ảnh xem trước khi chia sẻ link (`/og-image`)
+
+`/og-image` nằm trong `src/server.ts` chứ **không** phải file route: nó là tài nguyên HTTP thuần,
+crawler của Facebook chỉ GET chứ không gọi RPC.
+
+Vì sao phải sinh ảnh thay vì trỏ thẳng `og:image` vào hero: hero trong `lp_settings` là `.webp`
+(đường ảnh do CRM upload), mà bộ thu thập OG của Facebook **không nhận WebP** — chỉ JPEG/PNG/GIF.
+Route này tải hero về, cắt 1200×630 và xuất JPEG. Hero lỗi hoặc chưa cấu hình thì rơi về logo em
+bán gạch trên nền thương hiệu, nên link chia sẻ không bao giờ trắng ảnh.
+
+Hai điều bắt buộc khi sửa phần này:
+
+- **Thẻ OG phải dùng URL tuyệt đối.** Facebook/Google bỏ qua đường dẫn tương đối. Trước đây LP
+  khai `content="/logo.png"` nên crawler tự đi tìm ảnh khác — thực tế lấy logo Innomat của CRM.
+  Gốc URL lấy từ `VITE_SITE_URL`, mặc định `https://embangach.com`.
+- **Không import module `.server` vào `-lp-route.ts`.** File đó đi cả vào bundle client, mà
+  `vite.config.ts` đặt `importProtection.client.files` với `behavior: "error"` — build sẽ vỡ
+  (đã xảy ra thật). Hằng số dùng chung phải khai tại chỗ.
+
+Sau khi deploy, Facebook **cache OG rất lâu** theo URL. Muốn thấy kết quả mới phải vào
+[Sharing Debugger](https://developers.facebook.com/tools/debug/) dán đúng URL và bấm "Scrape Again".
 
 ## Search param
 
