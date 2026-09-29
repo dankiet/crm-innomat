@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 import {
   exportProductsXlsxFn,
   exportInternalCodesXlsxFn,

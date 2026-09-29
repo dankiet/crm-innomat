@@ -2,7 +2,7 @@
  * Import / export catalog sản phẩm (Excel).
  * Upsert theo Mã báo giá (code). Không đụng ảnh.
  */
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 import { createProduct, updateProduct, type ProductCreateInput, type ProductUpdate } from "./media.server";
 import { getProduct, listProducts } from "./crm.server";
 import type { Product } from "@/lib/types";
