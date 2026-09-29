@@ -27,6 +27,9 @@ hình ảnh ở **Supabase Storage**, triển khai trên **Vercel** (preset `nit
 Quy ước bắt buộc khi sửa code (delete 2 bước, không `router.invalidate()` khi lưu,
 luật deploy) nằm ở [AGENTS.md](AGENTS.md) — docs không lặp lại.
 
+Tài liệu **thương mại** (định vị, đối tượng, content, quảng cáo) nằm ở
+[`marketing/`](marketing/README.md) — điểm vào là `marketing/README.md`.
+
 ## Bắt đầu nhanh
 
 ```bash

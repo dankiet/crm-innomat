@@ -60,6 +60,18 @@ Tài liệu nằm ở `docs/`. Điểm vào là **`docs/tong-quan-tinh-nang.md`*
 | Thêm **tính năng mới**                       | `docs/tong-quan-tinh-nang.md` (bản đồ + mục của khu vực đó)         |
 | Đổi **script / biến môi trường**             | `docs/cai-dat-va-moi-truong.md` + bảng script ở `README.md`         |
 | Đổi **quy trình deploy / migrate**           | `docs/trien-khai-va-van-hanh.md`                                    |
+| Đổi **copy LP, định vị, offer, target quảng cáo** | `marketing/` — đúng file theo bảng ở `marketing/README.md`     |
+
+## Hai tầng tài liệu
+
+- **`docs/`** — tài liệu **kỹ thuật**: route, RPC, bảng DB, nghiệp vụ. Suy ra từ code.
+- **`marketing/`** — tài liệu **thương mại**: khách hàng, thông điệp, content, quảng cáo.
+  Điểm vào là `marketing/README.md`; mọi con số phải truy được về code hoặc ghi nhãn `[GIẢ ĐỊNH]`.
+
+Một thay đổi vừa đổi **route/tính năng** vừa đổi **offer/định vị** phải sửa **cả hai** trong
+cùng commit. Copy thật đang chạy nằm ở `src/lib/lp-content.ts`, `src/data/mockData.ts` và
+`src/components/landing/*` — `marketing/05-thong-diep-copy-bank.md` là bản sao có chủ đích,
+lệch nhau là lỗi.
 
 ## Luật
 
