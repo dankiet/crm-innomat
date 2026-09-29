@@ -1382,7 +1382,7 @@ export const importProductsFn = createServerFn({ method: "POST" })
     return result;
   });
 
-/** Xuất báo giá thành file HTML in A4 ngang (mở tab mới để in / lưu PDF). */
+/** Xuất báo giá: HTML in A4 ngang (mở tab mới) hoặc Excel (tải file). */
 export const exportQuotePrintFn = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
@@ -1394,6 +1394,8 @@ export const exportQuotePrintFn = createServerFn({ method: "POST" })
       showColorVariance?: boolean;
       projectName?: string;
       deliveryLocation?: string;
+      /** "html" (mặc định) = bản in A4; "xlsx" = bảng tính. */
+      format?: "html" | "xlsx";
     }) => data,
   )
   .handler(async ({ data }) => {
@@ -1403,9 +1405,10 @@ export const exportQuotePrintFn = createServerFn({ method: "POST" })
     const quote = await getQuote(data.quoteId);
     if (!quote) throw new Error("Không tìm thấy báo giá");
     await assertCanAccessCustomer(me, quote.customer_id);
-    const { exportQuoteToHtml } = await import("@/render/export-quote.server");
+    const { exportQuoteToHtml, exportQuoteToXlsx } = await import("@/render/export-quote.server");
     const { writeAudit } = await import("@/db/audit.server");
-    const result = await exportQuoteToHtml(
+    const isXlsx = data.format === "xlsx";
+    const result = await (isXlsx ? exportQuoteToXlsx : exportQuoteToHtml)(
       data.quoteId,
       data.paymentTerms || "",
       data.deliveryTerms || "",
@@ -1420,7 +1423,7 @@ export const exportQuotePrintFn = createServerFn({ method: "POST" })
       action: "quote.export",
       entity_type: "quote",
       entity_id: data.quoteId,
-      summary: `In báo giá ${quote.code}`,
+      summary: isXlsx ? `Xuất Excel báo giá ${quote.code}` : `In báo giá ${quote.code}`,
     });
     return result;
   });

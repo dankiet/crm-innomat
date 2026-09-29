@@ -79,7 +79,9 @@ khách hàng.
 
 `/bao-gia` — hai tab qua `?tab=quotes|orders`:
 
-- **Báo giá**: dòng hàng, chiết khấu, VAT 8%, xuất HTML in được.
+- **Báo giá**: dòng hàng, chiết khấu, VAT 8%. Xuất qua `ExportQuoteDialog` chọn định dạng:
+  HTML in A4 ngang (mở tab mới) hoặc Excel `.xlsx` (tải file). Hai bản dùng chung
+  `loadQuoteForExport` nên số liệu khớp tuyệt đối.
 - **Đơn hàng**: sinh từ báo giá, mã chứng từ riêng.
 - Mã chứng từ, trạng thái, công thức giá: xem [nghiep-vu](nghiep-vu.md).
 

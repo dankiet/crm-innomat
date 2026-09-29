@@ -232,9 +232,18 @@ function QuotesPage() {
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       const blob = new Blob([bytes], { type: file.mimeType || "text/html; charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      if (opts.format === "xlsx") {
+        // Excel: tải file về máy, không mở tab (mở tab sẽ tải rồi để lại tab trắng).
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file.filename;
+        a.click();
+        toast.success(`Đã tải báo giá: ${file.filename}`);
+      } else {
+        window.open(url, "_blank");
+        toast.success(`Đã mở báo giá: ${file.filename}`);
+      }
       window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      toast.success(`Đã mở báo giá: ${file.filename}`);
       setExportQuote(null);
     } catch (err) {
       toast.error(
