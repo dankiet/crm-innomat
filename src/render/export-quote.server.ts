@@ -329,7 +329,7 @@ export async function exportQuoteToHtml(
     <div class="brand">
       <div class="brand-name">CÔNG TY TNHH THƯƠNG MẠI QUỐC TẾ INNOMAT</div>
       <div class="brand-sub">Địa chỉ: 36 đường 25, Phường Tân Quy, TP. Hồ Chí Minh</div>
-      <div class="brand-sub">Hotline: 0901 194 094</div>
+      <div class="brand-sub">Hotline: 090 988 4429 - 093 115 4449 - 0901 378 391</div>
       <div class="brand-sub">Email: info@innomat.vn</div>
     </div>
   </div>
