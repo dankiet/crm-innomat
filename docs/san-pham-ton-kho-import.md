@@ -78,7 +78,7 @@ injection"_. Thêm field mới thì thêm vào whitelist, đừng bỏ kiểm tr
 
 ## Import / export Excel
 
-Module: **`src/db/product-import-export.server.ts`** (~751 dòng, dùng SheetJS `xlsx-js-style`).
+Module: **`src/db/product-import-export.server.ts`** (~751 dòng, dùng SheetJS `xlsx`).
 
 Nguyên tắc đầu file:
 

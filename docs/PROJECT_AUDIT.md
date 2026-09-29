@@ -27,7 +27,7 @@
 | Schema | 1 file SQL duy nhất, áp bằng 1 transaction | `src/db/schema-pg.sql`, `scripts/db-migrate.mjs:1` |
 | Storage ảnh | **Supabase Storage** (`@supabase/storage-js`) + mirror local `public/images` | `src/lib/storage.ts:1`, `scripts/storage-backup.mjs:1` |
 | Xử lý ảnh | `sharp` (server), canvas API (client) | `src/lib/image-upload.server.ts:6`, `src/lib/image-upload.ts:4` |
-| Excel | `xlsx-js-style` (import/export sản phẩm, tồn kho) | `src/db/product-import-export.server.ts` |
+| Excel | `xlsx` (import/export sản phẩm, tồn kho) | `src/db/product-import-export.server.ts:717` |
 | PDF | `pdfjs-dist` (đọc PDF trong hộp thoại mapping) | `src/components/CustomerMappingDialog.tsx:433` |
 | Auth | Session cookie tự viết (scrypt hash) + Google OAuth qua Supabase | `src/db/auth.server.ts:177`, `src/db/auth-public.server.ts:1` |
 | Validation | `inputValidator` của `createServerFn` (không dùng zod/yup) | `src/api/functions.ts:20` |

@@ -139,7 +139,7 @@ Thao tác không hoàn tác được — UI dùng confirm 2 bước theo quy ư�
 | `importInternalCodeMappingFn` | Import mapping mã nội bộ → sản phẩm                                    |
 | `syncProductInternalCodesFn`  | Đồng bộ danh sách mã nội bộ của **một** sản phẩm                       |
 | `importStockUpdateFn`         | Cập nhật tồn kho từ file MISA                                          |
-| `exportQuotePrintFn`          | Xuất báo giá — HTML in A4 hoặc Excel (`format`)                        |
+| `exportQuotePrintFn`          | Xuất báo giá ra HTML in được                                           |
 | `exportMappingPrintFn`        | Xuất đề xuất vật liệu ra HTML                                          |
 
 Chi tiết định dạng file: [san-pham-ton-kho-import.md](san-pham-ton-kho-import.md).

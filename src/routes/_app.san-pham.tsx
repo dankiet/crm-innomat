@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import { EditProductDialog } from "@/components/EditProductDialog";
