@@ -58,7 +58,7 @@ export function MoodboardDrawer({
         (m, i) =>
           `${i + 1}. [${m.code}] ${m.name} — ${m.type} (Khổ: ${m.size} | Bề mặt: ${m.finish})`,
       ),
-      "\nLiên hệ nhận mẫu thực tế & File ảnh Map: Hotline / Zalo 0909 888 951",
+      "\nLiên hệ nhận mẫu thực tế & File ảnh Map: Hotline / Zalo 0901 194 094",
     ];
     const text = lines.join("\n");
 

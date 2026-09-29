@@ -544,9 +544,9 @@ export function ArchitectLanding({
                 <span>Showroom &amp; Kho mẫu: TP. Hồ Chí Minh</span>
                 <ArrowUpRight size={11} className="footer-ext-arrow" />
               </a>
-              <a className="footer-contact-link" href="tel:0909888951">
+              <a className="footer-contact-link" href="tel:0901194094">
                 <Phone size={12} />
-                <span>0909 888 951</span>
+                <span>0901 194 094</span>
               </a>
               <div className="footer-socials">
                 <a

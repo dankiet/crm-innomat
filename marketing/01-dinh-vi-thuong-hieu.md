@@ -135,7 +135,7 @@ rẻ nhất · combo · chốt đơn · mua ngay · giao ngay trong 2h.
   `GB-` (gạch bông), `OL-` (ốp lát). **Không dùng mã nội bộ CRM** trên content công khai.
   - ⚠️ Placeholder tìm kiếm trong Thư viện ghi "MS-02" — **prefix `MS-` không tồn tại**
     trong taxonomy. Không sao chép placeholder này vào content.
-- Handle: `fb.com/embangach`, TikTok `@embangach`. Hotline `0909 888 951`.
+- Handle: `fb.com/embangach`, TikTok `@embangach`. Hotline `0901 194 094`.
 
 ## 6. Đối thủ & khung so sánh
 

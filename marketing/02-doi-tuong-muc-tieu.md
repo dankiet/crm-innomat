@@ -124,7 +124,7 @@ flowchart LR
 | Interest | Landing page `/`, `/lp/gach-the`, `/lp/mosaic` | Đã có 3 biến thể |
 | Consider | Thư viện mã gạch (gate), Lookbook | Gate hiện **ngay** với khách chưa đăng nhập, không chờ xem hết |
 | Intent | Form brief trên LP | 10 field (Họ tên + SĐT bắt buộc) + shortlist đính kèm |
-| Convert | Zalo OA / Messenger / điện thoại | `ChatWidget`, hotline 0909 888 951 |
+| Convert | Zalo OA / Messenger / điện thoại | `ChatWidget`, hotline 0901 194 094 |
 | Retain | Zalo, email (nếu consent marketing) | `consent_marketing` tách khỏi cookie |
 | Top (organic) | Pinterest | Kênh gom moodboard của persona A/C — tái dùng ảnh dọc từ P2/P4 |
 
