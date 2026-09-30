@@ -77,8 +77,13 @@ export type LpLeadInput = {
   project_name?: string;
   /** Ước tính diện tích ốp lát, để nguyên text khách nhập. */
   area?: string;
-  /** Tên file khách chọn đính kèm — CHỈ tên, file không được upload. */
+  /** Tên file đính kèm (CSV) — NHÃN hiển thị; file thật ở bucket riêng tư. */
   attachment_names?: string[];
+  /**
+   * Token của file đã tải lên bucket riêng tư và ĐÃ xác thực magic bytes.
+   * Server đối chiếu với `lp_lead_attachments` rồi gắn vào lead; token lạ bị bỏ qua.
+   */
+  attachment_tokens?: string[];
   form_kind?: LpFormKind;
   consent_marketing?: boolean;
   utm?: LpUtm;
@@ -109,8 +114,19 @@ export type LpLead = {
   project_stage: string;
   project_name: string;
   area: string;
-  /** Tên file khách nói sẽ gửi (CSV) — file chưa nằm trên server. */
+  /** Tên file đính kèm (CSV) — nhãn hiển thị; file thật ở bucket riêng tư. */
   attachment_names: string;
+  /**
+   * File đã tải lên và gắn vào lead này (decorate ở `listLpLeads`).
+   * Token dùng để xin signed URL tải xuống — KHÔNG phải URL công khai.
+   */
+  attachments?: Array<{
+    token: string;
+    file_name: string;
+    mime_type: string;
+    kind: string;
+    file_size: number;
+  }>;
   form_kind: LpFormKind;
   /** Mã gạch trong shortlist, phân cách bằng dấu phẩy (canonical product ids). */
   shortlist_codes: string;

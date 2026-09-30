@@ -13,7 +13,7 @@
 npm install
 cp .env.example .env
 # điền các biến ở phần dưới, tối thiểu: DATABASE_URL
-npm run db:migrate        # tạo schema (26 bảng) + bật RLS
+npm run db:migrate        # tạo schema (27 bảng) + bật RLS
 npm run db:seed-admin     # tạo user admin từ CRM_ADMIN_*
 npm run dev               # → http://localhost:8080
 ```
@@ -49,11 +49,24 @@ Khai báo trong `.env` (local) và trong **Vercel → Project → Environment Va
 | --------------------------- | ------------------------------------------------------------------ |
 | `SUPABASE_URL`              | `https://<project-ref>.supabase.co`                                |
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role`. **Chỉ dùng phía server.** |
-| `SUPABASE_STORAGE_BUCKET`   | Tên bucket, mặc định `crm-images`                                  |
+| `SUPABASE_STORAGE_BUCKET`   | Tên bucket **ảnh công khai**, mặc định `crm-images`                |
 | `SUPABASE_STORAGE_PREFIX`   | Tiền tố object, mặc định `crm`                                     |
+| `SUPABASE_BRIEF_BUCKET`     | Bucket **riêng tư** cho file brief khách gửi, mặc định `crm-brief-files`. Phải là bucket private — chứa mặt bằng/phối cảnh là dữ liệu dự án |
 
 Thiếu `SUPABASE_URL` **hoặc** `SUPABASE_SERVICE_ROLE_KEY` → app tự chuyển sang chế độ
 lưu hình local vào `public/images/`. Xem [hinh-anh-va-thu-vien.md](hinh-anh-va-thu-vien.md).
+File brief ở chế độ local ghi vào `.local-brief-files/` — **cố ý ngoài** `public/`, để dev
+cũng không phục vụ file brief như tài nguyên tĩnh.
+
+### Landing page (tuỳ chọn)
+
+| Biến             | Mặc định                | Ý nghĩa                                                                 |
+| ---------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `VITE_SITE_URL`  | `https://embangach.com` | Gốc URL **tuyệt đối** của LP, dùng cho `og:image` / `og:url`. Facebook **không nhận** đường dẫn tương đối. |
+
+Chỉ biến `VITE_*` mới lộ ra client. Mặc định đã hardcode trong `siteOrigin()`
+(`src/routes/-lp-route.ts`) nên clone mới không cần khai vẫn chạy đúng — chỉ đặt biến khi
+đổi domain. Chi tiết ảnh xem trước: [routes-va-ui.md](routes-va-ui.md).
 
 ### Migration & bootstrap
 
@@ -86,6 +99,7 @@ lưu hình local vào `public/images/`. Xem [hinh-anh-va-thu-vien.md](hinh-anh-v
 | `npm run lint`            | ESLint toàn repo                                                                         |
 | `npm run format`          | Prettier `--write .`                                                                     |
 | `npm run db:migrate`      | Áp `src/db/schema-pg.sql` (idempotent)                                                   |
+| `npm run lp:attachments-sweep` | Xoá file brief mồ côi (`pending`/`uploaded` quá 24h) — cả row lẫn object. Chạy định kỳ, nên gắn cron |
 | `npm run db:enable-rls`   | Bật RLS cho mọi bảng schema `public`                                                     |
 | `npm run db:seed-admin`   | Tạo/đặt lại admin, hash scrypt                                                           |
 | `npm run db:media-backfill` | Backfill `media_assets` + usage từ 5 nguồn ref (idempotent) — chạy **sau** `db:migrate` |

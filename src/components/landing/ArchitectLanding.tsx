@@ -26,7 +26,7 @@ import { MaterialModal } from "./MaterialModal";
 import { SpaceLookbookSection } from "./SpaceLookbookSection";
 import { MaterialLibraryPage } from "./MaterialLibraryPage";
 import { useShortlistStorage } from "./useShortlistStorage";
-import { clearConsent, stopGtm } from "@/lib/lp-consent";
+import { clearConsent } from "@/lib/lp-consent";
 import { useShortlistedMaterials } from "./useShortlistedMaterials";
 import { trackEvent } from "@/lib/lp-tracking";
 import { tileLines, deliverables, heroImage, type Material, type TileLine } from "@/data/mockData";
@@ -125,11 +125,10 @@ export function ArchitectLanding({
   };
 
   // Xoá lựa chọn cookie để banner hiện lại, khách đổi ý được bất cứ lúc nào.
-  // `stopGtm` nạp lại trang nếu GTM đang chạy — không reload thì container vẫn
-  // sống trong RAM và tiếp tục bắn dù đã rút đồng thuận.
+  // KHÔNG reload trang: GTM nay nạp cho mọi khách nên không có gì phải dừng —
+  // đổi lựa chọn chỉ cập nhật cờ trong `dataLayer` (xem ConsentBanner).
   const reopenConsent = () => {
     clearConsent();
-    stopGtm();
   };
 
   // Shortlist = resolve theo canonical ID (KHÔNG filter trên 12 material của Home).
@@ -544,9 +543,9 @@ export function ArchitectLanding({
                 <span>Showroom &amp; Kho mẫu: TP. Hồ Chí Minh</span>
                 <ArrowUpRight size={11} className="footer-ext-arrow" />
               </a>
-              <a className="footer-contact-link" href="tel:0909888951">
+              <a className="footer-contact-link" href="tel:0901194094">
                 <Phone size={12} />
-                <span>0909 888 951</span>
+                <span>0901 194 094</span>
               </a>
               <div className="footer-socials">
                 <a

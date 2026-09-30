@@ -1,5 +1,4 @@
 import { getDb } from "../db/index.server";
-import * as XLSX from "xlsx";
 import { VAT_RATE } from "@/lib/pricing";
 import { readImageBytes } from "@/lib/storage.server";
 import { logoDataUrl, stampDataUrl } from "@/lib/brand-assets.server";
@@ -28,14 +27,34 @@ async function imageRefToDataUrl(ref: string): Promise<string> {
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
-
 /**
- * Load báo giá + tính mọi con số (VAT, chiết khấu, phí VC) — NGUỒN DUY NHẤT.
+ * Xuất báo giá thành file HTML in đẹp.
  *
- * Cả bản HTML (in A4) và bản Excel đều gọi hàm này, nên hai định dạng không bao
- * giờ lệch số. Mọi chi tiết trình bày (cột xuất xứ, độ lệch màu) nằm ở tầng render.
+ * Logic VAT nhất quán:
+ * - Luôn có dòng "VAT 8%" riêng trong tài liệu.
+ * - prices_include_vat = 0 (chưa VAT):
+ *     đơn giá hiển thị = unit_price (gốc)
+ *     thành tiền gốc   = unit_price × qty
+ *     VAT              = (Σ thành tiền + phí VC) × 8%
+ *     Tổng cộng        = Σ thành tiền + phí VC + VAT
+ * - prices_include_vat = 1 (giá đã gồm VAT):
+ *     đơn giá hiển thị = unit_price / 1.08  (tách VAT ra)
+ *     thành tiền gốc   = (unit_price / 1.08) × qty
+ *     VAT              = (Σ thành tiền gốc + phí VC) × 8%
+ *     Tổng cộng        = Σ thành tiền gốc + phí VC + VAT
+ *                      = (stored_total / 1.08 + phí VC) × 1.08
+ * - Phí vận chuyển luôn được nhập chưa VAT → cộng VAT 8% cùng SP.
  */
-async function loadQuoteForExport(quoteId: number, hideVat: boolean) {
+export async function exportQuoteToHtml(
+  quoteId: number,
+  paymentTerms: string = "",
+  deliveryTerms: string = "",
+  hideVat: boolean = false,
+  showOrigin: boolean = false,
+  showColorVariance: boolean = false,
+  projectName: string = "",
+  deliveryLocation: string = "",
+): Promise<QuoteExportResult> {
   const db = getDb();
 
   // ── Load quote ──────────────────────────────────────────────
@@ -151,44 +170,6 @@ async function loadQuoteForExport(quoteId: number, hideVat: boolean) {
     if (isNaN(d.getTime())) return quote.created_at;
     return `Ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}`;
   })();
-  return {
-    quote,
-    rows,
-    generatedFilename,
-    dateStr,
-    includeVat,
-    shippingFeeInput,
-    shippingFeePreVat,
-    productSubtotal,
-    vatBase,
-    vatAmount,
-    grandTotal,
-  };
-}
-
-export async function exportQuoteToHtml(
-  quoteId: number,
-  paymentTerms: string = "",
-  deliveryTerms: string = "",
-  hideVat: boolean = false,
-  showOrigin: boolean = false,
-  showColorVariance: boolean = false,
-  projectName: string = "",
-  deliveryLocation: string = "",
-): Promise<QuoteExportResult> {
-  const {
-    quote,
-    rows,
-    generatedFilename,
-    dateStr,
-    includeVat,
-    shippingFeeInput,
-    shippingFeePreVat,
-    productSubtotal,
-    vatBase,
-    vatAmount,
-    grandTotal,
-  } = await loadQuoteForExport(quoteId, hideVat);
 
   // Hai cột tuỳ chọn mặc định được ẩn để ưu tiên không gian cho ảnh và tên hàng.
   const trailingColumnCount = 2 + Number(showOrigin) + Number(showColorVariance);
@@ -504,125 +485,4 @@ export async function exportQuoteToHtml(
   };
 }
 
-/**
- * Xuất báo giá thành file Excel (.xlsx) — cùng số liệu với bản HTML.
- *
- * Dùng chung `loadQuoteForExport` nên VAT / chiết khấu / phí vận chuyển khớp
- * tuyệt đối với bản in A4. Khác biệt duy nhất là cách trình bày: Excel không
- * nhúng ảnh sản phẩm (đường dẫn ảnh là URL, không phải bytes) và không có
- * phần lưu ý / chữ ký — bảng tính chỉ để đối chiếu số.
- */
-export async function exportQuoteToXlsx(
-  quoteId: number,
-  paymentTerms: string = "",
-  deliveryTerms: string = "",
-  hideVat: boolean = false,
-  showOrigin: boolean = false,
-  showColorVariance: boolean = false,
-  projectName: string = "",
-  deliveryLocation: string = "",
-): Promise<QuoteExportResult> {
-  const {
-    quote,
-    rows,
-    generatedFilename,
-    dateStr,
-    shippingFeeInput,
-    shippingFeePreVat,
-    vatBase,
-    vatAmount,
-    grandTotal,
-  } = await loadQuoteForExport(quoteId, hideVat);
 
-  const header = [
-    "STT",
-    "Mã hàng",
-    "Tên hàng",
-    "Kích thước",
-    "Chất liệu",
-    "Số lượng (m2)",
-    "ĐVT",
-    "Đơn giá",
-    "Thành tiền",
-    ...(showOrigin ? ["Xuất xứ"] : []),
-    ...(showColorVariance ? ["Độ lệch màu"] : []),
-    "Quy cách",
-    "Khu vực",
-  ];
-
-  const body = rows.map((r, i) => [
-    i + 1,
-    r.product_code,
-    r.product_name,
-    r.size || "",
-    r.material || "",
-    Number(r.quantity_m2),
-    "m2",
-    Math.round(r.unitPreVat),
-    Math.round(r.subtotal),
-    ...(showOrigin ? ["Trung Quốc"] : []),
-    ...(showColorVariance ? ["V2"] : []),
-    r.finalNote,
-    r.area || "",
-  ]);
-
-  // Dòng tổng: đặt nhãn ở cột "Tên hàng" cho dễ đọc, số ở cột "Thành tiền".
-  const totalLabelCol = 2;
-  const totalValueCol = header.indexOf("Thành tiền");
-  const blank = (n: number) => Array(n).fill("");
-  const totalRow = (label: string, value: number) => {
-    const row = blank(header.length);
-    row[totalLabelCol] = label;
-    row[totalValueCol] = Math.round(value);
-    return row;
-  };
-
-  const aoa: (string | number)[][] = [
-    [`${generatedFilename}`],
-    ["BÁO GIÁ"],
-    [],
-    ["Khách hàng:", quote.customer_name || "", "", "Ngày:", dateStr],
-    ["Điện thoại:", quote.customer_phone || "", "", "Công trình:", projectName || ""],
-    ["Địa điểm giao:", deliveryLocation || ""],
-    [],
-    header,
-    ...body,
-  ];
-
-  if (shippingFeeInput > 0) {
-    aoa.push(totalRow("PHÍ VẬN CHUYỂN", shippingFeePreVat));
-  }
-  aoa.push(totalRow("TỔNG CỘNG", vatBase));
-  if (!hideVat) {
-    aoa.push(totalRow("THUẾ VAT (8%)", vatAmount));
-    aoa.push(totalRow("TỔNG THANH TOÁN", grandTotal));
-  }
-
-  // Ghi chú dạng văn bản ở cuối sheet — giữ nội dung đã nhập trong dialog.
-  if (paymentTerms.trim() || deliveryTerms.trim()) {
-    aoa.push([]);
-    if (paymentTerms.trim()) {
-      aoa.push(["Phương thức thanh toán:"]);
-      for (const line of paymentTerms.split("\n")) aoa.push(["", line]);
-    }
-    if (deliveryTerms.trim()) {
-      aoa.push(["Thời gian giao hàng:"]);
-      for (const line of deliveryTerms.split("\n")) aoa.push(["", line]);
-    }
-  }
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = header.map((h) =>
-    h === "Tên hàng" ? { wch: 42 } : h === "Mã hàng" ? { wch: 14 } : { wch: 16 },
-  );
-  XLSX.utils.book_append_sheet(wb, ws, "BaoGia");
-
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  return {
-    filename: `${generatedFilename}.xlsx`,
-    base64: buf.toString("base64"),
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  };
-}

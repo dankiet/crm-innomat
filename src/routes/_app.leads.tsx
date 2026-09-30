@@ -9,10 +9,19 @@
  */
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { fetchLpLeadsFn, setLpLeadStatusFn, convertLpLeadFn, deleteLpLeadFn } from "@/api/lp";
+import {
+  fetchLpLeadsFn,
+  setLpLeadStatusFn,
+  convertLpLeadFn,
+  deleteLpLeadFn,
+  getBriefAttachmentUrlFn,
+  deleteLeadAttachmentFn,
+  fetchAttachmentStatsFn,
+} from "@/api/lp";
 import {
   LP_FORM_KIND_LABEL,
   LP_LEAD_STATUS_LABEL,
@@ -30,6 +39,32 @@ const STATUS_CLS: Record<LpLeadStatus, string> = {
   converted: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20",
   spam: "bg-muted text-muted-foreground ring-black/5",
 };
+
+/** Dung lượng dễ đọc cho tooltip. */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+/**
+ * Tải file đính kèm: xin signed URL TTL ngắn rồi mở tab mới.
+ *
+ * Link không được nhúng sẵn vào DOM vì nó hết hạn sau 5 phút — lấy tại thời
+ * điểm bấm thì link luôn còn hiệu lực, và token không nằm trong HTML.
+ */
+async function downloadAttachment(token: string, fileName: string) {
+  try {
+    const res = await getBriefAttachmentUrlFn({ data: { token } });
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    window.open(res.url, "_blank", "noopener,noreferrer");
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : `Không tải được ${fileName}`);
+  }
+}
 
 export const Route = createFileRoute("/_app/leads")({
   head: () => ({
@@ -51,27 +86,62 @@ export const Route = createFileRoute("/_app/leads")({
     q: search.q?.trim() ?? "",
   }),
   loader: async ({ deps }) => {
-    const leads = await fetchLpLeadsFn({
-      data: { status: deps.status, search: deps.q || undefined, limit: 300 },
-    });
-    return { leads, status: deps.status, q: deps.q };
+    const [leads, attachmentStats] = await Promise.all([
+      fetchLpLeadsFn({
+        data: { status: deps.status, search: deps.q || undefined, limit: 300 },
+      }),
+      fetchAttachmentStatsFn(),
+    ]);
+    return { leads, status: deps.status, q: deps.q, attachmentStats };
   },
   component: LeadsPage,
 });
 
 function LeadsPage() {
-  const { leads, status, q } = Route.useLoaderData();
+  const { leads, status, q, attachmentStats } = Route.useLoaderData();
   const router = useRouter();
   const navigate = Route.useNavigate();
 
   const [search, setSearch] = useState(q);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  /** Token đang chờ xác nhận xoá (hai bước, inline). */
+  const [confirmDeleteToken, setConfirmDeleteToken] = useState<string | null>(null);
+  /** Token đang xoá — chặn bấm hai lần. */
+  const [deletingToken, setDeletingToken] = useState<string | null>(null);
+
+  /**
+   * Xoá một file đính kèm. Chỉ báo "đã xoá" khi server xác nhận Storage đã xoá
+   * thật — nuốt lỗi ở đây là cách file mồ côi sinh ra trong khi UI nói đã xoá.
+   */
+  async function handleDeleteAttachment(token: string) {
+    setDeletingToken(token);
+    try {
+      const res = await deleteLeadAttachmentFn({ data: { token } });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Đã xoá file đính kèm");
+      setConfirmDeleteToken(null);
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
+      await router.invalidate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không xoá được file");
+    } finally {
+      setDeletingToken(null);
+    }
+  }
 
   async function onStatus(lead: LpLead, next: LpLeadStatus) {
     setBusyId(lead.id);
     try {
       await setLpLeadStatusFn({ data: { id: lead.id, status: next } });
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không đổi được trạng thái");
@@ -89,6 +159,9 @@ function LeadsPage() {
         return;
       }
       toast.success(`Đã tạo khách hàng #${res.customer_id}`);
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không chuyển được lead");
@@ -102,6 +175,9 @@ function LeadsPage() {
     try {
       await deleteLpLeadFn({ data: { id: lead.id } });
       setPendingDelete(null);
+      // Danh sách vừa đổi -> xoá luôn trạng thái chờ xác nhận, tránh nút
+      // "Xóa vĩnh viễn" cũ trỏ vào row đã khác sau khi refetch.
+      setConfirmDeleteToken(null);
       await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không xóa được");
@@ -117,6 +193,22 @@ function LeadsPage() {
         title="Hộp thư Lead"
         description="Lead do quảng cáo & KTS gửi về, chưa nằm trong pipeline. Xác minh rồi chuyển thành khách hàng."
       />
+      {/* Dung lượng file brief — số lấy từ BUCKET (chính xác), không phải từ DB:
+          cột `file_size` chỉ có sau khi xác thực magic bytes, nên row đang chờ
+          mang 0 byte và con số trong DB thiếu đúng phần rác đang tích. */}
+      {attachmentStats.bucketObjects !== null && attachmentStats.bucketObjects > 0 ? (
+        <p className="mb-3 text-xs text-muted-foreground">
+          File brief trên storage: <b>{attachmentStats.bucketObjects}</b> file ·{" "}
+          <b>{formatBytes(attachmentStats.bucketBytes ?? 0)}</b>
+          {attachmentStats.orphanCount > 0 ? (
+            <>
+              {" "}
+              · {attachmentStats.orphanCount} file chưa gắn lead (dọn bằng{" "}
+              <code className="rounded bg-surface-strong px-1">npm run lp:attachments-sweep</code>)
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {STATUS_TABS.map((s) => (
           <button
@@ -226,12 +318,63 @@ function LeadsPage() {
                         <strong>Diện tích:</strong> {lead.area}
                       </span>
                     ) : null}
-                    {lead.attachment_names ? (
-                      <span className="text-amber-700">
-                        <strong>File:</strong> {lead.attachment_names}
-                      </span>
-                    ) : null}
                   </div>
+                </div>
+              ) : null}
+
+              {/* File đính kèm — tải qua signed URL TTL ngắn, không phải link công khai */}
+              {lead.attachments?.length ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    File đính kèm:
+                  </span>
+                  {lead.attachments.map((file) => (
+                    <span key={file.token} className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void downloadAttachment(file.token, file.file_name)}
+                        className="rounded-lg bg-surface-strong px-2 py-0.5 text-[11px] font-medium text-foreground ring-1 ring-black/5 hover:bg-surface-strong/70"
+                        title={`${file.mime_type} · ${formatBytes(file.file_size)}`}
+                      >
+                        {file.file_name}
+                      </button>
+                      {/* Xoá hai bước, xác nhận ngay tại chỗ (không dùng window.confirm) */}
+                      {confirmDeleteToken === file.token ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={deletingToken === file.token}
+                            onClick={() => void handleDeleteAttachment(file.token)}
+                            className="rounded-lg bg-red-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {deletingToken === file.token ? "Đang xoá…" : "Xóa vĩnh viễn"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteToken(null)}
+                            className="rounded-lg bg-surface-strong px-2 py-0.5 text-[11px] font-medium text-foreground ring-1 ring-black/5"
+                          >
+                            Không xóa
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteToken(file.token)}
+                          className="rounded-lg px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-red-500/10 hover:text-red-700"
+                          title="Xoá file này"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              ) : lead.attachment_names ? (
+                <div className="mt-2">
+                  <span className="text-[11px] text-amber-700">
+                    Khách nói sẽ gửi file: {lead.attachment_names} (chưa tải lên được)
+                  </span>
                 </div>
               ) : null}
 

@@ -62,8 +62,6 @@ export type QuotePrintOptions = {
   showColorVariance: boolean;
   projectName: string;
   deliveryLocation: string;
-  /** "html" = bản in A4 (mở tab mới); "xlsx" = tải file Excel. */
-  format: "html" | "xlsx";
 };
 
 export function ExportQuoteDialog({
@@ -92,7 +90,6 @@ export function ExportQuoteDialog({
   const [showColorVariance, setShowColorVariance] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [deliveryLocation, setDeliveryLocation] = useState("");
-  const [format, setFormat] = useState<"html" | "xlsx">("html");
 
   const projectListId = "quote-export-project-suggestions";
   const locationListId = "quote-export-location-suggestions";
@@ -113,7 +110,6 @@ export function ExportQuoteDialog({
     setHideVat(false);
     setShowOrigin(false);
     setShowColorVariance(false);
-    setFormat("html");
 
     const key = storageKeyFor(customerId);
     // Ưu tiên state đã hydrate; fallback đọc localStorage trực tiếp
@@ -170,7 +166,6 @@ export function ExportQuoteDialog({
       showColorVariance,
       projectName,
       deliveryLocation,
-      format,
     });
   }
 
@@ -178,25 +173,10 @@ export function ExportQuoteDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Xuất báo giá</DialogTitle>
+          <DialogTitle>Tùy chọn in báo giá A4 ngang</DialogTitle>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="quote-export-format">
-              Định dạng xuất:
-            </label>
-            <select
-              id="quote-export-format"
-              className="w-full h-9 px-3 border rounded-md text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
-              value={format}
-              onChange={(e) => setFormat(e.target.value as "html" | "xlsx")}
-            >
-              <option value="html">Bản in A4 ngang (HTML) — mở tab mới để in / lưu PDF</option>
-              <option value="xlsx">Bảng tính Excel (.xlsx) — tải file về máy</option>
-            </select>
-          </div>
-
           <div className="space-y-2">
             <label className="text-sm font-medium">Phương thức thanh toán:</label>
             <div className="flex gap-2">
@@ -339,11 +319,7 @@ export function ExportQuoteDialog({
             onClick={handleExport}
             disabled={isExporting}
           >
-            {isExporting
-              ? "Đang xử lý..."
-              : format === "xlsx"
-                ? "Tải file Excel"
-                : "Xem trước / In A4 ngang"}
+            {isExporting ? "Đang mở..." : "Xem trước / In A4 ngang"}
           </button>
         </DialogFooter>
       </DialogContent>

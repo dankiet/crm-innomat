@@ -121,9 +121,127 @@ function tryServePublicFile(request: Request): Response | null {
   return new Response(buf, { status: 200, headers });
 }
 
+/**
+ * Route file brief CHỈ dùng ở chế độ local (dev, thiếu cấu hình Supabase).
+ *
+ * Production không bao giờ chạm tới đây: browser PUT thẳng lên Supabase qua
+ * signed URL. Ở dev không có Supabase nên cần một chỗ nhận PUT và một chỗ trả
+ * file, để luồng upload/verify/tải giống hệt production.
+ *
+ * Vì đây là đường ghi CÔNG KHAI (không đăng nhập), nó bị giới hạn chặt:
+ *  - chỉ nhận khi thật sự ở local mode (không có SUPABASE_URL)
+ *  - token phải tồn tại trong DB và còn 'pending'
+ *  - đúng một lần ghi cho mỗi token
+ * Các lớp đó nằm ở `src/db/brief-attachments.server.ts`, dùng chung với prod.
+ */
+async function handleLocalBriefRoute(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+
+  if (url.pathname === "/api/brief-upload") {
+    if (request.method !== "PUT") return new Response("Method Not Allowed", { status: 405 });
+    // Local mode only — production đi thẳng Supabase, không qua server app.
+    const { supabaseCredentials } = await import("./lib/storage.server");
+    if (supabaseCredentials()) return new Response("Not Found", { status: 404 });
+
+    const token = url.searchParams.get("token") ?? "";
+    const { getPendingUploadToken, writeLocalBriefBytes } = await import(
+      "./db/brief-attachments.server"
+    );
+    if (!(await getPendingUploadToken(token))) {
+      return new Response("Token không hợp lệ", { status: 403 });
+    }
+
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    if (bytes.byteLength > 10 * 1024 * 1024) {
+      return new Response("File quá lớn", { status: 413 });
+    }
+    if (!(await writeLocalBriefBytes(token, bytes))) {
+      return new Response("Không ghi được file", { status: 500 });
+    }
+    return new Response(null, { status: 200 });
+  }
+
+  if (url.pathname === "/api/brief-file") {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method Not Allowed", { status: 405 });
+    }
+    const { supabaseCredentials } = await import("./lib/storage.server");
+    if (supabaseCredentials()) return new Response("Not Found", { status: 404 });
+
+    const token = url.searchParams.get("token") ?? "";
+    const { attachmentLeadId, readLocalBriefBytes } = await import(
+      "./db/brief-attachments.server"
+    );
+    // Chỉ phục vụ file đã gắn vào một lead — không phục vụ object mồ côi.
+    if ((await attachmentLeadId(token)) === null) {
+      return new Response("Not Found", { status: 404 });
+    }
+    const bytes = await readLocalBriefBytes(token);
+    if (!bytes) return new Response("Not Found", { status: 404 });
+
+    // `attachment` buộc tải xuống thay vì render — cùng lý do như bản production.
+    // Bọc trong Blob: `Uint8Array<ArrayBufferLike>` không thoả `BodyInit` trực tiếp.
+    return new Response(new Blob([new Uint8Array(bytes)]), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": "attachment",
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+
+  return null;
+}
+
+/**
+ * `/og-image` — ảnh xem trước khi chia sẻ link (Open Graph).
+ *
+ * Vì sao cần route riêng thay vì trỏ `og:image` vào hero: hero là `.webp`, mà bộ
+ * thu thập OG của Facebook **không nhận WebP**. Route này tải hero về, cắt
+ * 1200×630 và xuất JPEG — đúng định dạng OG chấp nhận.
+ *
+ * Đặt ở đây (entry server) chứ không phải `createServerFn` vì đây là tài nguyên
+ * HTTP thuần: crawler của Facebook chỉ GET, không gọi RPC.
+ */
+async function handleOgImageRoute(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (url.pathname !== "/og-image") return null;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  try {
+    const { getHeroImageSetting } = await import("./db/lp.server");
+    const { buildOgImage } = await import("./lib/og-image.server");
+    const heroUrl = await getHeroImageSetting();
+    const jpeg = await buildOgImage(heroUrl);
+
+    return new Response(request.method === "HEAD" ? null : new Uint8Array(jpeg), {
+      status: 200,
+      headers: {
+        "Content-Type": "image/jpeg",
+        "Content-Length": String(jpeg.byteLength),
+        // Ảnh chỉ đổi khi admin đổi hero; cho cache dài nhưng vẫn `revalidate`.
+        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    });
+  } catch (error) {
+    console.error("[og-image] dựng ảnh thất bại:", error);
+    // Không trả 500: crawler gặp lỗi sẽ bỏ ảnh, nhưng trang vẫn phải phục vụ.
+    return new Response("Không dựng được ảnh", { status: 500 });
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const ogRes = await handleOgImageRoute(request);
+      if (ogRes) return ogRes;
+
+      const briefRes = await handleLocalBriefRoute(request);
+      if (briefRes) return briefRes;
+
       const staticRes = tryServePublicFile(request);
       if (staticRes) return staticRes;
 

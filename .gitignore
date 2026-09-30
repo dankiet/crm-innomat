@@ -39,6 +39,10 @@ dist-ssr
 # Runtime images — kept local only, not tracked in git
 public/images/
 
+# File brief khách gửi ở chế độ local (dev, thiếu cấu hình Supabase).
+# Cố ý nằm NGOÀI public/ để dev cũng không phục vụ như tài nguyên tĩnh.
+.local-brief-files/
+
 # Local test exports / stock dumps
 data/exports/
 Stock.xlsx

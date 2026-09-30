@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { getDb, type SqlValue } from "./index.server";
 import { createCustomer } from "./crm.server";
 import { syncHeroUsage } from "./media-assets.server";
+import { deleteBriefObject } from "@/lib/brief-storage.server";
 import { normalizePhone, isPhoneMatchable } from "@/lib/phone";
 import { COLOR_PALETTES, matchColorPalette } from "@/lib/color-palette";
 import { SURFACE_FINISHES, FORMAT_FAMILIES } from "@/lib/material-taxonomy";
@@ -476,8 +477,16 @@ const MAX_HITS = 5;
 
 /**
  * Fixed-window rate limit, state trong Postgres.
+ *
+ * `opts` cho phép endpoint khác dùng ngân sách riêng — mặc định giữ nguyên
+ * 5 lượt / 10 phút của form lead.
  */
-export async function checkRateLimit(bucket: string): Promise<boolean> {
+export async function checkRateLimit(
+  bucket: string,
+  opts?: { windowMs?: number; maxHits?: number },
+): Promise<boolean> {
+  const windowMs = opts?.windowMs ?? WINDOW_MS;
+  const maxHits = opts?.maxHits ?? MAX_HITS;
   const db = getDb();
   const now = Date.now();
   const row = await db
@@ -492,14 +501,14 @@ export async function checkRateLimit(bucket: string): Promise<boolean> {
   }
 
   const started = Number(row.window_start) || 0;
-  if (now - started > WINDOW_MS) {
+  if (now - started > windowMs) {
     await db
       .prepare("UPDATE lp_rate_limits SET hits = 1, window_start = ? WHERE bucket = ?")
       .run(String(now), bucket);
     return true;
   }
 
-  if (row.hits >= MAX_HITS) return false;
+  if (row.hits >= maxHits) return false;
 
   await db.prepare("UPDATE lp_rate_limits SET hits = hits + 1 WHERE bucket = ?").run(bucket);
   return true;
@@ -546,19 +555,59 @@ export async function createLpLead(
   const recent = dedupeVal
     ? await db
         .prepare(
-          `SELECT id FROM lp_leads
+          `SELECT id, ip_hash FROM lp_leads
             WHERE ${dedupeCol} = ? AND lp_slug = ? AND form_kind = ?
               AND created_at > ?
             LIMIT 1`,
         )
-        .get<{ id: number }>(
+        .get<{ id: number; ip_hash: string }>(
           dedupeVal,
           clip(input.lp_slug, 64),
           formKind,
           new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace("T", " "),
         )
     : null;
-  if (recent) return { ok: true, duplicate: true };
+  if (recent) {
+    // Khách gửi lại (đã có lead trong 24h): KHÔNG ghi lead mới, nhưng file họ
+    // vừa tải lên vẫn phải gắn vào lead cũ. Bỏ qua bước này thì file thành mồ
+    // côi và bị sweep xoá sau 24h — khách tưởng đã gửi kèm mà thực ra mất.
+    //
+    // CHỈ gắn khi người gửi ĐÚNG LÀ chủ lead cũ. Dedupe khoá theo SĐT/email,
+    // mà ai cũng biết SĐT của người khác: không chặn ở đây thì kẻ xấu chỉ cần
+    // submit trùng SĐT nạn nhân là gắn được file của mình vào bản ghi thật, và
+    // sale mở lead thật để tải nội dung do kẻ tấn công cung cấp.
+    const sameSubmitter = recent.ip_hash !== "" && recent.ip_hash === meta.ipHash;
+    if (sameSubmitter && input.attachment_tokens?.length) {
+      try {
+        const { claimBriefUploads } = await import("./brief-attachments.server");
+        const labels = await claimBriefUploads({
+          tokens: input.attachment_tokens,
+          leadId: recent.id,
+        });
+        if (labels.length) {
+          const existing = await db
+            .prepare(`SELECT attachment_names FROM lp_leads WHERE id = ?`)
+            .get<{ attachment_names: string }>(recent.id);
+          const merged = [...new Set(
+            [existing?.attachment_names ?? "", labels.join(", ")]
+              .filter(Boolean)
+              .join(", ")
+              .split(", ")
+              .map((s) => s.trim())
+              .filter(Boolean),
+          )]
+            .slice(0, 4)
+            .join(", ");
+          await db
+            .prepare(`UPDATE lp_leads SET attachment_names = ? WHERE id = ?`)
+            .run(merged as SqlValue, recent.id as SqlValue);
+        }
+      } catch (err) {
+        console.error("[lp] gắn file vào lead trùng thất bại:", err);
+      }
+    }
+    return { ok: true, duplicate: true };
+  }
 
   const ts = nowUtc();
   const consent = input.consent_marketing ? 1 : 0;
@@ -576,7 +625,7 @@ export async function createLpLead(
       ? JSON.stringify(input.shortlist_details.slice(0, 24))
       : "";
 
-  await db
+  const inserted = await db
     .prepare(
       `INSERT INTO lp_leads
          (full_name, phone, phone_norm, email, need, note, lp_slug,
@@ -630,6 +679,28 @@ export async function createLpLead(
       created_at: ts,
     } as unknown as SqlValue);
 
+  // Gắn file đã tải lên vào lead. Đặt SAU khi lead đã ghi và KHÔNG để lỗi ở
+  // bước này làm hỏng cả lead: mất file là thiệt, mất lead là mất khách.
+  const leadId = inserted.lastInsertRowid;
+  if (leadId && input.attachment_tokens?.length) {
+    try {
+      const { claimBriefUploads } = await import("./brief-attachments.server");
+      const labels = await claimBriefUploads({
+        tokens: input.attachment_tokens,
+        leadId,
+      });
+      // Tên file do SERVER đọc từ DB ghi đè tên client khai — nhãn hiển thị
+      // phải khớp đúng file đã xác thực, không phải thứ browser tự nhận.
+      if (labels.length) {
+        await db
+          .prepare(`UPDATE lp_leads SET attachment_names = ? WHERE id = ?`)
+          .run(labels.join(", ").slice(0, 600) as SqlValue, leadId as SqlValue);
+      }
+    } catch (err) {
+      console.error("[lp] gắn file đính kèm thất bại:", err);
+    }
+  }
+
   return { ok: true, duplicate: false };
 }
 
@@ -670,6 +741,47 @@ export async function listLpLeads(opts?: {
         LIMIT ?`,
     )
     .all<LpLead>(...params)) as LpLead[];
+
+  // File đính kèm: 1 query cho cả page rồi gom theo lead_id (không N+1).
+  if (rows.length > 0) {
+    const ids = rows.map((l) => l.id);
+    const placeholders = ids.map(() => "?").join(", ");
+    const attachmentRows = (await db
+      .prepare(
+        `SELECT lead_id, token, file_name, mime_type, kind, file_size
+           FROM lp_lead_attachments
+          WHERE lead_id IN (${placeholders}) AND status = 'claimed'
+          ORDER BY id`,
+      )
+      .all<{
+        lead_id: number;
+        token: string;
+        file_name: string;
+        mime_type: string;
+        kind: string;
+        file_size: number;
+      }>(...ids)) as Array<{
+      lead_id: number;
+      token: string;
+      file_name: string;
+      mime_type: string;
+      kind: string;
+      file_size: number;
+    }>;
+    const byLead = new Map<number, LpLead["attachments"]>();
+    for (const a of attachmentRows) {
+      const list = byLead.get(a.lead_id) ?? [];
+      list.push({
+        token: a.token,
+        file_name: a.file_name,
+        mime_type: a.mime_type,
+        kind: a.kind,
+        file_size: a.file_size,
+      });
+      byLead.set(a.lead_id, list);
+    }
+    for (const lead of rows) lead.attachments = byLead.get(lead.id) ?? [];
+  }
 
   // Decorate shortlist_codes (canonical product ids) -> code/name để inbox
   // hiển thị mã gạch thật thay vì id thô. Id không còn tồn tại được bỏ qua
@@ -725,8 +837,30 @@ export async function setLpLeadStatus(
   return { ok: true };
 }
 
+/**
+ * Xoá lead + file đính kèm của nó.
+ *
+ * Phải xoá OBJECT trên storage TRƯỚC khi xoá row lead: `lp_lead_attachments` có
+ * `ON DELETE CASCADE`, nên xoá lead là mất luôn row — và mất luôn manh mối về
+ * object còn nằm trên bucket. Khi đó file thành rác vĩnh viễn: sweep cũng không
+ * thấy vì nó chỉ quét row `pending`/`uploaded`, mà row thì đã biến mất.
+ */
 export async function deleteLpLead(id: number): Promise<{ ok: true }> {
-  await getDb().prepare("DELETE FROM lp_leads WHERE id = ?").run(id);
+  const db = getDb();
+  const attachments = await db
+    .prepare(`SELECT token FROM lp_lead_attachments WHERE lead_id = ?`)
+    .all<{ token: string }>(id);
+
+  for (const a of attachments) {
+    const gone = await deleteBriefObject(a.token);
+    if (!gone) {
+      // Vẫn xoá row: giữ lại chỉ tạo row mồ côi trỏ vào lead đã biến mất.
+      // Sweep sẽ dọn object còn sót (quét theo tiền tố, xem script).
+      console.error(`[lp] xoá object ${a.token} thất bại khi xoá lead #${id}`);
+    }
+  }
+
+  await db.prepare("DELETE FROM lp_leads WHERE id = ?").run(id);
   return { ok: true };
 }
 

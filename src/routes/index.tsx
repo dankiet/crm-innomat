@@ -10,7 +10,7 @@ import { DEFAULT_LP_SLUG } from "@/lib/lp-content";
 import { loadLpHeroImage, lpHead } from "./-lp-route";
 
 export const Route = createFileRoute("/")({
-  head: () => lpHead(),
+  head: (ctx) => lpHead(ctx),
   loader: async () => await loadLpHeroImage(),
   component: HomePageRoute,
 });

@@ -239,7 +239,7 @@ Vẫn dùng tốt làm **kịch bản trả lời comment/ads** vì nội dung �
 
 | Kênh | Giá trị thật |
 |---|---|
-| Hotline | `0909 888 951` |
+| Hotline | `0901 194 094` |
 | Showroom & Kho mẫu | TP. Hồ Chí Minh ([Google Maps](https://maps.app.goo.gl/3Hqo3fNFhF2B3UrY8)) |
 | Facebook | `fb.com/embangach` |
 | TikTok | `@embangach` |

@@ -40,7 +40,7 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
   chưa từng chạy ở production**, không phải code chết. Xem
   [audit-2026-09-19](audit-2026-09-19.md) §G3.
 
-**Toàn bộ 27 bảng đều đang dùng** — `public` có đúng 27 bảng, khớp 100% với `schema-pg.sql`,
+**Toàn bộ 28 bảng đều đang dùng** — `public` có đúng 28 bảng, khớp 100% với `schema-pg.sql`,
 **0 bảng mồ côi** (bằng chứng: [audit-2026-09-19](audit-2026-09-19.md) §G0; đã gỡ 2 bảng gallery
 và `image_assets` ngày 2026-09-24, rồi thêm lại `media_assets`, `mapping_media_usages`,
 `landing_page_media_usages` ngày 2026-09-25 theo Option 2, thêm `short_links` ngày 2026-09-30).
@@ -83,9 +83,7 @@ khách hàng.
 
 `/bao-gia` — hai tab qua `?tab=quotes|orders`:
 
-- **Báo giá**: dòng hàng, chiết khấu, VAT 8%. Xuất qua `ExportQuoteDialog` chọn định dạng:
-  HTML in A4 ngang (mở tab mới) hoặc Excel `.xlsx` (tải file). Hai bản dùng chung
-  `loadQuoteForExport` nên số liệu khớp tuyệt đối.
+- **Báo giá**: dòng hàng, chiết khấu, VAT 8%, xuất HTML in được.
 - **Đơn hàng**: sinh từ báo giá, mã chứng từ riêng.
 - Mã chứng từ, trạng thái, công thức giá: xem [nghiep-vu](nghiep-vu.md).
 
@@ -136,43 +134,70 @@ Trang public cho khách vãng lai (không cần đăng nhập), nội dung lấy
 | `fetchLpHeroImageFn` / `setLpHeroImageFn`                       | Ảnh hero 1 (section 1)                      |
 | `fetchLpHeroImage2Fn` / `setLpHeroImage2Fn`                     | Ảnh hero 2 (section 4)                      |
 | `submitLpLeadFn`                                                | Nhận form liên hệ → `lp_leads`              |
+| `startBriefUploadFn` / `verifyBriefUploadFn`                    | Cấp signed URL + xác thực file brief (magic bytes) |
+| `getBriefAttachmentUrlFn` / `fetchLeadAttachmentsFn`            | Signed URL tải file (TTL 300s) + danh sách file của lead |
+| `deleteLeadAttachmentFn` / `fetchAttachmentStatsFn`             | Xoá file thủ công + thống kê dung lượng      |
 | `fetchFeaturedSlotsFn` / `setFeaturedSlotFn`                    | 12 vị trí "Tuyển chọn Trang chủ"            |
 
-**Bảng**: `lp_settings` (key/value), `lp_leads`, `lp_rate_limits` (chống spam form),
-`public_users` + `public_sessions` (danh tính khách vãng lai).
+**Bảng**: `lp_settings` (key/value), `lp_leads`, `lp_lead_attachments` (file khách gửi),
+`lp_rate_limits` (chống spam form), `public_users` + `public_sessions` (danh tính khách vãng lai).
+
+**File đính kèm brief** đi đường riêng: browser PUT thẳng lên bucket **riêng tư**
+(`SUPABASE_BRIEF_BUCKET`, mặc định `crm-brief-files`) qua signed URL — không qua server app
+(trần body Vercel thấp hơn 10MB), và không nằm trong bucket ảnh public. Định dạng chốt bằng
+magic bytes ở server; chỉ nhận PDF/PNG/JPEG/WEBP. Row mồ côi quá 24h bị
+`npm run lp:attachments-sweep` dọn.
 
 Ảnh dùng cho LP được bật/tắt bằng `toggleProductPublicFn` / `bulkSetProductsPublicFn` /
 `setConceptImagePublicFn` — tức là từ CRM chứ không sửa trực tiếp trên LP.
 
+**Ảnh xem trước khi chia sẻ link** (`/og-image`) — LP khai `og:image` trỏ về route này, không trỏ
+thẳng vào hero. Lý do: hero là `.webp` mà bộ thu thập OG của Facebook không nhận WebP. Route tải
+hero, cắt 1200×630, xuất JPEG; hero lỗi thì rơi về logo em bán gạch trên nền thương hiệu. Route
+nằm trong `src/server.ts` (entry), **không** phải file route. Chi tiết + cách ép Facebook quét
+lại: [routes-va-ui.md](routes-va-ui.md).
+
 ### Đồng thuận cookie & Google Tag Manager
 
-GTM (`GTM-P4SQ7HBB`) **chỉ hoạt động sau khi khách đồng ý**. Cổng chặn nằm ở **server**, ngay
-lúc dựng `<head>` — không phải chặn bằng JS phía client (chặn client vẫn kịp bắn request).
+GTM (`GTM-P4SQ7HBB`) **nạp cho MỌI khách trên landing** — kể cả người bấm "Từ chối". Lựa chọn
+của khách chỉ quyết định (a) thanh hỏi còn hiện hay không, và (b) cờ đẩy vào `dataLayer`.
+
+> **Đánh đổi có chủ đích.** Bản trước chặn ở server: chưa đồng ý thì không nạp GTM. Nhưng thanh
+> là loại **không chặn** (khách cuộn qua, phần lớn không bấm), nên nhóm đông nhất không có số
+> liệu nào — mất tracking đúng chỗ cần nhất. Giờ ưu tiên có số liệu; khách từ chối được ghi
+> nhận bằng cờ để lọc về sau.
+>
+> ⚠️ Hệ quả: đây là mô hình **tự khai báo rồi loại trừ**, KHÔNG phải chặn theo đồng thuận.
+> Cookie theo dõi được đặt TRƯỚC khi khách chọn. Nếu sau này cần chặt hơn (Nghị định 13/2023,
+> hoặc có khách EU), phải quay lại gate ở `lpHead()` và chấp nhận mất số liệu nhóm không bấm.
 
 - Cookie `ebg_gtm_consent` (`granted` | `denied`, `Max-Age` 1 năm, `SameSite=Lax`) là nguồn
   sự thật. Giá trị lạ ⇒ coi như chưa chọn.
-- `lpHead()` (`src/routes/-lp-route.ts`) đọc cookie: chỉ khi `granted` mới phát snippet GTM
-  vào `<head>`. Thẻ `<noscript>` của GTM nằm ở `RootShell` (`src/routes/__root.tsx`), cũng chỉ
-  khi `granted` **và** đang ở phạm vi landing (`/` hoặc `/lp/*`) — route CRM không dính GTM.
+- `gtmHeadSnippet()` (`src/lib/lp-consent.ts`) đẩy cờ `ebg_consent` (`granted` / `denied` /
+  `unknown`) vào `dataLayer` **trước** khi nạp container — nếu đẩy sau thì trigger đã bắn xong
+  trước khi GTM biết khách từ chối, mất khả năng lọc.
+- Thẻ `<noscript>` của GTM nằm ở `RootShell` (`src/routes/__root.tsx`), chỉ trong phạm vi landing
+  (`/` hoặc `/lp/*`) — route CRM không dính GTM.
 - `ConsentBanner` (`src/components/landing/ConsentBanner.tsx`) là **thanh neo đáy, KHÔNG chặn**
   (`z-index: 95`): khách vẫn cuộn và dùng trang bình thường, thanh chỉ chiếm một dải ở đáy. Hiện
   khi cookie chưa có; nút "Đổi lựa chọn cookie" ở footer xoá cookie để thanh trở lại.
-  - Đánh đổi có chủ đích: không ai bị buộc phải bấm, nên khách bỏ qua thì GTM không nạp và không có
-    số liệu. Muốn chắc chắn có dữ liệu thì phải dùng cổng chặn (đã cân nhắc và bỏ).
-  - Snapshot server của `useSyncExternalStore` là chính `readConsent`, tức server đọc cookie của
-    request y như `lpHead()` đã đọc để quyết định chèn GTM — khách đã chọn rồi không thấy thanh loé
-    lên ở lần render đầu.
-  - Khách tắt JS: `<noscript><style>` ẩn thanh đi vì hai nút sẽ không làm gì được.
-  - Nội dung cố ý KHÔNG nêu tên công cụ thu thập (Google Tag Manager) — chỉ nói mục đích. Về mặt
-    kỹ thuật, `lp-tracking.ts` bắn cả `fbq` (Meta Pixel) lẫn `gtag`, nên nêu đích danh một cái là
-    vừa thừa vừa dễ sai.
-  - Component dùng `<div>` chứ không `<aside>`: `src/styles.css` (CSS app CRM, cũng nạp ở landing)
-    có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, đè mất màu nút. Đổi thẻ
-    là sửa gốc, không phải thêm `!important` ngược lại.
-- `trackEvent` (`src/lib/lp-tracking.ts`) tự chặn nếu chưa `granted`, nên bất biến không phụ
-  thuộc vào việc GTM có tình cờ định nghĩa `gtag`/`fbq` hay không.
-- Rút lại đồng thuận ⇒ `stopGtm()` **nạp lại trang**: gỡ thẻ `<script>` không dừng được
-  container đã nằm trong RAM, chỉ reload mới thật sự về trạng thái "chưa đồng ý".
+
+**Trong GTM cần dựng:** biến đọc `ebg_consent` + audience/trigger lọc `denied` cho các tag đo
+lường. Không có bước này thì "từ chối" không có tác dụng gì.
+
+- Snapshot server của `useSyncExternalStore` là chính `readConsent`, tức server đọc cookie của
+  request y như `lpHead()` đã đọc để ghi cờ vào snippet — khách đã chọn rồi không thấy thanh loé
+  lên ở lần render đầu.
+- Khách tắt JS: `<noscript><style>` ẩn thanh đi vì hai nút sẽ không làm gì được (GTM `noscript`
+  vẫn chạy — đó là iframe, không cần JS của ta).
+- Nội dung cố ý KHÔNG nêu tên công cụ thu thập (Google Tag Manager) — chỉ nói mục đích. Về mặt
+  kỹ thuật, `lp-tracking.ts` bắn cả `fbq` (Meta Pixel) lẫn `gtag`, nên nêu đích danh một cái là
+  vừa thừa vừa dễ sai.
+- Component dùng `<div>` chứ không `<aside>`: `src/styles.css` (CSS app CRM, cũng nạp ở landing)
+  có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, đè mất màu nút. Đổi thẻ
+  là sửa gốc, không phải thêm `!important` ngược lại.
+- `trackEvent` (`src/lib/lp-tracking.ts`) **không còn** tự chặn theo cờ đồng thuận — sự kiện bắn
+  cho mọi khách, việc lọc nằm ở audience trong GTM (đúng theo mô hình tự khai báo rồi loại trừ).
 
 > Khác với `consent_marketing` trên form lead (`lp_leads`) — đó là đồng ý **nhận email
 > marketing**, không liên quan tới cookie theo dõi.
@@ -214,6 +239,12 @@ UTM).
 - `setLpLeadStatusFn` — đổi trạng thái xử lý.
 - `convertLpLeadFn` — **chuyển lead thành khách hàng** trong CRM.
 - `deleteLpLeadFn` — xoá.
+
+**File khách đính kèm** hiện thành nút tải ngay trong thẻ lead (nhãn "File đính kèm"). Bấm nút
+mới xin signed URL TTL 300s — link không nhúng sẵn vào DOM vì sẽ hết hạn, và token không nằm
+trong HTML. Cạnh mỗi file có nút thùng rác để **xoá thủ công** (xác nhận hai bước inline);
+đầu trang hiện tổng số file + dung lượng. Lead cũ (trước khi có tính năng) vẫn hiện dòng
+"Khách nói sẽ gửi file: …" vì khi đó chỉ lưu được tên.
 
 ## 11. Lookbook / Concept — `/khong-gian` (redirect)
 
@@ -321,9 +352,10 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 | Ảnh sản phẩm          | `product_images`, `product_image_room_tags` + `media_assets`, `mapping_media_usages`, `landing_page_media_usages` |
 | Khách hàng & bán hàng | `customers`, `quotes`, `quote_items`, `orders`, `payments`, `notes`, `customer_product_samples`      |
 | Đề xuất vật liệu      | `customer_mappings`, `customer_mapping_items`, `customer_mapping_quote_links`                        |
-| Landing công khai     | `lp_settings`, `lp_leads`, `lp_rate_limits`, `public_users`, `public_sessions`                       |
+| Landing công khai     | `lp_settings`, `lp_leads`, `lp_lead_attachments`, `lp_rate_limits`, `public_users`, `public_sessions` |
+| Shortlink             | `short_links`                                                                                        |
 
-Tổng **26 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
+Tổng **28 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 15. Quy mô code
 
@@ -348,4 +380,4 @@ RPC: **72** `createServerFn` trong `src/api/functions.ts` + **21** trong `src/ap
 (2 hàm auth được `api/lp.ts` re-export lại, không tính trùng).
 
 `npx tsc --noEmit` = **0 lỗi** (baseline cũ 29 đã được xoá — xem
-[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **104 test pass**.
+[audit-2026-09-19](audit-2026-09-19.md) §E1). `npm test` = **115 test pass**.
