@@ -24,6 +24,7 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
 | 13  | Quản trị   | Người dùng (**admin**)                             | `/nguoi-dung`                | Đang dùng     | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
 | 14  | Quản trị   | Nhật ký thao tác (**admin**)                       | `/nhat-ky`                   | Đang dùng     | [co-so-du-lieu](co-so-du-lieu.md)                                        |
 | 15  | Landing    | Shortlink chia sẻ (302 + UTM đóng băng)            | `/s/$slug`                   | Đang dùng     | §9b                                                                      |
+| 16  | Landing    | Quản lý Shortlink                                  | `/shortlink`                 | Đang dùng     | §9b                                                                      |
 
 **Cột "Trạng thái"** suy ra từ dữ liệu thật trong DB, không phải phỏng đoán:
 
@@ -48,7 +49,7 @@ Không có bảng nào nên xoá.
 Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 5 route **công
 khai**: `/` (trang chủ landing — cũng render `ArchitectLanding`, xem §1 cột Trạng thái),
 `/lp/$slug` (biến thể landing theo slug), `/s/$slug` (shortlink chia sẻ), `/login`,
-`/auth/callback`.
+`/auth/callback`. Route quản trị shortlink `/shortlink` nằm **trong** `_app.*` (cần đăng nhập).
 
 ## 2. Nền tảng
 
@@ -201,8 +202,9 @@ Bốn bất biến (đọc `src/lib/short-link.ts` trước khi sửa):
    `target_path` do người dùng CRM đặt thành **open-redirect** (lấy domain mình làm bàn đạp phishing).
 4. **Đếm click best-effort.** Lỗi đếm không được làm hỏng redirect.
 
-Không có UI quản trị: hiện tạo/sửa qua RPC (hoặc DB). Chỉ nên mở UI khi có người thứ hai cần
-tự tạo link.
+Có UI quản trị tại `/shortlink` (nhóm "Landing Page" ở sidebar): danh sách link kèm số click, nút
+Copy / Mở / Sửa, dialog tạo-sửa có preview URL sống, xoá 2 bước. Tạo/sửa/xoá vẫn qua RPC như
+trên — UI chỉ là lớp gọi.
 
 ## 10. Hộp thư Lead — `/leads`
 

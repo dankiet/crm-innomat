@@ -17,6 +17,7 @@ import {
   Images,
   ChevronRight,
   Inbox,
+  Link2,
 } from "lucide-react";
 import { ALL_PRODUCTS_SLUG, PRODUCT_GROUPS } from "@/lib/product-categories";
 import { Fragment, useEffect, useState } from "react";
@@ -46,6 +47,7 @@ const navGroups = [
     items: [
       { to: "/leads", label: "Hộp thư Lead", icon: Inbox },
       { to: "/luu-tru", label: "Media", icon: Images },
+      { to: "/shortlink", label: "Shortlink", icon: Link2 },
     ],
   },
 ] as const;
