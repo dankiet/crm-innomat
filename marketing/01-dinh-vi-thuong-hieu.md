@@ -103,11 +103,12 @@ gần gũi, khiêm nhường, chuyên môn — không phải giọng tập đoà
 |---|---|
 | Bắt đầu từ **cảm xúc bề mặt** trước thông số | Mở bài bằng bảng thông số kỹ thuật |
 | Nói **mã gạch, bề mặt, bối cảnh** | Nói "sản phẩm", "hàng hoá", "combo" |
-| Dùng "anh/chị", "em" | Dùng "quý khách", "chúng tôi" |
+| Dùng "bạn", "em" | Dùng "quý khách", "chúng tôi" |
 | Để ảnh vật liệu là **nhân vật chính** | Ảnh nội thất chung chung làm hero |
 | Nói lý do chọn ("vì concept cần…") | Nói "đẹp", "sang", "hot trend" |
 | Cụ thể: "75 × 300 mm", "R10", "men mờ" | Chung chung: "chất lượng cao", "đa dạng mẫu mã" |
 | CTA mời trao đổi: "Gửi brief", "Lưu mã" | CTA mua hàng: "Mua ngay", "Chốt đơn" |
+| Copy ra ngoài chỉ dùng gạch ngang "-" | Dùng dấu "—"; dấu này bị quét ra là AI |
 
 ### Từ vựng bắt buộc vs cấm
 

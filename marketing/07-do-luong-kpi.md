@@ -114,14 +114,14 @@ Từ `LP_LEAD_STATUS_LABEL`:
 
 ## 5. Đọc số đúng (quan trọng)
 
-### Vì sao số liệu pixel thấp hơn thực tế — ba tầng
+### Vì sao số liệu pixel thấp hơn thực tế — hai tầng
 
-1. **Container GTM đang rỗng** — đo ngày **2026-09-28**, `GTM-P4SQ7HBB` trả payload
-   332 KB nhưng `"tags":[]` (`docs/trien-khai-va-van-hanh.md` §GTM). **Chưa có tag GA4
-   hay Meta Pixel nào được publish** ⇒ `window.fbq`/`window.gtag` không tồn tại ⇒
-   `trackEvent` **no-op kể cả khi khách đã đồng ý**. **Đây là nguyên nhân số 1 khiến
-   hiện tại không có dữ liệu pixel.** Sửa ở GTM UI (thêm tag → Submit → Publish), không
-   phải ở code.
+1. **~~Container GTM đang rỗng~~ → ĐÃ SỬA (2026-09-29).** Container `GTM-P4SQ7HBB`
+   đã được publish tag: Meta Pixel `1086936020738731`. Kiểm chứng bằng browser
+   (bấm "Đồng ý" rồi đọc `window.fbq`): `fbq` = function, script
+   `connect.facebook.net/signals/config/1086936020738731` nạp thật. Pixel nhận event
+   thật (30 ngày: PageView, ViewContent, Lead). Ghi chú cũ "container rỗng" (đo
+   2026-09-28) đã lỗi thời — **retargeting + conversion optimization dùng được**.
 2. **Consent model:** GTM chỉ nạp khi khách bấm đồng ý. Khách bỏ qua ⇒ **0 event**.
    Cookie 1 năm, nhưng khách mới luôn bắt đầu ở trạng thái "chưa chọn".
 3. **Banner không nêu tên công cụ** — cố ý, để tăng tỷ lệ đồng ý.
@@ -181,7 +181,7 @@ Lead `form_kind='lp'` mang 5 cột UTM. Cách nối với camp:
 
 | Giới hạn | Thực tế |
 |---|---|
-| **Container GTM rỗng** | **Chưa có pixel/GA4 tag — 0 dữ liệu cho tới khi publish** |
+| **Container GTM** | **Đã publish (2026-09-29) — Meta Pixel `1086936020738731` chạy thật** |
 | Consent gate | Số event thấp hơn thực tế |
 | **Slug mặc định 301 strip UTM** | `/lp/gach-trang-tri` redirect về `/` **mất query** ⇒ lead Track-1 về với UTM rỗng. Dùng thẳng `/` cho track chung |
 | **`google-unlock` không có UTM** | Lead mở thư viện không gắn được camp |
