@@ -155,6 +155,21 @@ Ba endpoint import có hành vi đáng nhớ:
 - **`syncProductInternalCodesFn`** kiểm tra mã có đang thuộc sản phẩm khác không (`internal_code`
   UNIQUE toàn cục) rồi mới delete-then-`INSERT OR IGNORE`.
 
+### Shortlink chia sẻ
+
+| Endpoint                | Việc nó làm                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `resolveShortLinkFn`    | **Công khai** — slug → URL tuyệt đối (origin từ header + UTM đã lưu). Dùng bởi route `/s/$slug`. |
+| `listShortLinksFn`      | Liệt kê toàn bộ shortlink (`requireUser`)                                        |
+| `createShortLinkFn`     | Tạo mới; chuẩn hoá slug, chặn slug trùng & path không an toàn (`requireUser` + audit) |
+| `updateShortLinkFn`     | Cập nhật (`requireUser` + audit)                                                 |
+| `deleteShortLinkFn`     | Xoá (`requireUser` + audit)                                                      |
+
+`create/update` trả `{ ok: true, data }` hoặc `{ ok: false, error: { field, reason } }` —
+lỗi nghiệp vụ (slug trùng, slug sai định dạng, path không an toàn) là **giá trị trả về**,
+không throw, để UI hiển thị ngay tại field. `resolveShortLinkFn` trả `null` khi không thấy /
+đang tắt / path không an toàn ⇒ route `notFound()` (404).
+
 ## Nhật ký (`writeAudit`)
 
 `src/db/audit.server.ts`:

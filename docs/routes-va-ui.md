@@ -21,6 +21,7 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 | `/leads`                  | `_app.leads.tsx`                                   | **Hộp thư Lead** — lead từ landing, chuyển thành khách hàng               |
 | `/khong-gian`             | `_app.khong-gian.tsx`                              | **Lookbook** — ảnh Concept, bật/tắt công khai trên LP                     |
 | `/lp/$slug`               | `lp.$slug.tsx`                                     | **Công khai** — trang landing cho khách vãng lai (không qua cổng auth)    |
+| `/s/$slug`                | `s.$slug.tsx`                                      | **Công khai** — shortlink chia sẻ; **302** sang đích thật + UTM đã lưu (không auth). 302 (không 301) vì đích/UTM còn sửa được |
 | `/nguoi-dung`             | `_app.nguoi-dung.tsx`                              | **Admin** — quản lý user                                                 |
 | `/nhat-ky`                | `_app.nhat-ky.tsx`                                 | **Admin** — nhật ký thao tác                                             |
 

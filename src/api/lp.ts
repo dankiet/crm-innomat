@@ -372,3 +372,121 @@ export const demoteConceptImageFn = createServerFn({ method: "POST" })
     });
     return res;
   });
+
+// ─── Shortlink chia sẻ ───────────────────────────────────────
+
+/**
+ * Resolve shortcode → URL tuyệt đối (CÔNG KHAI — khách vãng lai bấm link).
+ *
+ * Origin dựng từ header của request (giống `authGoogleStart`) để không hardcode
+ * domain: chạy đúng ở production, preview deploy và localhost.
+ */
+export const resolveShortLinkFn = createServerFn({ method: "GET" })
+  .inputValidator((data: { slug: string }) => ({ slug: (data?.slug ?? "").trim().slice(0, 64) }))
+  .handler(async ({ data }) => {
+    if (!data.slug) return null;
+    const { getRequestUrl } = await import("@tanstack/react-start/server");
+    const { resolveShortLink } = await import("@/db/short-links.server");
+
+    // Dùng URL của chính request: lấy được origin thật (production/preview/localhost)
+    // VÀ query khách mang vào (vd `fbclid` Meta tự gắn) mà không hardcode domain.
+    const requestUrl = getRequestUrl({ xForwardedHost: true, xForwardedProto: true });
+    if (!requestUrl) return null;
+    const parsed = new URL(requestUrl);
+
+    return await resolveShortLink(data.slug, parsed.origin, parsed.searchParams);
+  });
+
+export const listShortLinksFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireUser } = await import("@/db/auth.server");
+  await requireUser();
+  const { listShortLinks } = await import("@/db/short-links.server");
+  return await listShortLinks();
+});
+
+export const createShortLinkFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      slug: string;
+      label?: string;
+      targetPath?: string;
+      isActive?: boolean;
+      utm_source?: string;
+      utm_medium?: string;
+      utm_campaign?: string;
+      utm_content?: string;
+      utm_term?: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    const me = await requireUser();
+    const { createShortLink } = await import("@/db/short-links.server");
+    const { writeAudit } = await import("@/db/audit.server");
+
+    const result = await createShortLink(data);
+    if (result.ok) {
+      await writeAudit({
+        user: me,
+        action: "short_link.create",
+        entity_type: "short_link",
+        entity_id: result.data.id,
+        summary: `Tạo shortlink /s/${result.data.slug} → ${result.data.target_path}`,
+        meta: { slug: result.data.slug, utm_content: result.data.utm_content },
+      });
+    }
+    return result;
+  });
+
+export const updateShortLinkFn = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      id: number;
+      slug: string;
+      label?: string;
+      targetPath?: string;
+      isActive?: boolean;
+      utm_source?: string;
+      utm_medium?: string;
+      utm_campaign?: string;
+      utm_content?: string;
+      utm_term?: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    const me = await requireUser();
+    const { updateShortLink } = await import("@/db/short-links.server");
+    const { writeAudit } = await import("@/db/audit.server");
+
+    const result = await updateShortLink(data.id, data);
+    if (result.ok) {
+      await writeAudit({
+        user: me,
+        action: "short_link.update",
+        entity_type: "short_link",
+        entity_id: data.id,
+        summary: `Cập nhật shortlink /s/${result.data.slug}`,
+      });
+    }
+    return result;
+  });
+
+export const deleteShortLinkFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    const { requireUser } = await import("@/db/auth.server");
+    const me = await requireUser();
+    const { deleteShortLink } = await import("@/db/short-links.server");
+    const { writeAudit } = await import("@/db/audit.server");
+
+    await deleteShortLink(data.id);
+    await writeAudit({
+      user: me,
+      action: "short_link.delete",
+      entity_type: "short_link",
+      entity_id: data.id,
+      summary: `Xoá shortlink #${data.id}`,
+    });
+    return { ok: true as const };
+  });
