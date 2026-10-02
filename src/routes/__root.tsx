@@ -37,8 +37,10 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
+  // API của router đổi: `error` nay là `unknown` (trước là `Error`), nên phải
+  // narrow trước khi log — không được giả định nó là `Error`.
+  console.error(error instanceof Error ? error : new Error(String(error)));
   const router = useRouter();
 
   return (
