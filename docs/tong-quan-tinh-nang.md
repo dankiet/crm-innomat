@@ -198,9 +198,16 @@ lường. Không có bước này thì "từ chối" không có tác dụng gì.
   là sửa gốc, không phải thêm `!important` ngược lại.
 - `trackEvent` (`src/lib/lp-tracking.ts`) **không** tự chặn theo cờ đồng thuận — sự kiện bắn cho
   mọi khách, việc lọc nằm ở audience trong GTM (đúng theo mô hình tự khai báo rồi loại trừ).
-- `trackEvent` đẩy sự kiện vào `dataLayer` chứ **không** gọi thẳng `fbq`/`gtag`. Bản cũ gọi thẳng
-  kèm điều kiện `typeof === "function"`; GTM nạp async nên sự kiện bắn lúc React mount thường
-  rơi vào lúc container chưa khởi động → mất im lặng. Qua `dataLayer` thì GTM tự replay, không mất.
+- `trackEvent` bắn theo **HAI đường**: gọi thẳng `window.fbq`/`window.gtag` (đường chính, sự kiện
+  tới Meta/GA4 ngay, KHÔNG phụ thuộc cấu hình GTM) **và** đẩy vào `dataLayer` (đường phụ, cho GTM
+  lọc consent về sau).
+  Lịch sử để lại: bản đầu chỉ gọi thẳng (mất sự kiện khi GTM chưa kịp khởi động vì điều kiện
+  `typeof === "function"` sai); bản sau chỉ đẩy `dataLayer` — nhưng container KHÔNG có tag Custom
+  Event cho `AddToCart`/`ViewContent`/`Lead` (trước giờ không cần) nên sự kiện kẹt, tracking chết
+  hẳn. Giữ cả hai đường mới đúng.
+- ⚠️ **Đếm trùng**: nếu dựng tag Custom Event trong GTM khớp `event` (`AddToCart` / `ViewContent`
+  / `Lead` / `UnlockLibrary`), sự kiện sẽ gửi HAI lần — một từ code, một từ GTM. Lúc đó phải bỏ
+  một trong hai.
 - `ViewContent` bắn khi khách **mở chi tiết một mã gạch** (`handleOpenMaterialModal`), kèm
   `content_ids: [mã]` + `content_type: "product"` theo cách Meta khuyến nghị.
 - **KHÔNG** bắn `ViewContent` khi tải trang chủ. Trước đây nó bắn lúc mount, trùng chức năng với
