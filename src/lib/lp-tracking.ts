@@ -1,43 +1,52 @@
 /**
  * Tracking cho bề mặt công khai (LP + Thư viện mã gạch).
  *
- * Prototype Lovable bắn thẳng `fbq`/`gtag`. Ở đây gói lại một lớp mỏng vì:
- *   - Pixel có thể CHƯA được cài (chưa có id) — gọi thẳng sẽ ném lỗi và
- *     làm chết cả handler submit, tức là mất lead vì một chuyện phụ.
- *   - Chỉ chạy client. SSR không có `window`.
+ * Bắn sự kiện qua `dataLayer` của GTM, KHÔNG gọi thẳng `fbq`/`gtag`.
+ *
+ * Vì sao đổi: bản cũ gọi thẳng `window.fbq`/`window.gtag` với điều kiện
+ * `typeof === "function"`. GTM nạp **async** trong `<head>`, nên sự kiện bắn sớm
+ * (đúng lúc React mount) thường rơi vào lúc container CHƯA khởi động → điều kiện
+ * sai → sự kiện mất im lặng, không lỗi, không log. Mạng càng chậm càng dễ mất.
+ *
+ * Đẩy vào `dataLayer` thì GTM tự replay khi sẵn sàng, nên sự kiện không bao giờ
+ * mất. Trong GTM dựng trigger Custom Event khớp `event` để chuyển tiếp sang
+ * GA4 / Meta Pixel.
+ *
+ * Chỉ chạy client. SSR không có `window`.
  *
  * Tên event theo chuẩn Meta để campaign optimize được:
  *   ViewContent → vào trang | AddToCart → lưu mã | Lead → gửi form
+ *   UnlockLibrary → mở khoá thư viện (custom, không phải event chuẩn của Meta)
  */
 
 type Params = Record<string, string | number | boolean | string[] | undefined>;
 
-type FbqFn = (cmd: string, event: string, params?: Params) => void;
-type GtagFn = (cmd: string, event: string, params?: Params) => void;
-
 export type LpEvent = "ViewContent" | "AddToCart" | "Lead" | "UnlockLibrary";
 
+/** Sự kiện chuẩn của Meta; ngoài danh sách này phải dùng `trackCustom`. */
+const META_STANDARD_EVENTS: LpEvent[] = ["ViewContent", "AddToCart", "Lead"];
+
+/** Khai báo `dataLayer` trên `window` — GTM tạo nó, nhưng ta đẩy trước khi GTM chạy. */
+type WindowWithDataLayer = Window & { dataLayer?: unknown[] };
+
+/**
+ * Ghi một sự kiện vào `dataLayer` để GTM xử lý.
+ *
+ * Đẩy CẢ hai khoá trong cùng một entry: `event` (để GTM khớp trigger) và
+ * `meta_event_name` (để GTM biết chuyển tiếp sang Meta bằng `track` hay
+ * `trackCustom` — quyết định này cần `META_STANDARD_EVENTS`, thứ GTM không biết).
+ */
 export function trackEvent(event: LpEvent, params: Params = {}): void {
   if (typeof window === "undefined") return;
 
-  // KHÔNG chặn theo cờ đồng thuận: GTM nạp cho mọi khách (xem `lp-consent.ts`),
-  // nên sự kiện cũng bắn cho mọi khách. Việc loại trừ nhóm "Từ chối" nằm ở
-  // audience trong GTM, dựa trên cờ `ebg_consent` trong `dataLayer` — chặn ở đây
-  // sẽ khiến GTM không nhận được gì để mà lọc, và mất luôn số liệu nhóm chưa bấm.
-  const w = window as unknown as { fbq?: FbqFn; gtag?: GtagFn };
-
-  try {
-    // Meta Pixel. `UnlockLibrary` là custom event nên dùng trackCustom.
-    if (typeof w.fbq === "function") {
-      const std: LpEvent[] = ["ViewContent", "AddToCart", "Lead"];
-      w.fbq(std.includes(event) ? "track" : "trackCustom", event, params);
-    }
-    if (typeof w.gtag === "function") {
-      w.gtag("event", event, params);
-    }
-  } catch {
-    // Pixel lỗi không được phép ảnh hưởng tới luồng của khách.
-  }
+  const w = window as WindowWithDataLayer;
+  w.dataLayer = w.dataLayer ?? [];
+  w.dataLayer.push({
+    event,
+    meta_event_name: event,
+    meta_is_standard: META_STANDARD_EVENTS.includes(event),
+    ...params,
+  });
 
   if (import.meta.env.DEV) {
     console.info(`[lp-track] ${event}`, params);

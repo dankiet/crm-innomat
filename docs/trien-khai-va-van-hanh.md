@@ -142,11 +142,12 @@ Gần như luôn do mã nội bộ chưa được map vào sản phẩm. Chạy 
 
 Kiểm tra theo thứ tự — mỗi bước loại trừ một tầng:
 
-1. **Cổng đồng thuận đã chọn chưa?** Chưa chọn ⇒ server không chèn snippet nào vào HTML, và
-   `trackEvent` cũng tự chặn. Đây là hành vi đúng, không phải lỗi. Xem
-   [tong-quan-tinh-nang.md §9](tong-quan-tinh-nang.md).
-2. **Snippet có trong HTML không?** `curl -H "Cookie: ebg_gtm_consent=granted" <url>` phải thấy
-   `googletagmanager.com/gtm.js`. Không thấy ⇒ lỗi ở `lpHead()` / `readConsent()`.
+1. **Snippet có trong HTML không?** GTM nay nạp cho MỌI khách (mô hình opt-out), nên `curl <url>`
+   phải thấy `googletagmanager.com/gtm.js` bất kể cookie. Không thấy ⇒ lỗi ở `lpHead()`.
+2. **Cờ đồng thuận có trong `dataLayer` không?** Phải có entry `{"ebg_consent":"..."}` **trước**
+   `gtm.start` — dựng bởi `gtmHeadSnippet()`. Thiếu ⇒ audience lọc không hoạt động.
+3. **Sự kiện nghiệp vụ có vào `dataLayer` không?** `trackEvent` đẩy `{event:"ViewContent",...}`.
+   Không thấy ⇒ xem `src/lib/lp-tracking.ts`. Lưu ý: entry này CHỈ có sau khi React mount.
 3. **Container có tồn tại không?** `curl -s "https://www.googletagmanager.com/gtm.js?id=GTM-P4SQ7HBB"`
    phải trả `200` kèm payload cỡ vài trăm KB. Đây chỉ chứng minh **container tồn tại và đang publish**.
 4. **Container có TAG chưa?** Đây là bẫy hay gặp: container publish nhưng **rỗng tag** thì snippet

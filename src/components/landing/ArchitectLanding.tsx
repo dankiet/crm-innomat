@@ -81,9 +81,8 @@ export function ArchitectLanding({
   };
   const [liveMaterials, setLiveMaterials] = useState<Material[]>([]);
 
-  // Initial page view tracking & fetch live materials
+  // Nạp danh sách mã gạch. Phụ thuộc `currentView` vì mỗi view lọc một tập khác.
   useEffect(() => {
-    trackEvent("ViewContent", { content_name: "em-ban-gach-landing", page: currentView });
     fetchLpMaterialsFn({ data: { limit: 12 } })
       .then((mats) => {
         if (mats && mats.length > 0) {
@@ -108,6 +107,18 @@ export function ArchitectLanding({
         setLiveMaterials([]);
       });
   }, [currentView]);
+
+  // `ViewContent` bắn ĐÚNG MỘT LẦN khi trang được xem — dependency rỗng.
+  //
+  // Trước đây nó nằm chung effect trên (dependency `[currentView]`), nên mỗi lần
+  // khách bấm đổi giữa "trang chủ" ↔ "Thư viện mã gạch" là bắn thêm một lần dù
+  // vẫn cùng một lượt xem trang — khách qua lại vài lần là số liệu phồng lên.
+  //
+  // Không bắn `page_view` ở đây: GTM container đã tự bắn khi khởi động. Bắn thêm
+  // là đếm trùng cùng một lượt xem dưới hai tên.
+  useEffect(() => {
+    trackEvent("ViewContent", { content_name: "em-ban-gach-landing" });
+  }, []);
 
   // Scroll to top when switching views
   const handleSwitchView = (view: "home" | "library") => {

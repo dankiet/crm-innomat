@@ -187,13 +187,19 @@ lường. Không có bước này thì "từ chối" không có tác dụng gì.
 - Khách tắt JS: `<noscript><style>` ẩn thanh đi vì hai nút sẽ không làm gì được (GTM `noscript`
   vẫn chạy — đó là iframe, không cần JS của ta).
 - Nội dung cố ý KHÔNG nêu tên công cụ thu thập (Google Tag Manager) — chỉ nói mục đích. Về mặt
-  kỹ thuật, `lp-tracking.ts` bắn cả `fbq` (Meta Pixel) lẫn `gtag`, nên nêu đích danh một cái là
-  vừa thừa vừa dễ sai.
+  kỹ thuật, sự kiện đi qua `dataLayer` rồi GTM mới chuyển tiếp sang cả GA4 lẫn Meta Pixel, nên
+  nêu đích danh một cái là vừa thừa vừa dễ sai.
 - Component dùng `<div>` chứ không `<aside>`: `src/styles.css` (CSS app CRM, cũng nạp ở landing)
   có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, đè mất màu nút. Đổi thẻ
   là sửa gốc, không phải thêm `!important` ngược lại.
-- `trackEvent` (`src/lib/lp-tracking.ts`) **không còn** tự chặn theo cờ đồng thuận — sự kiện bắn
-  cho mọi khách, việc lọc nằm ở audience trong GTM (đúng theo mô hình tự khai báo rồi loại trừ).
+- `trackEvent` (`src/lib/lp-tracking.ts`) **không** tự chặn theo cờ đồng thuận — sự kiện bắn cho
+  mọi khách, việc lọc nằm ở audience trong GTM (đúng theo mô hình tự khai báo rồi loại trừ).
+- `trackEvent` đẩy sự kiện vào `dataLayer` chứ **không** gọi thẳng `fbq`/`gtag`. Bản cũ gọi thẳng
+  kèm điều kiện `typeof === "function"`; GTM nạp async nên sự kiện bắn lúc React mount thường
+  rơi vào lúc container chưa khởi động → mất im lặng. Qua `dataLayer` thì GTM tự replay, không mất.
+- `ViewContent` bắn **một lần** khi mount (dependency rỗng), KHÔNG bắn lại khi khách đổi view
+  giữa "trang chủ" ↔ "Thư viện mã gạch" — trước đây nằm chung effect `[currentView]` nên bắn
+  thêm mỗi lần đổi view dù vẫn cùng một lượt xem trang.
 
 > Khác với `consent_marketing` trên form lead (`lp_leads`) — đó là đồng ý **nhận email
 > marketing**, không liên quan tới cookie theo dõi.
