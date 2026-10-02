@@ -3,7 +3,7 @@
 Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:migrate`
 (idempotent — mọi lệnh đều `IF NOT EXISTS` / `IF EXISTS`, chạy lại an toàn).
 
-## 27 bảng
+## 28 bảng
 
 > Số dòng thật của từng bảng: xem [audit-2026-09-19](audit-2026-09-19.md) §G0b — **không
 > chép lại ở đây** để tránh hai bản số liệu trôi lệch nhau. Mốc đó đo 25 bảng; từ 2026-09-21
@@ -11,7 +11,20 @@ Schema nguồn duy nhất: **`src/db/schema-pg.sql`**. Áp bằng `npm run db:mi
 > `image_assets` (2026-09-24, bỏ tầng registry/GC) → 23, rồi thêm lại đúng 3 bảng
 > registry theo **Option 2 (1 file ảnh = 1 MediaAsset): `media_assets`,
 > `mapping_media_usages`, `landing_page_media_usages`** (2026-09-25) → **26 bảng**;
-> thêm `lp_lead_attachments` (file brief khách gửi, 2026-09-29) → **27 bảng**.
+> thêm `lp_lead_attachments` (file brief khách gửi, 2026-09-29) → **27 bảng**, rồi
+> thêm `short_links` (2026-09-30) → **28 bảng**.
+
+### Shortlink chia sẻ
+
+| Bảng          | Vai trò                                                      | Ràng buộc đáng chú ý                                          |
+| ------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
+| `short_links` | Link ngắn cho ads/caption/comment/bio, **UTM đóng băng theo shortcode** | `UNIQUE(slug)`; `slug` khớp `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
+
+Vì sao có bảng này: link dài kèm UTM dán vào caption/comment bị coi là "quảng cáo" và làm
+giảm reach; đồng thời người đăng hay quên/gõ sai UTM → lead về `lp_leads` với cột UTM rỗng.
+Shortlink giải cả hai: `/s/<slug>` (ngắn, không phản cảm) → **302** sang đích thật **kèm UTM đã
+lưu**. Resolve là endpoint công khai, đích dựng từ `origin` của request + cột UTM (KHÔNG
+forward query khách gửi — tránh bẫy 301-strip-query ở `marketing/06`).
 
 ### Catalog sản phẩm
 

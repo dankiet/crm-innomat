@@ -18,9 +18,11 @@ File-based routing trong `src/routes/`. Tiền tố `_app.` = **vùng đã đăn
 | `/ghi-chu`                | `_app.ghi-chu.tsx`                                 | Ghi chú toàn hệ thống                                                    |
 | `/san-pham`               | `_app.san-pham.tsx`                                | Catalog sản phẩm, filter & tồn kho                                       |
 | `/luu-tru`                | `_app.luu-tru.tsx`                                 | **Media** — media workspace: kho ảnh, thẻ phòng, tuyển chọn, hiển thị LP       |
-| `/leads`                  | `_app.leads.tsx`                                   | **Hộp thư Lead** — lead từ landing, chuyển thành khách hàng               |
+| `/leads`      | `_app.leads.tsx`                                   | **Hộp thư Lead** — lead từ landing, chuyển thành khách hàng               |
+| `/shortlink`  | `_app.shortlink.tsx`                               | **Shortlink** — tạo/quản lý link ngắn chia sẻ (UTM đóng băng)             |
 | `/khong-gian`             | `_app.khong-gian.tsx`                              | **Lookbook** — ảnh Concept, bật/tắt công khai trên LP                     |
 | `/lp/$slug`               | `lp.$slug.tsx`                                     | **Công khai** — trang landing cho khách vãng lai (không qua cổng auth)    |
+| `/s/$slug`                | `s.$slug.tsx`                                      | **Công khai** — shortlink chia sẻ; **302** sang đích thật + UTM đã lưu (không auth). 302 (không 301) vì đích/UTM còn sửa được |
 | `/og-image`               | `src/server.ts` (entry, không phải file route)     | **Công khai** — ảnh xem trước khi chia sẻ link (JPEG 1200×630)           |
 | `/nguoi-dung`             | `_app.nguoi-dung.tsx`                              | **Admin** — quản lý user                                                 |
 | `/nhat-ky`                | `_app.nhat-ky.tsx`                                 | **Admin** — nhật ký thao tác                                             |

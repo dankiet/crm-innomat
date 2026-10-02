@@ -83,7 +83,7 @@ Kế thừa tinh thần `AGENTS.md` (nguồn luật duy nhất của repo) — k
 > Chi tiết cách dùng các cam kết này trong content: xem `05-thong-diep-copy-bank.md`
 > §Proof bank. Chi tiết đối chiếu: xem `01-dinh-vi-thuong-hieu.md` §Bằng chứng.
 
-## ⚠️ Ba điểm code chưa khớp docs (đã kiểm 2026-09-29)
+## ⚠️ Hai điểm code chưa khớp docs (đã kiểm 2026-09-29)
 
 Khi viết content/ads, **đừng tin các điểm sau cho tới khi code được sửa**:
 
@@ -91,7 +91,13 @@ Khi viết content/ads, **đừng tin các điểm sau cho tới khi code đư�
 |---|---|---|
 | **Biến thể LP chưa render** | `LP_VARIANTS` + `SHARED_FAQ` (`src/lib/lp-content.ts`) **không có consumer**; mọi slug render cùng `ArchitectLanding` | 3 track chỉ khác URL, **thông điệp giống hệt**. Đừng quảng cáo offer riêng theo track. |
 | **`UnlockLibrary` chưa bắn** | Khai báo trong `LpEvent` nhưng **không có callsite** | Không dựng audience/KPI trên event này. Proxy: đếm lead `google-unlock`. |
-| **Container GTM rỗng** | `GTM-P4SQ7HBB` trả `"tags":[]` (đo 2026-09-28, `docs/trien-khai-va-van-hanh.md`) | **Không có pixel/GA4** cho tới khi publish tag ⇒ chạy ads bây giờ = mù số liệu. |
+
+> ✅ **GTM đã publish (sửa 2026-09-29).** Container `GTM-P4SQ7HBB` giờ có tag Meta
+> Pixel `1086936020738731`. Kiểm chứng bằng browser (bấm "Đồng ý" rồi đọc
+> `window.fbq`): `fbq` = function, script `connect.facebook.net/signals/config/1086936020738731`
+> nạp thật. Pixel đã nhận event thật (30 ngày: PageView, ViewContent, Lead).
+> **Retargeting + conversion optimization dùng được.** Ghi chú cũ "container rỗng"
+> (đo 2026-09-28) đã lỗi thời.
 
 ## Đồng bộ với thư mục `docs/`
 

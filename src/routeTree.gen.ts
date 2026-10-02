@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppTongQuanRouteImport } from './routes/_app.tong-quan'
+import { Route as AppShortlinkRouteImport } from './routes/_app.shortlink'
 import { Route as AppSanPhamRouteImport } from './routes/_app.san-pham'
 import { Route as AppNhatKyRouteImport } from './routes/_app.nhat-ky'
 import { Route as AppNguoiDungRouteImport } from './routes/_app.nguoi-dung'
@@ -43,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SSlugRoute = SSlugRouteImport.update({
+  id: '/s/$slug',
+  path: '/s/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LpSlugRoute = LpSlugRouteImport.update({
   id: '/lp/$slug',
   path: '/lp/$slug',
@@ -56,6 +63,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AppTongQuanRoute = AppTongQuanRouteImport.update({
   id: '/tong-quan',
   path: '/tong-quan',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppShortlinkRoute = AppShortlinkRouteImport.update({
+  id: '/shortlink',
+  path: '/shortlink',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSanPhamRoute = AppSanPhamRouteImport.update({
@@ -138,9 +150,11 @@ export interface FileRoutesByFullPath {
   '/nguoi-dung': typeof AppNguoiDungRoute
   '/nhat-ky': typeof AppNhatKyRoute
   '/san-pham': typeof AppSanPhamRoute
+  '/shortlink': typeof AppShortlinkRoute
   '/tong-quan': typeof AppTongQuanRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/lp/$slug': typeof LpSlugRoute
+  '/s/$slug': typeof SSlugRoute
   '/khach-hang/$customerId': typeof AppKhachHangCustomerIdRoute
   '/khach-hang/': typeof AppKhachHangIndexRoute
 }
@@ -157,9 +171,11 @@ export interface FileRoutesByTo {
   '/nguoi-dung': typeof AppNguoiDungRoute
   '/nhat-ky': typeof AppNhatKyRoute
   '/san-pham': typeof AppSanPhamRoute
+  '/shortlink': typeof AppShortlinkRoute
   '/tong-quan': typeof AppTongQuanRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/lp/$slug': typeof LpSlugRoute
+  '/s/$slug': typeof SSlugRoute
   '/khach-hang/$customerId': typeof AppKhachHangCustomerIdRoute
   '/khach-hang': typeof AppKhachHangIndexRoute
 }
@@ -179,9 +195,11 @@ export interface FileRoutesById {
   '/_app/nguoi-dung': typeof AppNguoiDungRoute
   '/_app/nhat-ky': typeof AppNhatKyRoute
   '/_app/san-pham': typeof AppSanPhamRoute
+  '/_app/shortlink': typeof AppShortlinkRoute
   '/_app/tong-quan': typeof AppTongQuanRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/lp/$slug': typeof LpSlugRoute
+  '/s/$slug': typeof SSlugRoute
   '/_app/khach-hang/$customerId': typeof AppKhachHangCustomerIdRoute
   '/_app/khach-hang/': typeof AppKhachHangIndexRoute
 }
@@ -201,9 +219,11 @@ export interface FileRouteTypes {
     | '/nguoi-dung'
     | '/nhat-ky'
     | '/san-pham'
+    | '/shortlink'
     | '/tong-quan'
     | '/auth/callback'
     | '/lp/$slug'
+    | '/s/$slug'
     | '/khach-hang/$customerId'
     | '/khach-hang/'
   fileRoutesByTo: FileRoutesByTo
@@ -220,9 +240,11 @@ export interface FileRouteTypes {
     | '/nguoi-dung'
     | '/nhat-ky'
     | '/san-pham'
+    | '/shortlink'
     | '/tong-quan'
     | '/auth/callback'
     | '/lp/$slug'
+    | '/s/$slug'
     | '/khach-hang/$customerId'
     | '/khach-hang'
   id:
@@ -241,9 +263,11 @@ export interface FileRouteTypes {
     | '/_app/nguoi-dung'
     | '/_app/nhat-ky'
     | '/_app/san-pham'
+    | '/_app/shortlink'
     | '/_app/tong-quan'
     | '/auth/callback'
     | '/lp/$slug'
+    | '/s/$slug'
     | '/_app/khach-hang/$customerId'
     | '/_app/khach-hang/'
   fileRoutesById: FileRoutesById
@@ -254,6 +278,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   LpSlugRoute: typeof LpSlugRoute
+  SSlugRoute: typeof SSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -279,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/s/$slug': {
+      id: '/s/$slug'
+      path: '/s/$slug'
+      fullPath: '/s/$slug'
+      preLoaderRoute: typeof SSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lp/$slug': {
       id: '/lp/$slug'
       path: '/lp/$slug'
@@ -298,6 +330,13 @@ declare module '@tanstack/react-router' {
       path: '/tong-quan'
       fullPath: '/tong-quan'
       preLoaderRoute: typeof AppTongQuanRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/shortlink': {
+      id: '/_app/shortlink'
+      path: '/shortlink'
+      fullPath: '/shortlink'
+      preLoaderRoute: typeof AppShortlinkRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/san-pham': {
@@ -420,6 +459,7 @@ interface AppRouteChildren {
   AppNguoiDungRoute: typeof AppNguoiDungRoute
   AppNhatKyRoute: typeof AppNhatKyRoute
   AppSanPhamRoute: typeof AppSanPhamRoute
+  AppShortlinkRoute: typeof AppShortlinkRoute
   AppTongQuanRoute: typeof AppTongQuanRoute
 }
 
@@ -435,6 +475,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNguoiDungRoute: AppNguoiDungRoute,
   AppNhatKyRoute: AppNhatKyRoute,
   AppSanPhamRoute: AppSanPhamRoute,
+  AppShortlinkRoute: AppShortlinkRoute,
   AppTongQuanRoute: AppTongQuanRoute,
 }
 
@@ -446,6 +487,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   LpSlugRoute: LpSlugRoute,
+  SSlugRoute: SSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

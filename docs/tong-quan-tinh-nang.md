@@ -23,6 +23,8 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
 | 12  | Landing    | Lookbook / Concept                                 | `/khong-gian`                | Đang dùng     | §11                                                                      |
 | 13  | Quản trị   | Người dùng (**admin**)                             | `/nguoi-dung`                | Đang dùng     | [xac-thuc-va-phan-quyen](xac-thuc-va-phan-quyen.md)                      |
 | 14  | Quản trị   | Nhật ký thao tác (**admin**)                       | `/nhat-ky`                   | Đang dùng     | [co-so-du-lieu](co-so-du-lieu.md)                                        |
+| 15  | Landing    | Shortlink chia sẻ (302 + UTM đóng băng)            | `/s/$slug`                   | Đang dùng     | §9b                                                                      |
+| 16  | Landing    | Quản lý Shortlink                                  | `/shortlink`                 | Đang dùng     | §9b                                                                      |
 
 **Cột "Trạng thái"** suy ra từ dữ liệu thật trong DB, không phải phỏng đoán:
 
@@ -38,14 +40,16 @@ Bản đồ tính năng của CRM Innomat. Mỗi tính năng gắn với **route
   chưa từng chạy ở production**, không phải code chết. Xem
   [audit-2026-09-19](audit-2026-09-19.md) §G3.
 
-**Toàn bộ 27 bảng đều đang dùng** — `public` có đúng 27 bảng, khớp 100% với `schema-pg.sql`,
+**Toàn bộ 28 bảng đều đang dùng** — `public` có đúng 28 bảng, khớp 100% với `schema-pg.sql`,
 **0 bảng mồ côi** (bằng chứng: [audit-2026-09-19](audit-2026-09-19.md) §G0; đã gỡ 2 bảng gallery
 và `image_assets` ngày 2026-09-24, rồi thêm lại `media_assets`, `mapping_media_usages`,
-`landing_page_media_usages` ngày 2026-09-25 theo Option 2). Không có bảng nào nên xoá.
+`landing_page_media_usages` ngày 2026-09-25 theo Option 2, thêm `short_links` ngày 2026-09-30).
+Không có bảng nào nên xoá.
 
-Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 4 route **công
+Chỉ các route có tiền tố `_app.*` nằm sau cổng auth (`_app.tsx`). Ngoài ra có 5 route **công
 khai**: `/` (trang chủ landing — cũng render `ArchitectLanding`, xem §1 cột Trạng thái),
-`/lp/$slug` (biến thể landing theo slug), `/login`, `/auth/callback`.
+`/lp/$slug` (biến thể landing theo slug), `/s/$slug` (shortlink chia sẻ), `/login`,
+`/auth/callback`. Route quản trị shortlink `/shortlink` nằm **trong** `_app.*` (cần đăng nhập).
 
 ## 2. Nền tảng
 
@@ -204,6 +208,35 @@ lường. Không có bước này thì "từ chối" không có tác dụng gì.
 > Khác với `consent_marketing` trên form lead (`lp_leads`) — đó là đồng ý **nhận email
 > marketing**, không liên quan tới cookie theo dõi.
 
+## 9b. Shortlink chia sẻ — `/s/$slug`
+
+Link ngắn cho ads / caption / comment / bio. Vấn đề gốc: link dài kèm UTM dán vào caption bị
+coi là "quảng cáo" và làm giảm reach, mà người đăng cũng hay quên/gõ sai UTM → lead về
+`lp_leads` với cột UTM rỗng. Shortlink đóng băng UTM theo shortcode.
+
+| RPC (`src/api/lp.ts`) | Việc |
+| --- | --- |
+| `resolveShortLinkFn` | **Công khai** — slug → URL tuyệt đối (302). Dùng bởi route `/s/$slug` |
+| `listShortLinksFn` | Liệt kê shortlink (`requireUser`) |
+| `createShortLinkFn` / `updateShortLinkFn` / `deleteShortLinkFn` | CRUD (`requireUser` + audit) |
+
+**Bảng**: `short_links` — `UNIQUE(slug)`, slug khớp `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`.
+
+Bốn bất biến (đọc `src/lib/short-link.ts` trước khi sửa):
+
+1. **302, không 301.** Đây là link tracking theo chiến dịch — UTM/đích còn sửa. 301 bị browser
+   và FB link-scanner cache vĩnh viễn nên sửa xong người đã bấm trước đó vẫn đi đích cũ.
+2. **Query đến được MERGE, không bỏ.** Meta tự gắn `fbclid` khi khách bấm quảng cáo; bỏ nó là
+   mất attribution. Nhưng **UTM lưu sẵn luôn thắng** khi trùng key — không ai đổi được
+   `utm_campaign` bằng cách sửa URL.
+3. **Chỉ path nội bộ.** `isSafeTargetPath` chặn `https://…`, `//host`, backslash — nếu không thì
+   `target_path` do người dùng CRM đặt thành **open-redirect** (lấy domain mình làm bàn đạp phishing).
+4. **Đếm click best-effort.** Lỗi đếm không được làm hỏng redirect.
+
+Có UI quản trị tại `/shortlink` (nhóm "Landing Page" ở sidebar): danh sách link kèm số click, nút
+Copy / Mở / Sửa, dialog tạo-sửa có preview URL sống, xoá 2 bước. Tạo/sửa/xoá vẫn qua RPC như
+trên — UI chỉ là lớp gọi.
+
 ## 10. Hộp thư Lead — `/leads`
 
 `/leads` — lead đổ về từ form landing (`lp_leads`: tên, điện thoại, email, nhu cầu, shortlist mã,
@@ -326,8 +359,9 @@ Media Workspace duy nhất: **mỗi card = 1 file vật lý (MediaAsset)**, khô
 | Khách hàng & bán hàng | `customers`, `quotes`, `quote_items`, `orders`, `payments`, `notes`, `customer_product_samples`      |
 | Đề xuất vật liệu      | `customer_mappings`, `customer_mapping_items`, `customer_mapping_quote_links`                        |
 | Landing công khai     | `lp_settings`, `lp_leads`, `lp_lead_attachments`, `lp_rate_limits`, `public_users`, `public_sessions` |
+| Shortlink             | `short_links`                                                                                        |
 
-Tổng **27 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
+Tổng **28 bảng**. Chi tiết cột & RLS: [co-so-du-lieu](co-so-du-lieu.md).
 
 ## 15. Quy mô code
 

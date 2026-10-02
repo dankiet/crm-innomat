@@ -30,12 +30,12 @@
 | Event đang bắn | `ViewContent`, `AddToCart`, `Lead` | `UnlockLibrary` **chưa có callsite** — xem `07` §1 |
 | Biến thể LP | `/` (= gach-trang-tri), `/lp/gach-the`, `/lp/mosaic` | Mỗi camp dùng 1 slug |
 
-> 🚨 **Điều kiện tiên quyết — container đang rỗng.** Đo ngày **2026-09-28**,
-> `GTM-P4SQ7HBB` trả `"tags":[]` (`docs/trien-khai-va-van-hanh.md` §GTM): **chưa có tag
-> GA4 hay Meta Pixel nào được publish**. Nghĩa là `window.fbq`/`window.gtag` **không tồn
-> tại**, và `trackEvent` **no-op kể cả khi khách đã đồng ý**. **Chạy camp lúc này = không
-> thu được một event nào.** Phải vào GTM → thêm tag → **Submit → Publish** trước.
-> Đây là lỗi cấu hình GTM, **không phải lỗi code**.
+> ✅ **ĐÃ SỬA (2026-09-29) — container đã publish.** Ghi chú cũ (đo 2026-09-28:
+> `"tags":[]`) đã lỗi thời. `GTM-P4SQ7HBB` giờ có tag Meta Pixel `1086936020738731`;
+> kiểm chứng bằng browser: `window.fbq` = function, script
+> `connect.facebook.net/signals/config/1086936020738731` nạp thật. Pixel nhận event
+> thật (30 ngày: PageView, ViewContent, Lead). **Chạy camp được, event bắn được.**
+> Vẫn nên mở thử 1 ad rồi kiểm `fbq`/`lp_leads` để xác nhận sau khi publish.
 
 > ⚠️ **Thanh đồng thuận KHÔNG chặn.** Đây là thanh **neo đáy** (`z-index: 95`), khách vẫn
 > cuộn và dùng trang bình thường; bỏ qua ⇒ GTM không nạp ⇒ **không có dữ liệu pixel cho
@@ -175,7 +175,7 @@ Meta có hỗ trợ dynamic parameter, nhưng **có hai cái bẫy**:
 ### Ví dụ đầy đủ (gõ tay)
 
 ```
-https://embangach.vn/lp/mosaic?utm_source=facebook&utm_medium=paid&utm_campaign=ebg_mosaic_lead_202610&utm_content=quaybar_carousel_v1&utm_term=lal-lead-1p
+https://embangach.com/lp/mosaic?utm_source=facebook&utm_medium=paid&utm_campaign=ebg_mosaic_lead_202610&utm_content=quaybar_carousel_v1&utm_term=lal-lead-1p
 ```
 
 ### Luật UTM
