@@ -201,9 +201,12 @@ lường. Không có bước này thì "từ chối" không có tác dụng gì.
 - `trackEvent` đẩy sự kiện vào `dataLayer` chứ **không** gọi thẳng `fbq`/`gtag`. Bản cũ gọi thẳng
   kèm điều kiện `typeof === "function"`; GTM nạp async nên sự kiện bắn lúc React mount thường
   rơi vào lúc container chưa khởi động → mất im lặng. Qua `dataLayer` thì GTM tự replay, không mất.
-- `ViewContent` bắn **một lần** khi mount (dependency rỗng), KHÔNG bắn lại khi khách đổi view
-  giữa "trang chủ" ↔ "Thư viện mã gạch" — trước đây nằm chung effect `[currentView]` nên bắn
-  thêm mỗi lần đổi view dù vẫn cùng một lượt xem trang.
+- `ViewContent` bắn khi khách **mở chi tiết một mã gạch** (`handleOpenMaterialModal`), kèm
+  `content_ids: [mã]` + `content_type: "product"` theo cách Meta khuyến nghị.
+- **KHÔNG** bắn `ViewContent` khi tải trang chủ. Trước đây nó bắn lúc mount, trùng chức năng với
+  `PageView` mà tag custom HTML trong GTM đã bắn — Meta thấy 2 lượt xem cho 1 khách. Với Meta,
+  `PageView` mới là sự kiện đúng cho "vừa xem trang"; `ViewContent` dành cho xem một nội dung
+  cụ thể. Bắn sai chỗ làm nhiễu dữ liệu thuật toán quảng cáo.
 
 > Khác với `consent_marketing` trên form lead (`lp_leads`) — đó là đồng ý **nhận email
 > marketing**, không liên quan tới cookie theo dõi.

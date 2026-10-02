@@ -75,6 +75,18 @@ export function ArchitectLanding({
     tab: "surface" | "context" = "surface",
     list?: Material[],
   ) => {
+    // `ViewContent` = khách xem chi tiết MỘT mã gạch. Đây là chỗ duy nhất trong
+    // trang bắn sự kiện này — cả 3 lối mở modal đều đi qua hàm này, nên không
+    // thể bắn sót hay bắn trùng.
+    //
+    // Dùng mã gạch làm `content_ids` để Meta gom được theo sản phẩm (đúng cách
+    // Meta khuyến nghị), kèm `content_type: "product"`.
+    trackEvent("ViewContent", {
+      content_ids: [mat.code],
+      content_name: mat.name,
+      content_type: "product",
+      content_category: mat.type,
+    });
     setActiveModalMaterial(mat);
     setModalInitialTab(tab);
     setModalItems(list && list.length > 0 ? list : liveMaterials);
@@ -108,17 +120,15 @@ export function ArchitectLanding({
       });
   }, [currentView]);
 
-  // `ViewContent` bắn ĐÚNG MỘT LẦN khi trang được xem — dependency rỗng.
+  // KHÔNG bắn `ViewContent` ở đây.
   //
-  // Trước đây nó nằm chung effect trên (dependency `[currentView]`), nên mỗi lần
-  // khách bấm đổi giữa "trang chủ" ↔ "Thư viện mã gạch" là bắn thêm một lần dù
-  // vẫn cùng một lượt xem trang — khách qua lại vài lần là số liệu phồng lên.
+  // Trang chủ đã có GTM bắn `PageView` (tag custom HTML trong container), và với
+  // Meta thì `PageView` mới là sự kiện đúng cho "khách vừa xem trang". Bắn thêm
+  // `ViewContent` ở đây là đếm trùng một lượt xem dưới hai tên — Meta thấy 2 lượt
+  // cho 1 khách, làm nhiễu dữ liệu thuật toán quảng cáo.
   //
-  // Không bắn `page_view` ở đây: GTM container đã tự bắn khi khởi động. Bắn thêm
-  // là đếm trùng cùng một lượt xem dưới hai tên.
-  useEffect(() => {
-    trackEvent("ViewContent", { content_name: "em-ban-gach-landing" });
-  }, []);
+  // `ViewContent` chuẩn của Meta dành cho việc xem MỘT nội dung cụ thể, nên nó
+  // được bắn khi khách mở chi tiết một mã gạch — xem `handleOpenMaterialModal`.
 
   // Scroll to top when switching views
   const handleSwitchView = (view: "home" | "library") => {

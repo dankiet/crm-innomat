@@ -146,8 +146,11 @@ Kiểm tra theo thứ tự — mỗi bước loại trừ một tầng:
    phải thấy `googletagmanager.com/gtm.js` bất kể cookie. Không thấy ⇒ lỗi ở `lpHead()`.
 2. **Cờ đồng thuận có trong `dataLayer` không?** Phải có entry `{"ebg_consent":"..."}` **trước**
    `gtm.start` — dựng bởi `gtmHeadSnippet()`. Thiếu ⇒ audience lọc không hoạt động.
-3. **Sự kiện nghiệp vụ có vào `dataLayer` không?** `trackEvent` đẩy `{event:"ViewContent",...}`.
-   Không thấy ⇒ xem `src/lib/lp-tracking.ts`. Lưu ý: entry này CHỈ có sau khi React mount.
+3. **Sự kiện nghiệp vụ có vào `dataLayer` không?** `trackEvent` đẩy `{event:"AddToCart",...}`
+   khi khách lưu mã, `{event:"ViewContent",...}` khi mở chi tiết mã gạch. Không thấy ⇒ xem
+   `src/lib/lp-tracking.ts`.
+   Lưu ý: `ViewContent` KHÔNG bắn khi tải trang — đó là chủ ý, xem
+   [tong-quan-tinh-nang.md §9](tong-quan-tinh-nang.md).
 3. **Container có tồn tại không?** `curl -s "https://www.googletagmanager.com/gtm.js?id=GTM-P4SQ7HBB"`
    phải trả `200` kèm payload cỡ vài trăm KB. Đây chỉ chứng minh **container tồn tại và đang publish**.
 4. **Container có TAG chưa?** Đây là bẫy hay gặp: container publish nhưng **rỗng tag** thì snippet
