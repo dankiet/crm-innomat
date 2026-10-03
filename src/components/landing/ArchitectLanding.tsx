@@ -318,6 +318,9 @@ export function ArchitectLanding({
                 <img
                   src={activeHeroImage}
                   alt="Không gian villa với sàn gạch tông đất nung dưới ánh nắng chiều"
+                  fetchPriority="high"
+                  width={1200}
+                  height={800}
                 />
                 <div className="hero-media-caption">
                   <span>EBG / MATERIAL STUDY</span>

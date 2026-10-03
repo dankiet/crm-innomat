@@ -359,7 +359,7 @@ export function MaterialLibraryPage({
               type="button"
               onClick={() => setActivePalette("all")}
               className={cn(
-                "h-7 px-3 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
+                "h-10 px-4 rounded-full text-sm font-semibold transition-all cursor-pointer shrink-0 leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
                 activePalette === "all"
                   ? "bg-[#141f23] text-white shadow-xs"
                   : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
@@ -381,7 +381,7 @@ export function MaterialLibraryPage({
                     aria-label={palette.label}
                     title={`${palette.label}${facetCount > 0 ? ` (${facetCount} mã)` : ""}`}
                     className={cn(
-                      "size-7 rounded-full cursor-pointer shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
+                      "size-10 rounded-full cursor-pointer shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
                       isActive
                         ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-[#f7f4ed] scale-110 shadow-xs"
                         : "hover:scale-105 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40 active:scale-95",
