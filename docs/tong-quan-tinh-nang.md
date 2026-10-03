@@ -205,11 +205,28 @@ lường. Không có bước này thì "từ chối" không có tác dụng gì.
   `typeof === "function"` sai); bản sau chỉ đẩy `dataLayer` — nhưng container KHÔNG có tag Custom
   Event cho `AddToCart`/`ViewContent`/`Lead` (trước giờ không cần) nên sự kiện kẹt, tracking chết
   hẳn. Giữ cả hai đường mới đúng.
-- ⚠️ **Đếm trùng**: nếu dựng tag Custom Event trong GTM khớp `event` (`AddToCart` / `ViewContent`
-  / `Lead` / `UnlockLibrary`), sự kiện sẽ gửi HAI lần — một từ code, một từ GTM. Lúc đó phải bỏ
-  một trong hai.
-- `ViewContent` bắn khi khách **mở chi tiết một mã gạch** (`handleOpenMaterialModal`), kèm
-  `content_ids: [mã]` + `content_type: "product"` theo cách Meta khuyến nghị.
+- **Một sự kiện nội bộ → hai tên xuất.** Meta và GA4 có bộ tên chuẩn khác nhau, và báo cáo dựng
+  sẵn của mỗi bên chỉ hoạt động khi đúng tên của nó. Gửi `AddToCart` cho GA4 thì GA4 vẫn nhận
+  nhưng coi là **custom event**, không vào funnel thương mại điện tử.
+
+  | nội bộ | Meta | GA4 |
+  | --- | --- | --- |
+  | `ViewContent` | `ViewContent` | `view_item` |
+  | `AddToCart` | `AddToCart` | `add_to_cart` |
+  | `Lead` | `Lead` | `generate_lead` |
+
+  Tham số cũng dịch: Meta dùng `content_ids` / `content_name` / `content_category` /
+  `content_type`; GA4 dùng `items: [{ item_id, item_name, item_category }]`. Caller truyền dữ
+  liệu TRUNG LẬP (`itemId`/`itemName`/`itemCategory`), `trackEvent` lo phần dịch — thêm nền tảng
+  mới chỉ sửa một chỗ.
+- ⚠️ **Đếm trùng — hai nguồn cần tắt ở phía nền tảng:**
+  - **Meta Automatic Events**: Meta dùng AI tự đoán hành động từ nút bấm. Đang BẬT mà code đã
+    gửi thủ công → Meta nhận 2 lần. Tắt ở Events Manager.
+  - **GTM Custom Event tag** khớp `event`: nếu dựng thêm tag trong GTM cho cùng tên, sự kiện
+    cũng gửi 2 lần (một từ code, một từ GTM).
+  - GA4 Enhanced Measurement thì **KHÔNG** gây trùng: nó chỉ bắt cuộn / bấm link ngoài / tìm
+    kiếm / video / tải file — không đụng `view_item`/`add_to_cart`.
+- `ViewContent` bắn khi khách **mở chi tiết một mã gạch** (`handleOpenMaterialModal`).
 - **KHÔNG** bắn `ViewContent` khi tải trang chủ. Trước đây nó bắn lúc mount, trùng chức năng với
   `PageView` mà tag custom HTML trong GTM đã bắn — Meta thấy 2 lượt xem cho 1 khách. Với Meta,
   `PageView` mới là sự kiện đúng cho "vừa xem trang"; `ViewContent` dành cho xem một nội dung

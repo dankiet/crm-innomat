@@ -79,13 +79,12 @@ export function ArchitectLanding({
     // trang bắn sự kiện này — cả 3 lối mở modal đều đi qua hàm này, nên không
     // thể bắn sót hay bắn trùng.
     //
-    // Dùng mã gạch làm `content_ids` để Meta gom được theo sản phẩm (đúng cách
-    // Meta khuyến nghị), kèm `content_type: "product"`.
+    // Truyền dữ liệu TRUNG LẬP; `trackEvent` tự dịch sang `content_ids` (Meta)
+    // và `items[].item_id` (GA4).
     trackEvent("ViewContent", {
-      content_ids: [mat.code],
-      content_name: mat.name,
-      content_type: "product",
-      content_category: mat.type,
+      itemId: mat.code,
+      itemName: mat.name,
+      itemCategory: mat.type,
     });
     setActiveModalMaterial(mat);
     setModalInitialTab(tab);
@@ -141,7 +140,15 @@ export function ArchitectLanding({
     const isAdding = !selectedIds.includes(id);
     toggleStorageMaterial(id);
     if (isAdding) {
-      trackEvent("AddToCart", { material_id: id });
+      // `material_id` là id nội bộ (số), khác `code` hiển thị — giữ nguyên để
+      // đối soát với DB. Tra mã/tên từ danh sách đang hiển thị nếu có.
+      const mat = liveMaterials.find((m) => m.id === id);
+      trackEvent("AddToCart", {
+        itemId: mat?.code,
+        itemName: mat?.name,
+        itemCategory: mat?.type,
+        params: { material_id: id },
+      });
     }
   };
 

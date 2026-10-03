@@ -240,10 +240,12 @@ export function ProjectBriefForm({
       }
 
       trackEvent("Lead", {
-        content_name: "Project Brief Form",
-        shortlist_count: shortlistMaterialIds.length,
-        project_type: selectedProjectType,
-        has_files: files.length > 0,
+        params: {
+          content_name: "Project Brief Form",
+          shortlist_count: shortlistMaterialIds.length,
+          project_type: selectedProjectType,
+          has_files: files.length > 0,
+        },
       });
 
       setSubmitting(false);
