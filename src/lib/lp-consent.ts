@@ -136,21 +136,8 @@ export function clearConsent(): void {
  */
 export function gtmHeadSnippet(consent: ConsentValue | undefined): string {
   const flag = consent ?? "unknown";
-  // Google Consent Mode v2: khách CHƯA chọn hoặc TỪ CHỐI → denied; chỉ `granted`
-  // mới cho phép. Khách chưa chọn bị coi là denied (an toàn hơn) — họ vẫn thấy
-  // banner để đổi ý, và `update` bên dưới sẽ mở lại nếu họ bấm "Đồng ý".
-  const granted = consent === "granted";
-  const state = granted ? "granted" : "denied";
   return (
     `window.dataLayer=window.dataLayer||[];` +
-    // ⚠️ THỨ TỰ QUAN TRỌNG: `consent default` phải chạy TRƯỚC khi bất kỳ thư viện
-    // Google nào nạp. Đặt sau thì Google đã kịp đặt cookie trước khi biết lựa chọn
-    // → mất tác dụng, đúng cái lỗi mà Consent Mode sinh ra để chặn.
-    `function gtag(){dataLayer.push(arguments)}` +
-    `gtag('consent','default',{` +
-    `ad_storage:'${state}',ad_user_data:'${state}',ad_personalization:'${state}',` +
-    `analytics_storage:'${state}',functionality_storage:'granted',` +
-    `security_storage:'granted',wait_for_update:500});` +
     `window.dataLayer.push({${JSON.stringify(CONSENT_DATALAYER_KEY)}:${JSON.stringify(flag)}});` +
     `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':` +
     `new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],` +
@@ -158,54 +145,6 @@ export function gtmHeadSnippet(consent: ConsentValue | undefined): string {
     `'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);` +
     `})(window,document,'script','dataLayer','${GTM_ID}');`
   );
-}
-
-/**
- * Đặt Consent Mode cho Meta Pixel.
- *
- * Google Consent Mode chỉ điều khiển được thư viện **Google** — nó KHÔNG chặn
- * `_fbp` hay bất cứ gì Meta đặt. Meta có API riêng: `fbq('consent','revoke')`
- * chặn cookie, `'grant'` mở lại.
- *
- * ⚠️ Phải gọi TRƯỚC `fbq('init')` thì mới chặn được cookie ở lần tải đầu. Gọi sau
- * khi pixel đã init thì nó vẫn kịp đặt `_fbp` trong khoảng giữa.
- *
- * `fbq` là hàng đợi nên gọi trước khi pixel tồn tại vẫn an toàn — Meta giữ lệnh
- * rồi chạy đúng thứ tự.
- */
-export function setMetaConsent(value: ConsentValue): void {
-  if (typeof window === "undefined") return;
-  const w = window as unknown as { fbq?: (...a: unknown[]) => void };
-  if (typeof w.fbq !== "function") return;
-  try {
-    w.fbq("consent", value === "granted" ? "grant" : "revoke");
-  } catch {
-    // Pixel lỗi không được ảnh hưởng luồng khách.
-  }
-}
-
-/**
- * Cập nhật Consent Mode khi khách bấm nút (giữa phiên, không reload).
- *
- * Gọi `gtag('consent','update', …)` để Google mở/khoá cookie NGAY, không phải chờ
- * lần tải trang sau. Không có bước này thì khách bấm "Đồng ý" xong vẫn bị chặn cho
- * tới khi F5 — và ngược lại, bấm "Từ chối" vẫn bị theo dõi tiếp.
- */
-export function updateConsentMode(value: ConsentValue): void {
-  if (typeof window === "undefined") return;
-  const w = window as unknown as { dataLayer?: unknown[] };
-  w.dataLayer = w.dataLayer ?? [];
-  const state = value === "granted" ? "granted" : "denied";
-  w.dataLayer.push([
-    "consent",
-    "update",
-    {
-      ad_storage: state,
-      ad_user_data: state,
-      ad_personalization: state,
-      analytics_storage: state,
-    },
-  ]);
 }
 
 /** Nội dung `<noscript>` — iframe dự phòng khi khách tắt JS. */

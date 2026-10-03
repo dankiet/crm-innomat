@@ -167,22 +167,9 @@ của khách chỉ quyết định (a) thanh hỏi còn hiện hay không, và (
 > liệu nào — mất tracking đúng chỗ cần nhất. Giờ ưu tiên có số liệu; khách từ chối được ghi
 > nhận bằng cờ để lọc về sau.
 >
-> **Bù lại, có Google Consent Mode v2** (thêm 2026-10-02): snippet đặt
-> `gtag('consent','default', {ad_storage, analytics_storage, …})` **trước** khi container nạp.
-> Khách chưa chọn hoặc từ chối ⇒ `denied` ⇒ Google **không đặt** `_ga`/`_gid`. Bấm nút giữa
-> phiên thì `updateConsentMode()` gọi `gtag('consent','update')` — đổi hiệu lực ngay, không
-> cần F5.
->
-> ⚠️ **Consent Mode CHỈ áp dụng cho Google.** Meta Pixel không bị nó điều khiển — `_fbp` vẫn
-> được đặt kể cả khi khách từ chối. Meta có API riêng (`fbq('consent','revoke')`) nhưng **phải
-> gọi TRƯỚC `fbq('init')`**, mà `init` nằm trong tag GTM ⇒ code không chen vào được.
-> Đã thử đặt stub `window.fbq` trước trong snippet: **phá loader của GTM** (guard `b.fbq||`
-> thành truthy ⇒ `fbevents.js` không bao giờ nạp ⇒ Meta chết hoàn toàn). **Đừng thử lại.**
-> Muốn chặn `_fbp`: đặt `fbq('consent','revoke')` trong **chính tag HTML của GTM**, trước
-> `fbq('init')` — hoặc dùng Consent Settings của tag đó.
->
-> Nếu sau này cần chặt hơn nữa (Nghị định 13/2023, hoặc có khách EU), phải quay lại gate ở
-> `lpHead()` và chấp nhận mất số liệu nhóm không bấm.
+> ⚠️ Hệ quả: đây là mô hình **tự khai báo rồi loại trừ**, KHÔNG phải chặn theo đồng thuận.
+> Cookie theo dõi được đặt TRƯỚC khi khách chọn. Nếu sau này cần chặt hơn (Nghị định 13/2023,
+> hoặc có khách EU), phải quay lại gate ở `lpHead()` và chấp nhận mất số liệu nhóm không bấm.
 
 - Cookie `ebg_gtm_consent` (`granted` | `denied`, `Max-Age` 1 năm, `SameSite=Lax`) là nguồn
   sự thật. Giá trị lạ ⇒ coi như chưa chọn.
