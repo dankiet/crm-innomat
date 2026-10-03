@@ -81,8 +81,9 @@ export function ConsentBanner() {
         <div className="consent-bar-copy">
           <p className="consent-kicker">QUYỀN RIÊNG TƯ</p>
           <p className="consent-lead">
-            Em dùng cookie để đo lượt xem và những mã gạch bạn lưu. Chọn &ldquo;Từ chối&rdquo; thì
-            em ghi nhận để <b>loại bạn khỏi báo cáo quảng cáo</b> về sau.
+            Em dùng cookie để ghi nhớ những mã gạch bạn lưu và hoàn thiện trải nghiệm trên
+            trang. Nếu chọn &ldquo;Từ chối&rdquo;, em hoàn toàn{" "}
+            <b>tôn trọng quyền riêng tư và sẽ không làm phiền bạn bằng quảng cáo</b> về sau.
           </p>
         </div>
         <div className="consent-actions">

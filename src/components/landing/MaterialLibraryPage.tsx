@@ -19,7 +19,7 @@ import {
   fetchPublicMeFn,
 } from "@/api/lp";
 import type { CatalogFacets } from "@/lib/lp-types";
-import { COLOR_PALETTES } from "@/lib/color-palette";
+import { COLOR_PALETTES, ALL_COLOR_SWATCH } from "@/lib/color-palette";
 import { SURFACE_FINISHES, FORMAT_FAMILIES } from "@/lib/material-taxonomy";
 import { cn } from "@/lib/utils";
 import { FilterChip } from "@/components/product-filter/FilterChip";
@@ -215,8 +215,12 @@ export function MaterialLibraryPage({
 
   return (
     <div className="material-library-page">
-      {/* Top Bar Header */}
-      <header className="library-topbar">
+      {/* Top Bar Header — LÀ `<div role="banner">` chứ KHÔNG phải `<header>`:
+          `src/styles.css` (CSS app CRM, cũng nạp ở landing) có
+          `header{background:…!important}` cho TopBar, và `!important` đè mất nền
+          `rgba(251,249,244,.94)` của thanh này. Cùng lối sửa như `.landing-header`;
+          `role="banner"` giữ nguyên ngữ nghĩa của `<header>`. */}
+      <div className="library-topbar" role="banner">
         <div className="library-topbar-left">
           <button
             type="button"
@@ -248,7 +252,7 @@ export function MaterialLibraryPage({
             <span>Moodboard ({shortlistIds.length})</span>
           </button>
         </div>
-      </header>
+      </div>
 
       {/* Hero Section — Clean, open, no aggressive email capture boxes */}
       <section className="library-hero-banner-clean">
@@ -353,22 +357,28 @@ export function MaterialLibraryPage({
               Gạch ốp lát (OL)
             </button>
           </div>
-          {/* 2. Architectural Color Palette Swatches Bar */}
+          {/* 2. Architectural Color Palette Swatches Bar — 12 chấm hiện đủ, xuống
+              dòng thay vì cuộn ngang. Chấm đầu là "Đa sắc" (chọn tất cả gam màu),
+              thay cho nút chữ cũ: cùng kích thước, cùng ring active với 11 chấm kia
+              nên dải màu giữ được một nhịp thị giác. */}
           <div className="space-color-bar pt-3 border-t border-dashed border-border/70" role="group" aria-label="Lọc theo gam màu">
-            <button
-              type="button"
-              onClick={() => setActivePalette("all")}
-              className={cn(
-                "h-10 px-4 rounded-full text-sm font-semibold transition-all cursor-pointer shrink-0 leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
-                activePalette === "all"
-                  ? "bg-[#141f23] text-white shadow-xs"
-                  : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
-              )}
-              aria-label="Tất cả màu sắc"
-            >
-              Tất cả màu sắc
-            </button>
-            <div className="flex items-center gap-2.5 shrink-0 py-1 px-0.5">
+            <span className="space-color-label">Gam màu:</span>
+            {/* 12 chấm nằm trong MỘT khối riêng để nhãn "Gam màu:" đứng thẳng hàng với
+                chúng thay vì chiếm trọn một dòng phía trên, và để khối này cuộn ngang
+                được ở bề rộng hẹp (xem `.space-color-swatches` trong `styles-lp.css`).
+                Không bọc thì 12 chấm tràn khỏi mép phải và bị cắt cụt trên điện thoại. */}
+            <div className="space-color-swatches">
+              <button
+                type="button"
+                onClick={() => setActivePalette("all")}
+                aria-label={ALL_COLOR_SWATCH.label}
+                title={ALL_COLOR_SWATCH.label}
+                className={cn("space-color-dot", activePalette === "all" && "is-active")}
+                style={{
+                  background: ALL_COLOR_SWATCH.background,
+                  border: `1.5px solid ${ALL_COLOR_SWATCH.dotBorder}`,
+                }}
+              />
               {COLOR_PALETTES.map((palette) => {
                 const isActive = activePalette === palette.id;
                 const facetOption = facets.colorPalettes?.find((f) => f.value === palette.id);
@@ -380,12 +390,7 @@ export function MaterialLibraryPage({
                     onClick={() => setActivePalette(isActive ? "all" : palette.id)}
                     aria-label={palette.label}
                     title={`${palette.label}${facetCount > 0 ? ` (${facetCount} mã)` : ""}`}
-                    className={cn(
-                      "size-10 rounded-full cursor-pointer shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
-                      isActive
-                        ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-[#f7f4ed] scale-110 shadow-xs"
-                        : "hover:scale-105 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40 active:scale-95",
-                    )}
+                    className={cn("space-color-dot", isActive && "is-active")}
                     style={{
                       backgroundColor: palette.hex,
                       border: `1.5px solid ${palette.dotBorder || "rgba(0,0,0,0.15)"}`,

@@ -120,7 +120,7 @@ Các câu dưới nằm trong `lp-content.ts` nhưng **chưa hiện trên trang*
 > biểu để bạn khởi đầu nhanh cho công trình.
 
 ### Brief promise (đã chạy)
-> Ưu tiên tư vấn theo context dự án, không gửi một bảng giá chung chung.
+> Tư vấn theo bối cảnh & tinh thần từng công trình — em không gửi một bảng giá chung chung.
 
 ### Gate thư viện (đã chạy)
 > **Mở khóa toàn bộ Thư viện mã gạch**

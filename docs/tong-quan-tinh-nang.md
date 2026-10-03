@@ -193,6 +193,11 @@ lường. Không có bước này thì "từ chối" không có tác dụng gì.
 - Nội dung cố ý KHÔNG nêu tên công cụ thu thập (Google Tag Manager) — chỉ nói mục đích. Về mặt
   kỹ thuật, sự kiện đi qua `dataLayer` rồi GTM mới chuyển tiếp sang cả GA4 lẫn Meta Pixel, nên
   nêu đích danh một cái là vừa thừa vừa dễ sai.
+- Nội dung cũng KHÔNG mô tả cơ chế kỹ thuật của việc "Từ chối". Bản cũ viết *"ghi nhận để loại
+  bạn khỏi báo cáo quảng cáo"* — đúng về mặt kỹ thuật (nhóm `denied` bị audience trong GTM lọc
+  ra) nhưng đọc lên như ngôn ngữ backend, tạo cảm giác bị ghi sổ đen thay vì được tôn trọng.
+  Câu hiện tại nói theo trải nghiệm của khách: *"tôn trọng quyền riêng tư và sẽ không làm phiền
+  bạn bằng quảng cáo"*. Cơ chế thật vẫn là cờ `denied` — xem `src/lib/lp-consent.ts`.
 - Component dùng `<div>` chứ không `<aside>`: `src/styles.css` (CSS app CRM, cũng nạp ở landing)
   có `aside{…!important}` + `aside button{color:…!important}` cho sidebar, đè mất màu nút. Đổi thẻ
   là sửa gốc, không phải thêm `!important` ngược lại.
@@ -234,6 +239,108 @@ lường. Không có bước này thì "từ chối" không có tác dụng gì.
 
 > Khác với `consent_marketing` trên form lead (`lp_leads`) — đó là đồng ý **nhận email
 > marketing**, không liên quan tới cookie theo dõi.
+
+### Điều hướng & bộ lọc trên LP
+
+Bốn quy ước UI dưới đây áp dụng cho `ArchitectLanding`, `SpaceLookbookSection` và
+`MaterialLibraryPage`. CSS nằm ở `src/styles-lp.css`.
+
+**1. Một header dính duy nhất cho cả PC lẫn mobile.** `.landing-header` là `position: fixed;
+z-index: 50` — trong suốt (chỉ còn dải gradient trên hero) ở đỉnh trang, và đổi sang nền kính
+mờ đặc khi `.is-scrolled` (bật từ `window.scrollY > 60`). Không còn thanh `.mobile-quick-nav`
+riêng cho mobile. Hệ quả cần nhớ:
+
+- Mọi section nhảy tới bằng anchor phải có `scroll-margin-top` khớp chiều cao header (76px PC,
+  64px mobile), nếu không tiêu đề nằm ngay dưới header và bị che.
+- `.is-scrolled` bật `pointer-events: auto`. Lúc trong suốt header để `pointer-events: none`
+  (chỉ các con nhận click); giữ nguyên như vậy khi đã đặc thì click xuyên qua khe giữa các nút
+  sẽ trúng phần tử bị che bên dưới.
+
+**2. Bộ lọc Không gian & Gam màu.** Nút chọn-tất-cả của dải Gam màu là **chấm "Đa sắc"**
+(`ALL_COLOR_SWATCH`, `src/lib/color-palette.ts`) dùng chung class `.space-color-dot` với 11
+chấm kia — không phải nút chữ. Bản cũ là nút chữ `[Tất cả]` (`.space-color-all`): một viên
+thuốc đen nằm cạnh 11 chấm tròn, phá nhịp thị giác và lặp lại y hệt chữ "Tất cả" của dải
+Không gian ngay trên. 12 chấm (`1 Đa sắc + 11 COLOR_PALETTES`) nằm trong khối
+`.space-color-swatches`; nhãn "Gam màu:" đứng NGOÀI khối này nên khi cuộn ngang, nhãn neo lại
+(mất nhãn thì dải chấm thành vô danh).
+
+**Desktop (>900px):** hai dải nằm trên CÙNG trục dọc — nhãn và 12 chấm chung một hàng, thẳng
+mép trái với dải pill phía trên. Không cuộn ngang; `flex-wrap` lo nếu thiếu chỗ.
+
+**Mobile/hẹp (≤900px):** hai dải là **carousel cuộn ngang 1 hàng** (`.space-tabs-scroll`,
+`.space-color-swatches` với `overflow-x: auto` + `scroll-snap`). Đây là **ĐẢO NGƯỢC một quyết
+định cũ** (bản trước ghi rõ "KHÔNG cuộn ngang"; lý do: khách lướt dọc không biết phải vuốt
+ngang). Lý do đảo: bố cục thay thế — lưới 4 cột cố định ép đúng 4+3 — để lại **một ô trống ở
+góc phải hàng 2** (7 pill trong 4 cột), đọc thành "thiếu nút"/"lỗi layout"; `flex-wrap` tự
+nhiên thì rớt thành 3+3+1 với pill `F&B` mồ côi. Carousel triệt tiêu cả hai: không ô trống,
+không hàng mồ côi, pill dài ngắn tuỳ chữ, và chiều cao dải lọc giảm từ ~150px xuống ~90px.
+
+Ngưỡng **900px chứ không 768px**: 7 pill cần **785px** bề rộng tự nhiên, cộng padding `5vw`
+mỗi bên thì chỉ vừa một hàng từ ~873px trở lên. Khoảng 769–872px (tablet dọc) nếu để
+`flex-wrap` sẽ rớt thành 6+1 với pill `F&B` mồ côi — nên carousel phủ luôn khoảng đó. Trên
+900px chỗ rộng gấp đôi, một hàng tự nhiên nên không cần cuộn. (Carousel **card Lookbook** thì
+ngưỡng vẫn 768px — xem mục 3.)
+
+Để hoá giải chính phản đối cũ (khách không biết vuốt ngang), carousel dùng **kỹ thuật PEEK**:
+nội dung thừa bề rộng nên phần tử cuối bị cắt ở mép phải (7 pill ≈ 700px trong ~337px; card
+rộng `82%` nên card kế hé ra), mắt thấy vật thể bị cắt ở rìa thì tự kích hoạt phản xạ vuốt.
+KHÔNG dùng `mask-image` để làm mờ mép: mask trên scroll container vẽ tương đối với nội dung
+đang cuộn nên nó cuộn đi theo và làm mờ nhầm mép — peek tự nhiên đã đủ và tự sửa. Badge đếm 3
+chữ số hiện ĐỦ ở carousel (không còn bị ép vào cột hẹp nên không cắt cụt như bố cục grid cũ).
+
+**3. Progressive disclosure (chỉ desktop).** Lưới Lookbook ở desktop mở đầu bằng ĐÚNG 2 HÀNG
+card: 6 bối cảnh (3 cột) / 4 (2 cột). Cơ chế thuần CSS:
+
+- Lưới mang class `is-collapsed` / `is-expanded`; card bị ẩn bằng
+  `nth-child(n + <ngưỡng>) { display: none }`, ngưỡng khai lại trong từng `@media` khớp số cột.
+- Nút bung mở bị ẩn khi không có card nào thật sự bị ẩn:
+  `.space-gallery-grid.is-collapsed:not(:has(> .space-lookbook-card:nth-child(<ngưỡng>))) + .lookbook-controls .lookbook-expand-toggle { display: none }`.
+  Không có cổng này thì dữ liệu 4–6 bối cảnh sẽ cho nút ghi số ÂM (`4 - 6 = -2`).
+- Nút có hai nhãn (`label-wide` / `label-tablet`) vì số card còn ẩn khác nhau theo số cột;
+  CSS chọn đúng nhãn theo cùng breakpoint với ngưỡng ẩn.
+
+**Mobile KHÔNG dùng progressive disclosure cho Lookbook**: dải card là **carousel cuộn ngang**
+(`.space-gallery-grid` chuyển `grid-auto-flow: column`, mỗi card `grid-auto-columns: 82%`,
+`scroll-snap-type: x mandatory`). Mọi card đều cuộn tới được nên không có "hàng bị ẩn" để
+bung — nhờ vậy 3 card ≈ 1.000px cuộn dọc biến mất, mà ảnh vẫn lớn (thứ bán được hàng). Quyết
+định nằm ở CSS (không đo bề rộng màn hình trong JS) để HTML render ra đã đúng ngay từ SSR.
+
+**4. Lookbook có MỘT hàng điều khiển duy nhất.** Mọi nút dưới lưới nằm chung trong
+`.lookbook-controls` (một flex row), nên hai nút không bao giờ xếp chồng — lỗi cũ ở ảnh người
+dùng gửi là nút bung mở và nút tải thêm cùng hiện, cùng màu đen, chồng lên nhau.
+
+| Bề rộng | Trạng thái | Nút hiện |
+| --- | --- | --- |
+| Desktop | Thu gọn | **Chỉ** `Xem tiếp N bối cảnh` (nút tải thêm bị CSS ẩn vì 36 mẫu trong trang còn chưa xem hết) |
+| Desktop | Bung mở | `Tải thêm 24 bối cảnh khác` (khi `filteredItems.length > visibleCount`) **cạnh** `Thu gọn bối cảnh` — cùng hàng |
+| Mobile | (luôn) | **Chỉ** `Tải thêm 24 bối cảnh khác` khi kho còn mẫu. Nút bung/thu bị ẩn hẳn vì carousel không có khái niệm "hàng bị ẩn" |
+
+Nút tải thêm **chỉ** tăng `visibleCount` (không còn tự bật `lookbookExpanded`). Lưu ý: React
+vẫn gắn class `is-collapsed` lên lưới ở mobile (carousel không có trạng thái thu gọn), nên khối
+`@media (max-width: 768px)` phải ghi đè lại `display: inline-flex` cho `.lookbook-load-more` —
+nếu không, rule desktop `is-collapsed + .lookbook-controls .lookbook-load-more { display:none }`
+sẽ ẩn luôn nút tải thêm ở mobile. `ArrowUpRight` mặc định chỉ ĐÔNG BẮC: `.is-down` xoay 90°
+(bung xuống), `.is-up` xoay −90° (thu lên) — hai nút mang hai class riêng.
+
+
+
+### ⚠️ CSS app CRM rò rỉ sang landing
+
+`src/styles.css` (CSS app CRM) cũng được nạp ở landing qua `__root.tsx`, và nó chứa nhiều
+selector **trần** (`header`, `aside`, `main`, `input`, `button`, `table`) áp cho toàn tài liệu.
+Đây là nguồn lỗi thật, không phải giả định — hai lần đã dính:
+
+| Rule CRM | Hậu quả trên LP | Cách xử |
+| --- | --- | --- |
+| `header{background:…!important}` | Nền header LP thành kem đặc, chữ trắng mất tương phản; trạng thái trong suốt/kính mờ vô hiệu. `.library-topbar` cũng mất nền `rgba(251,249,244,.94)` của chính nó | Cả hai header của LP là `<div role="banner">`, KHÔNG dùng `<header>` |
+| `aside{…!important}` + `aside button{color:…!important}` | Sidebar gradient đè màu nút | `ConsentBanner` dùng `<div>` chứ không `<aside>` |
+| `@media(max-width:639px){…button{min-height:2.5rem}}` | Chip lọc 28px bị kéo lên 40px; chấm màu tròn thành oval 40×26 | Khai `min-height` tường minh cho `.space-color-dot` / `.space-tab-pill` (bản trong `@media` thắng được rule CRM cũng nằm trong `@media`) |
+
+**Cách sửa gốc là đổi thẻ hoặc khai `min-height` tường minh — KHÔNG thêm `!important` ngược
+lại**, vì như vậy chỉ đẩy cuộc chiến specificity đi xa hơn. Cũng KHÔNG scope rule `button` của
+CRM vào một class shell: dialog của CRM render qua portal ra `document.body`, nằm ngoài shell, nên
+scope sẽ làm hỏng chiều cao nút trên mobile của chính CRM. Thêm element mới vào landing thì kiểm
+tra trước xem tên thẻ có nằm trong bảng trên không.
 
 ## 9b. Shortlink chia sẻ — `/s/$slug`
 

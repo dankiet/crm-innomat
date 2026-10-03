@@ -14,7 +14,7 @@ import {
   fetchPublicMeFn,
   authGoogleStart,
 } from "@/api/lp";
-import { COLOR_PALETTES, matchColorPalette } from "@/lib/color-palette";
+import { COLOR_PALETTES, ALL_COLOR_SWATCH, matchColorPalette } from "@/lib/color-palette";
 import { type SpaceLookbookItem, type Material } from "@/data/mockData";
 import type { SpaceType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -27,17 +27,16 @@ export type SpaceLookbookSectionProps = {
 type TabFilter = {
   key: "all" | SpaceType;
   label: string;
-  shortLabel: string;
 };
 
 const SPACE_TABS: TabFilter[] = [
-  { key: "all", label: "Tất cả không gian", shortLabel: "Tất cả" },
-  { key: "living_room", label: "Phòng khách & Sảnh", shortLabel: "Phòng khách" },
-  { key: "kitchen_dining", label: "Bếp & Dining", shortLabel: "Bếp & Dining" },
-  { key: "bathroom_spa", label: "Phòng tắm & Spa", shortLabel: "Phòng tắm" },
-  { key: "bedroom", label: "Phòng ngủ & Suite", shortLabel: "Phòng ngủ" },
-  { key: "outdoor_balcony", label: "Ban công & Sân trong", shortLabel: "Sân trong" },
-  { key: "fnb_hospitality", label: "Thương mại & F&B", shortLabel: "F&B & Khách sạn" },
+  { key: "all", label: "Toàn bộ" },
+  { key: "living_room", label: "Phòng khách" },
+  { key: "kitchen_dining", label: "Bếp" },
+  { key: "bathroom_spa", label: "Phòng tắm" },
+  { key: "bedroom", label: "Phòng ngủ" },
+  { key: "outdoor_balcony", label: "Sân trong" },
+  { key: "fnb_hospitality", label: "F&B" },
 ];
 
 export function SpaceLookbookSection({
@@ -48,6 +47,7 @@ export function SpaceLookbookSection({
   const [activeTab, setActiveTab] = useState<"all" | SpaceType>("all");
   const [activeColor, setActiveColor] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(9);
+  const [lookbookExpanded, setLookbookExpanded] = useState(false);
   const [liveItems, setLiveItems] = useState<SpaceLookbookItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -233,46 +233,50 @@ export function SpaceLookbookSection({
                 onClick={() => handleTabChange(tab.key)}
               >
                 <span>{tab.label}</span>
-                <span className="space-tab-count">{count}</span>
+                {/* Tab "Toàn bộ" KHÔNG mang badge đếm: con số 441 rộng ~30px, không
+                    thêm thông tin (tổng số đã nằm ngay dưới ở dòng "Đã mở khóa…"),
+                    và chính nó đẩy pill thứ 7 xuống hàng mồ côi trên mobile. Các
+                    phòng cụ thể vẫn giữ badge vì số đó là thông tin thật. */}
+                {tab.key !== "all" && <span className="space-tab-count">{count}</span>}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 2.1 Color Palette Swatch Dots */}
+      {/* 2.1 Color Palette Swatch Dots — 11 gam màu hiện đủ, xuống dòng thay vì
+          cuộn ngang (cuộn ngang giấu 8/11 màu sau mép phải màn hình). */}
       <div className="space-color-bar" role="group" aria-label="Lọc theo gam màu">
-        {/* Nút "Tất cả màu sắc" đồng bộ với "Tất cả không gian" */}
-        <button
-          type="button"
-          onClick={() => handleColorChange("all")}
-          className={cn(
-            "h-10 px-4 rounded-full text-sm font-semibold transition-all cursor-pointer shrink-0 leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
-            activeColor === "all"
-              ? "bg-[#141f23] text-white shadow-xs"
-              : "bg-[#eae3d2] text-[#4b575a] hover:bg-[#ddd5c4]",
-          )}
-          aria-label="Tất cả màu sắc"
-        >
-          Tất cả màu sắc
-        </button>
-        {/* Dòng nút tròn hiển thị 11 gam màu trực diện */}
-        <div className="flex items-center gap-2.5 shrink-0 py-1 px-0.5">
+        <span className="space-color-label">Gam màu:</span>
+        {/* 12 chấm nằm trong MỘT khối riêng để nhãn "Gam màu:" đứng thẳng hàng với
+            chúng thay vì chiếm trọn một dòng phía trên. Khối này là `grid` cố định
+            (6 cột ở mobile) chứ không phải `flex-wrap` — bản cũ từng bọc chấm trong
+            flex container và bị chia 10 + 1 vì bề rộng `max-content` của container
+            vượt chỗ còn lại; grid khai cột tường minh nên luôn đúng 6 + 6. */}
+        <div className="space-color-swatches">
+          {/* Chấm "Đa sắc" = chọn TẤT CẢ gam màu. Cùng class `.space-color-dot` với
+              11 chấm kia nên dùng chung kích thước, ring active và hover. */}
+          <button
+            type="button"
+            onClick={() => handleColorChange("all")}
+            aria-label={ALL_COLOR_SWATCH.label}
+            title={ALL_COLOR_SWATCH.label}
+            className={cn("space-color-dot", activeColor === "all" && "is-active")}
+            style={{
+              background: ALL_COLOR_SWATCH.background,
+              border: `1.5px solid ${ALL_COLOR_SWATCH.dotBorder}`,
+            }}
+          />
           {COLOR_PALETTES.map((palette) => {
             const isActive = activeColor === palette.id;
             return (
               <button
                 key={palette.id}
                 type="button"
-                onClick={() => handleColorChange(palette.id)}
+                onClick={() => handleColorChange(isActive ? "all" : palette.id)}
                 aria-label={palette.label}
                 title={palette.label}
-                className={cn(
-                  "size-10 rounded-full cursor-pointer shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#141f23]",
-                  isActive
-                    ? "ring-2 ring-offset-2 ring-[#141f23] ring-offset-[#f7f4ed] scale-110 shadow-xs"
-                    : "hover:scale-105 hover:ring-2 hover:ring-offset-1 hover:ring-[#9E9E9E]/40 active:scale-95",
-                )}
+                className={cn("space-color-dot", isActive && "is-active")}
                 style={{
                   backgroundColor: palette.hex,
                   border: `1.5px solid ${palette.dotBorder || "rgba(0,0,0,0.15)"}`,
@@ -296,11 +300,14 @@ export function SpaceLookbookSection({
       {!isLoggedIn && !loading && (
         <div className="flex items-center gap-2 mb-4 text-xs text-[#78716C]">
           <Sparkles size={14} className="text-[#B94A2E]" />
-          <span>Gợi ý 9 bối cảnh tuyển chọn trong tuần · Tự động làm mới mỗi 7 ngày</span>
+          <span>Bộ bối cảnh tuyển chọn trong tuần · Tự động làm mới mỗi 7 ngày</span>
         </div>
       )}
 
-      <div className="space-gallery-grid">
+      <div
+        id="lookbook-grid"
+        className={`space-gallery-grid ${lookbookExpanded ? "is-expanded" : "is-collapsed"}`}
+      >
         {displayedItems.map((item) => {
           const isShortlisted = shortlistIds.includes(item.product.id);
 
@@ -436,19 +443,58 @@ export function SpaceLookbookSection({
           );
         })}
       </div>
-      {/* Load More Button (chỉ hiển thị khi đã đăng nhập và còn ảnh) */}
-      {isLoggedIn && filteredItems.length > visibleCount && (
-        <div className="flex justify-center mt-12 mb-4">
+      {/* MỘT hàng điều khiển duy nhất — không bao giờ có hai nút xếp chồng (lỗi cũ
+          ở ảnh người dùng gửi). Gồm tối đa hai nút, CSS quyết định nút nào hiện:
+          - Desktop: thu gọn → chỉ nút "Xem tiếp" (nút tải thêm ẩn vì 6 bối cảnh
+            trong trang còn chưa xem hết); bung mở → nút tải thêm (nếu kho còn mẫu)
+            đứng CẠNH nút thu gọn.
+          - Mobile: ẩn nút bung/thu (carousel cuộn ngang, không có "hàng bị ẩn"),
+            chỉ còn nút tải thêm khi kho còn mẫu.
+          Số bối cảnh còn ẩn khác nhau theo số cột (6 ở 3 cột, 4 ở 2 cột) nên nhãn
+          nút bung có hai biến thể, CSS chọn đúng nhãn — không đo bề rộng trong JS. */}
+      <div className="lookbook-controls">
+        {isLoggedIn && !loading && filteredItems.length > visibleCount && (
           <button
             type="button"
-            className="inline-flex items-center gap-2.5 px-8 py-3.5 bg-[#141f23] text-[#fffdf9] font-medium text-xs tracking-wider uppercase border border-[#141f23] hover:bg-[#2c3d44] transition-colors cursor-pointer shadow-sm rounded-none"
+            className="lookbook-load-more"
             onClick={() => setVisibleCount((prev) => prev + 24)}
           >
-            <span>Xem thêm bối cảnh khác ({filteredItems.length - visibleCount} mẫu còn lại)</span>
-            <ArrowUpRight size={14} />
+            <span>
+              Tải thêm 24 bối cảnh khác ({filteredItems.length - visibleCount} mẫu còn lại)
+            </span>
+            <ArrowUpRight size={15} className="is-down" aria-hidden="true" />
           </button>
-        </div>
-      )}
+        )}
+        {displayedItems.length > 3 &&
+          (lookbookExpanded ? (
+            <button
+              type="button"
+              className="lookbook-collapse-toggle"
+              onClick={() => setLookbookExpanded(false)}
+              aria-expanded={true}
+              aria-controls="lookbook-grid"
+            >
+              <span>Thu gọn bối cảnh</span>
+              <ArrowUpRight size={15} className="is-up" aria-hidden="true" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="lookbook-expand-toggle"
+              onClick={() => setLookbookExpanded(true)}
+              aria-expanded={false}
+              aria-controls="lookbook-grid"
+            >
+              <span className="label-wide">
+                Xem tiếp {displayedItems.length - 6} bối cảnh khác ({displayedItems.length} bối cảnh)
+              </span>
+              <span className="label-tablet">
+                Xem tiếp {displayedItems.length - 4} bối cảnh khác ({displayedItems.length} bối cảnh)
+              </span>
+              <ArrowUpRight size={15} className="is-down" aria-hidden="true" />
+            </button>
+          ))}
+      </div>
 
       {/* Google Login Gate for Guests (Hiển thị khi chưa đăng nhập) */}
       {!isLoggedIn && !loading && (
@@ -460,7 +506,8 @@ export function SpaceLookbookSection({
             Khám phá trọn bộ Lookbook Không gian
           </h3>
           <p className="text-sm text-[#78716C] mb-6 leading-relaxed">
-            Bạn đang xem 9 bối cảnh gợi ý trong tuần được làm mới mỗi 7 ngày. Đăng nhập Google để mở khóa toàn bộ hơn 100+ bối cảnh thực tế và mã gạch chỉ định.
+            Bộ bối cảnh tuyển chọn trong tuần, tự động làm mới mỗi 7 ngày. Đăng nhập Google để mở
+            khóa toàn bộ hơn 100+ bối cảnh thực tế và mã gạch chỉ định.
           </p>
           <button
             type="button"

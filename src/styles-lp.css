@@ -72,11 +72,19 @@ button, input, select, textarea { font: inherit; }
 button:not(:disabled), a[href], select:not(:disabled), input:not(:disabled), textarea:not(:disabled) { cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--terracotta); outline-offset: 3px; }
 
-.architect-landing { position:relative; overflow: hidden; background: var(--paper); }
+/* `overflow: clip` (không phải `hidden`): `hidden` tạo scroll container nên con
+   `position: sticky` bên trong sẽ neo vào container đó (không bao giờ cuộn) và
+   trôi đi như `static`. `clip` vẫn cắt tràn ngang như cũ nhưng KHÔNG tạo scroll
+   container, và không cắt phần tử `position: fixed` (xem `.landing-header`). */
+.architect-landing { position:relative; overflow: clip; background: var(--paper); }
 .architect-landing::before { content:""; position:fixed; z-index:25; inset:0; pointer-events:none; opacity:.17; mix-blend-mode:multiply; background-image:radial-gradient(rgba(48,43,37,.42) .46px, transparent .7px),radial-gradient(rgba(48,43,37,.25) .34px, transparent .7px); background-position:0 0, 7px 9px; background-size:12px 12px, 17px 17px; }
+/* Header dùng CHUNG cho PC lẫn mobile: neo `fixed` trên đỉnh viewport nên logo,
+   menu và nút "Gửi brief" luôn với tới được ở mọi vị trí cuộn. Ở đỉnh trang nó
+   trong suốt (chỉ còn dải gradient mờ trên hero); khi cuộn xuống thì `.is-scrolled`
+   đổi sang nền kính mờ đặc để chữ vẫn đọc được trên mọi nền bên dưới. */
 .landing-header {
-  position: absolute;
-  z-index: 20;
+  position: fixed;
+  z-index: 50;
   top: 0;
   right: 0;
   left: 0;
@@ -88,6 +96,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: #fffaf3;
   background: linear-gradient(180deg, rgba(14, 22, 25, 0.78) 0%, rgba(14, 22, 25, 0.35) 60%, transparent 100%);
   pointer-events: none;
+  transition: min-height 200ms ease, background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+.landing-header.is-scrolled {
+  min-height: 64px;
+  background: rgba(18, 28, 33, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 250, 243, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+  /* Ở trạng thái cuộn header là một dải ĐẶC nằm đè lên nội dung, nên nó phải nhận
+     click cho cả dải. Để `pointer-events: none` như lúc trong suốt thì click xuyên
+     qua khe giữa các nút sẽ trúng phần tử bị che bên dưới (vd nút "Chọn mẫu" của
+     card đang trôi qua dưới header) — khách bấm vào chỗ không thấy gì mà lại kích
+     hoạt nhầm. */
+  pointer-events: auto;
 }
 .landing-header > * {
   pointer-events: auto;
@@ -141,6 +164,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .nav-links a.nav-link-highlight:hover {
   background: var(--terracotta);
   color: #ffffff;
+}
+/* Scroll-spy: gạch chân mục đang xem. Dùng `box-shadow` inset thay vì
+   `border-bottom` để không đẩy layout khi mục sáng đổi theo nhịp cuộn. */
+.nav-links a.is-current {
+  color: #ffffff;
+  box-shadow: inset 0 -2px 0 -0.5px var(--terracotta);
 }
 .header-actions { justify-self: end; display: flex; align-items: center; gap: 10px; }
 .header-brief {
@@ -228,7 +257,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hero-index { position: absolute; z-index: 4; right: 1.9vw; bottom: 8.2vh; display: flex; align-items: center; gap: 12px; color: rgba(255,250,243,.65); font-size: 8px; font-weight: 700; letter-spacing: .16em; writing-mode: vertical-rl; transform: rotate(180deg); }
 .hero-index i { width: 1px; height: 40px; background: rgba(255,250,243,.4); }
 
-.intent-section, .library-section, .deliverables-section, .cases-section, .brief-section { scroll-margin-top: 10px; }
+/* Header đã chuyển sang `fixed`: mọi section được nhảy tới bằng anchor phải chừa
+   đúng chiều cao header, nếu không tiêu đề nằm ngay dưới nó và bị che.
+   Gom CHUNG một chỗ: các override trong `@media` bên dưới phải nằm SAU rule này mới
+   thắng được. Khai rải rác thì bản khai sau (vd `.space-lookbook-section` ở khu
+   Lookbook) đè mất override của mobile dù specificity bằng nhau. */
+.intent-section, .library-section, .deliverables-section, .cases-section, .brief-section,
+.space-lookbook-section { scroll-margin-top: 76px; }
 .intent-section { position: relative; display: grid; grid-template-columns: minmax(240px, .7fr) 1.3fr; gap: 48px; padding: 126px 8vw 116px 8vw; background: #f9f6ef; }
 .intent-heading h2, .library-topline h2, .deliverables-copy h2, .cases-heading h2, .brief-heading h2 { margin-top: 15px; color: var(--ink); font-size: clamp(48px, 4.5vw, 73px); line-height: .89; }
 .intent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
@@ -254,6 +289,51 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .filter-tabs button:hover, .filter-tabs button.is-active { border-color: var(--terracotta); color: var(--ink); }
 .material-count { color: #7c817b; font-size: 10px; font-weight: 700; letter-spacing: .09em; white-space: nowrap; }
 .materials-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 20px; }
+/* Progressive disclosure — MỌI bề rộng đều mở đầu bằng ĐÚNG 2 HÀNG card, phần còn
+   lại chỉ hiện khi khách bấm "Xem tiếp". Ngưỡng ẩn phải khớp số cột của chính
+   breakpoint đó (4 cột → 8 card, 3 cột → 6, 2 cột → 4), nên mỗi block `@media` bên
+   dưới lặp lại ngưỡng của mình — sửa số cột thì sửa luôn ngưỡng cùng chỗ.
+   Quyết định nằm ở CSS để HTML render ra đã đúng ngay từ SSR; đo bề rộng trong JS
+   sẽ lệch giữa lần render server và client.
+   `.materials-expand-bar` là sibling NGAY SAU lưới nên `:has()` chọn được đúng thanh:
+   chỉ hiện khi lưới thu gọn VÀ thật sự có card bị ẩn ở bề rộng đang xem — bộ tuyển
+   chọn ít mã thì không có nút bấm mà chẳng thấy gì đổi. */
+.materials-grid.is-collapsed .material-card:nth-child(n + 9) { display: none; }
+.materials-expand-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid #c9c0b2;
+}
+.materials-grid.is-collapsed:has(> .material-card:nth-child(9)) + .materials-expand-bar,
+.materials-grid.is-expanded + .materials-expand-bar { display: flex; }
+.materials-expand-toggle,
+.materials-expand-library {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 11px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.materials-expand-toggle { background: var(--ink); color: #fffaf3; border: 1px solid var(--ink); }
+.materials-expand-toggle:hover { background: #2c3d44; }
+.materials-expand-toggle svg { transition: transform 180ms var(--ease-out); }
+.materials-expand-toggle svg.is-up { transform: rotate(-90deg); }
+.materials-expand-library { background: transparent; color: var(--ink); border: 1px solid #bfb6a7; }
+.materials-expand-library:hover { border-color: var(--terracotta); color: var(--terracotta); }
+/* Số mã còn ẩn khác nhau theo bề rộng nên nút có sẵn 3 nhãn; CSS chọn đúng nhãn
+   theo cùng breakpoint với ngưỡng ẩn. */
+.materials-expand-toggle .label-tablet,
+.materials-expand-toggle .label-mobile { display: none; }
 .material-card { position: relative; display: flex; flex-direction: column; height: 100%; border-top: 1px solid #bfb6a7; background: #f7f4ed; transition: transform 180ms var(--ease-out), box-shadow 180ms ease, border-color 180ms ease; }
 .material-card::before { content: ""; position: absolute; z-index: 3; top: 0; right: 16px; width: 24px; height: 6px; background: var(--paper-deep); box-shadow: 0 0 0 1px #c9c0b2; transform: translateY(-3px) rotate(-1deg); }
 .material-card:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(49, 47, 40, .1); }
@@ -273,9 +353,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .material-spec { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border-top: 1px solid #ded7ca; margin-top: auto; }
 .material-spec div { padding: 8px 14px 10px; }.material-spec div + div { border-left: 1px solid #ded7ca; }
 .material-spec dt { color: #8a8b83; font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.material-spec dd { margin: 3px 0 0; font-size: 10px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 1200px) { .materials-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
-@media (max-width: 860px) { .materials-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } }
-@media (max-width: 520px) { .materials-grid { grid-template-columns: 1fr; gap: 14px; } }
+/* Ngưỡng ẩn + nhãn nút phải đi kèm số cột: 3 cột → 2 hàng = 6 card. */
+@media (max-width: 1200px) {
+  .materials-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .materials-grid.is-collapsed .material-card:nth-child(n + 7) { display: none; }
+  .materials-grid.is-collapsed:has(> .material-card:nth-child(7)) + .materials-expand-bar { display: flex; }
+  .materials-expand-toggle .label-wide { display: none; }
+  .materials-expand-toggle .label-tablet { display: inline; }
+}
+/* 2 cột → 2 hàng = 4 card. */
+@media (max-width: 860px) {
+  .materials-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .materials-grid.is-collapsed .material-card:nth-child(n + 5) { display: none; }
+  .materials-grid.is-collapsed:has(> .material-card:nth-child(5)) + .materials-expand-bar { display: flex; }
+  .materials-expand-toggle .label-wide,
+  .materials-expand-toggle .label-tablet { display: none; }
+  .materials-expand-toggle .label-mobile { display: inline; }
+}
+/* Bề rộng hẹp hơn nữa đã do `@media (max-width: 620px)` lo (2 cột, gap 10px) —
+   rule 1 cột cũ ở đây bị chính block đó ghi đè nên đã bỏ để không còn hai khai báo
+   số cột mâu thuẫn nhau trong cùng file. */
 .library-foot { display: flex; justify-content: space-between; align-items: center; gap: 30px; margin: 33px 0 0 112px; padding-top: 21px; border-top: 1px solid #c9c0b2; }
 .library-foot > div { display: flex; align-items: flex-start; max-width: 460px; gap: 10px; color: #596263; font-size: 12px; line-height: 1.48; }.library-foot svg { flex: 0 0 auto; color: var(--olive); }
 .text-action { display: inline-flex; align-items: center; gap: 8px; border: 0; border-bottom: 1px solid var(--ink); padding: 0 0 6px; background: none; color: var(--ink); font-size: 12px; font-weight: 700; transition: color 160ms ease, border-color 160ms ease; }.text-action:hover { border-color: var(--terracotta); color: var(--terracotta); }
@@ -286,7 +383,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .cases-section { padding: 122px 8vw 128px; background: #f8f5ed; }.cases-heading { display: flex; justify-content: space-between; align-items: end; gap: 44px; }.cases-heading h2 { margin-top: 15px; }.cases-heading > p { max-width: 370px; margin: 0 0 4px; color: #60696b; font-size: 13px; line-height: 1.62; }.cases-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-top: 58px; }.case-image { position: relative; aspect-ratio: .92; overflow: hidden; background: #d8d0c2; }.case-image::after { content:""; position:absolute; inset:0; background:linear-gradient(0deg, rgba(20,31,35,.28), transparent 42%); }.case-image img { width:100%; height:100%; object-fit:cover; transition:transform 400ms var(--ease-out); }.case-card:hover .case-image img { transform:scale(1.04); }.case-image span { position:absolute; z-index:1; right:15px; bottom:13px; color:#fffaf3; font-size:10px; font-weight:700; letter-spacing:.15em; }.case-kind { margin:18px 0 0; color:var(--terracotta); font-size:9px; font-weight:700; letter-spacing:.12em; }.case-card h3 { margin:8px 0 0; color:var(--ink); font-family:var(--serif); font-size:34px; font-weight:600; letter-spacing:-.055em; line-height:.9; }.case-note { min-height:52px; margin:12px 0 0; color:#62696b; font-size:12px; line-height:1.54; }.case-link { display:inline-flex; align-items:center; gap:7px; border:0; padding:0; margin-top:17px; background:none; color:var(--ink); font-size:11px; font-weight:700; text-align:left; }.case-link:hover { color:var(--terracotta); }
 
-.brief-section { display: grid; grid-template-columns: .77fr 1.23fr; gap: 8vw; padding: 123px 8vw 126px; background-color: #e7ddd0; background-image:linear-gradient(120deg, rgba(255,255,255,.16), transparent 35%),linear-gradient(90deg, rgba(80,67,54,.055) 1px, transparent 1px); background-size:auto, 44px 44px; }.brief-heading { padding-top: 4px; }.brief-heading .section-kicker { margin-top: 28px; }.brief-heading h2 { margin-top: 15px; }.brief-heading > p:not(.section-kicker) { max-width: 365px; margin: 26px 0 0; color: #566164; font-size: 14px; line-height: 1.66; }.brief-promise { display:flex; align-items:flex-start; gap:11px; margin-top:49px; color:#475556; font-size:12px; font-weight:600; line-height:1.55; }.brief-promise svg { color:var(--terracotta); }.brief-panel { border-top:1px solid #bfb6a7; padding-top:33px; }.brief-folder-label { display:flex; justify-content:space-between; margin-bottom:23px; color:#788075; font-size:9px; font-weight:700; letter-spacing:.14em; }
+.brief-section { display: grid; grid-template-columns: .77fr 1.23fr; gap: 8vw; padding: 123px 8vw 126px; background-color: #e7ddd0; background-image:linear-gradient(120deg, rgba(255,255,255,.16), transparent 35%),linear-gradient(90deg, rgba(80,67,54,.055) 1px, transparent 1px); background-size:auto, 44px 44px; }.brief-heading { padding-top: 4px; }.brief-heading .section-kicker { margin-top: 28px; }.brief-heading h2 { margin-top: 15px; }.brief-heading > p:not(.section-kicker) { max-width: 365px; margin: 26px 0 0; color: #566164; font-size: 14px; line-height: 1.66; }.brief-promise { display:flex; align-items:flex-start; gap:11px; margin-top:32px; padding:11px 14px; background:#f4efe6; border:1px solid rgba(185,74,46,.2); border-radius:8px; color:#475556; font-size:12px; font-weight:600; line-height:1.55; }.brief-promise svg { color:var(--terracotta); flex-shrink:0; margin-top:1px; }.brief-panel { border-top:1px solid #bfb6a7; padding-top:33px; }.brief-folder-label { display:flex; justify-content:space-between; margin-bottom:23px; color:#788075; font-size:9px; font-weight:700; letter-spacing:.14em; }
 
 .landing-footer { display:grid; grid-template-columns:1fr 1fr 1fr; align-items:end; gap:25px; padding:47px 8vw 92px; background:#1f2b33; color:#fffaf3; }.footer-brand { font-size:20px; }.footer-brand .brand-mark { width:42px; height:42px; }.landing-footer > p { margin:0; color:#c5cbc6; font-family:var(--serif); font-size:24px; font-weight:500; letter-spacing:-.03em; line-height:1.02; }.landing-footer > p.footer-tagline { font-style:italic; font-weight:400; color:#ddd7cb; letter-spacing:-.015em; line-height:1.18; text-shadow:0 0 26px rgba(221,215,203,.28); }.footer-contact { justify-self:end; display:flex; flex-direction:column; align-items:flex-end; gap:8px; color:#98a39f; font-size:11px; }.footer-contact-link, .footer-social-link { display:inline-flex; align-items:center; gap:6px; color:#98a39f; font-size:11px; font-weight:400; text-decoration:none; border-bottom:none; padding-bottom:0; transition:color 150ms ease; }.footer-contact-link:hover, .footer-social-link:hover { color:#fffaf3; }.footer-ext-arrow { opacity:.6; transition:transform 150ms ease, opacity 150ms ease; }.footer-contact-link:hover .footer-ext-arrow { opacity:1; transform:translate(1px,-1px); }.footer-socials { display:inline-flex; align-items:center; gap:8px; margin:2px 0; }.footer-divider { color:#606e68; font-size:10px; user-select:none; }.footer-cta { display:inline-flex; gap:6px; align-items:center; color:#fffaf3; font-size:11px; font-weight:700; text-decoration:none; border-bottom:1px solid #c1b5a3; padding-bottom:4px; margin-top:4px; transition:border-color 150ms ease, color 150ms ease; }.footer-cta:hover { color:var(--terracotta); border-bottom-color:var(--terracotta); }.footer-copyright { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:18px; padding-top:22px; border-top:1px solid rgba(193,181,163,.18); color:#98a39f; font-size:10px; letter-spacing:.02em; }.footer-copyright-line { font-family:var(--serif); font-style:italic; font-size:15px; letter-spacing:.005em; color:#b3bdb8; text-shadow:0 0 22px rgba(179,189,184,.22); }.footer-consent-btn { background:none; border:none; padding:0; color:#98a39f; font-size:10px; letter-spacing:.02em; text-decoration:underline; text-underline-offset:3px; cursor:pointer; transition:color 150ms ease; }.footer-consent-btn:hover { color:#fffaf3; }
 
@@ -400,6 +497,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     color: #f7a38d;
     background: transparent;
   }
+  /* Menu mobile là danh sách dòng có border-bottom sẵn — gạch chân inset của PC
+     sẽ chồng lên đó, nên ở đây chỉ đổi màu chữ. */
+  .nav-links a.is-current {
+    color: #e58a70;
+    box-shadow: none;
+  }
   .hero-section { grid-template-columns: 1fr; min-height: 0; }
   .hero-copy { min-height: 650px; padding: 135px 11vw 70px; }
   .hero-media { min-height: 465px; }
@@ -424,6 +527,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @media (max-width: 620px) {
   .landing-header { min-height: 64px; padding: 0 4.5vw; }
+  .landing-header.is-scrolled { min-height: 56px; }
   .brand-lockup { font-size: 15px; }
   .brand-lockup .brand-mark { width: 26px; height: 26px; }
   .header-brief { display: none; }
@@ -442,22 +546,112 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .hero-media { min-height: 330px; }
   .hero-media-caption { right: 7vw; bottom: 22px; left: 7vw; }
   .hero-mark { top: 22px; right: 7vw; }
+  /* Header dính là `fixed` cao 56px → section nhảy tới phải chừa đúng chiều cao đó. */
+  .intent-section, .library-section, .space-lookbook-section,
+  .deliverables-section, .brief-section {
+    scroll-margin-top: 64px;
+  }
   .intent-section { grid-template-columns: 1fr; gap: 0; padding: 72px 6vw; }
   .section-rail { flex-direction: row; align-items: center; padding: 0; }
   .section-rail i { width: 34px; height: 1px; }
   .intent-heading { grid-column: auto; margin-top: 18px; }
-  .intent-grid { grid-template-columns: 1fr; margin-top: 26px; }
+  /* Mobile: 4 dòng gạch xếp 2×2 (thay vì 4 hàng dọc ~800px) — bao quát cả 4
+     concept trong một nhịp mắt. Card thu gọn, mô tả cắt 2 dòng. */
+  .intent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 26px; }
+  .intent-card { padding: 16px 14px 14px; min-height: 136px; }
+  .intent-number { font-size: 9px; }
+  .intent-title { margin-top: 14px; font-size: 19px; line-height: 1.05; }
+  .intent-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 6px;
+    font-size: 11px;
+  }
+  .intent-action { padding-top: 12px; font-size: 9px; }
   .library-section { padding: 82px 6vw 60px; }
   .library-topline { grid-template-columns: 1fr; gap: 18px; }
   .library-topline .section-rail { flex-direction: row; align-items: center; }
+  /* Mobile: lưới 2 cột (thay vì 1 cột full-width) — 12 card đơn cột ngốn >5.000px
+     chiều cao cuộn. Card thu gọn để 2 cột vẫn đọc được. */
+  .materials-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .material-image { aspect-ratio: 1; }
+  .material-info { min-height: 58px; padding: 10px 10px 8px; }
+  .material-info h3 { font-size: 15px; line-height: 1.2; }
+  .material-type { font-size: 8px; letter-spacing: .08em; }
+  .material-spec div { padding: 6px 8px; }
+  .material-spec dt { font-size: 7px; }
+  .material-spec dd { font-size: 9px; }
+  /* Icon-only 40×40: giữ touch target ≥40px mà không che nửa ảnh card (card 2 cột
+     chỉ rộng ~160px). aria-label đã có sẵn nên vẫn đọc được cho screen reader. */
+  .material-select {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    right: 8px;
+    bottom: 8px;
+  }
+  .material-select span { display: none; }
+  /* Progressive disclosure đã đặt ở `@media (max-width: 860px)` (cùng 2 cột, cùng
+     ngưỡng 4 card) — ở đây chỉ thu khoảng cách và xếp nút thành cột dọc. */
+  .materials-expand-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 18px;
+  }
   .library-controls, .featured-ledger { flex-direction: column; align-items: flex-start; margin: 32px 0 20px; }
   .library-foot { flex-direction: column; align-items: flex-start; gap: 16px; margin-top: 26px; }
   .shortlist-inline { flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 22px; }
   .cases-section { padding: 82px 6vw; }
   .cases-grid { grid-template-columns: 1fr; gap: 18px; margin-top: 34px; }
-  .brief-section { padding: 76px 6vw 84px; }
-  /* Touch target ≥44px (Apple HIG). Desktop giữ nút nhỏ gọn overlay trên ảnh. */
-  .material-select { padding: 11px 14px; font-size: 11px; }
+  .brief-section { padding: 48px 5vw 52px; }
+  /* Mobile gập 1 cột: `.brief-section` đổi thành `grid-template-columns: 1fr` với
+     `gap: 52px`, nên khoảng cách giữa khối heading và panel do `gap` quyết định chứ
+     không phải margin của phần tử cuối. Giữ `.brief-promise` sát đoạn mô tả
+     (`margin-top: 18px`) rồi để `gap` lo phần thở trước panel; trước đây promise có
+     `margin-top: 49px` nên nó tụt xuống sát đáy khối heading, dính vào đường kẻ
+     `border-top` của panel và trông chắp vá.
+     Đường kẻ của `.brief-panel` đóng vai "nắp hồ sơ" — chừa `margin-bottom` cho nhãn
+     folder để nhãn không dán vào nắp. */
+  .brief-promise {
+    margin-top: 18px;
+    margin-bottom: 28px;
+  }
+  .brief-folder-label {
+    margin-top: 10px;
+    margin-bottom: 20px;
+  }
+  /* Chưa có ảnh hero-2 từ storage → .deliverables-visual là khối đen trống 420px.
+     Thu về dải kicker gọn. Có ảnh thì giới hạn 220px. `:has` đã dùng sẵn trong file. */
+  .deliverables-visual {
+    min-height: 0;
+    padding: 22px 6vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .deliverables-visual:has(img) {
+    min-height: 220px;
+    padding: 0;
+    display: block;
+  }
+  .deliverables-visual img { max-height: 220px; }
+  .deliverables-visual:not(:has(img)) .visual-note { position: static; text-align: center; }
+  .deliverable-list { margin-top: 28px; }
+  .deliverable-list article { grid-template-columns: 30px 1fr; gap: 12px; padding: 14px 0; }
+  .deliverable-list article > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+  .deliverable-list h3 { font-size: 20px; }
+  .deliverable-list p { margin-top: 5px; font-size: 11.5px; }
   .landing-footer { grid-template-columns: 1fr; gap: 24px; padding: 38px 6vw 74px; }
   .footer-contact { justify-self: start; align-items: flex-start; gap: 9px; }
   /* Thanh neo đáy trên mobile phải GỌN: mỗi px chiều cao là một px nội dung bị che
@@ -1929,6 +2123,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .form-row-2 {
     grid-template-columns: 1fr;
   }
+  /* iOS tự zoom khi focus input có font-size <16px → giật, hỏng khung nhìn.
+     Đặt ở đây (sau rule gốc .form-input font-size 13px) để thực sự ghi đè. */
+  .form-input,
+  .form-textarea {
+    font-size: 16px;
+  }
+  /* Cùng lý do: base .file-upload-box (padding 18px 20px) và .form-submit-cta nằm
+     sau block 620px, phải ghi đè ở đây mới ăn. */
+  .file-upload-box { padding: 11px 14px; }
+  .form-submit-cta { min-height: 48px; }
   .uploaded-files-list {
     grid-template-columns: 1fr;
   }
@@ -1964,7 +2168,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
    SPACE LOOKBOOK SECTION: DỰ ÁN ĐA ẢNH (2-23 ẢNH) & LƯỚI KHÔNG GIAN THỰC TẾ
    ========================================================================== */
 .space-lookbook-section {
-  scroll-margin-top: 10px;
   padding: 100px 5vw 110px;
   background: #f8f5ed;
   border-bottom: 1px solid var(--border);
@@ -2591,21 +2794,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-bottom: none;
 }
 
+/* Bộ lọc không gian & gam màu.
+   Desktop: nhãn "Gam màu:" và 12 chấm nằm CÙNG MỘT HÀNG, thẳng trục dọc với dải pill
+   phía trên — trước đây 12 chấm là con trực tiếp của thanh `flex-wrap` nên nhãn và
+   chấm chung một dòng chảy, nhìn hai dải lệch trục nhau.
+   Mobile (≤768px): dải pill thành carousel cuộn ngang, dải màu thành một hàng cuộn
+   ngang — xem khối @media bên dưới. */
 .space-color-bar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 0 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
   max-width: 100%;
 }
-.space-color-bar::-webkit-scrollbar {
-  display: none;
-}
 .space-color-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -2613,24 +2816,57 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   flex-shrink: 0;
   user-select: none;
 }
+/* Khối 12 chấm. Là một `flex` riêng để nhãn không bị chấm đẩy trôi; `flex-wrap` cho
+   desktop xuống dòng nếu thiếu chỗ, còn mobile ghi đè thành carousel cuộn ngang. */
+.space-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+/* Nút chữ "Tất cả" cũ (`.space-color-all`) đã bị bỏ: nó là viên thuốc đen đứng cạnh
+   11 chấm tròn, phá nhịp thị giác của dải màu và lặp lại y hệt chữ "Tất cả" của dải
+   Không gian ngay trên. Thay bằng chấm "Đa sắc" dùng CHUNG `.space-color-dot` bên
+   dưới (gradient khai trong `ALL_COLOR_SWATCH`, `src/lib/color-palette.ts`), nên dải
+   màu còn đúng 12 chấm đồng nhất — mobile xếp 6 + 6 thay vì 10 + 2.
+   `min-height` phải khai tường minh: `src/styles.css` (CSS app CRM, cũng nạp ở
+   landing) có `@media(max-width:639px){input,textarea,select,button{min-height:2.5rem}}`
+   — `height` không gỡ được `min-height`, nên nếu bỏ trống thì chấm 26px bị kéo lên
+   40px và dải lọc đội thêm một hàng. */
+.space-color-dot {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.space-color-dot.is-active {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px #f7f4ed, 0 0 0 4px #141f23;
+}
+.space-color-dot:not(.is-active):hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 2px rgba(158, 158, 158, 0.4);
+}
 .space-tabs-scroll {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
   padding: 2px 0;
 }
 
-.space-tabs-scroll::-webkit-scrollbar {
-  display: none;
-}
-
+/* `min-height: 0` gỡ `min-height: 2.5rem` mà `src/styles.css` (CSS app CRM, cũng
+   nạp ở landing) áp cho MỌI `button` dưới 640px — không gỡ thì pill 6px padding
+   bị kéo lên 40px và 7 nhãn tràn sang hàng thứ ba. */
 .space-tab-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
+  min-height: 0;
   background: #eae4d8;
   border: 1px solid #d8cfbf;
   color: var(--ink);
@@ -2678,6 +2914,102 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
 }
+/* Progressive disclosure (chỉ áp cho LƯỚI ở desktop): mặc định đúng 2 hàng card
+   (6 bối cảnh ở lưới 3 cột). Xem `.materials-grid.is-collapsed` để biết lý do
+   dùng `nth-child` + `display: none` thay vì đo bề rộng màn hình trong JS.
+   Mobile KHÔNG dùng cơ chế này: dải card thành carousel cuộn ngang nên mọi card
+   đều cuộn tới được, không có "hàng bị ẩn" — xem khối @media 768px bên dưới. */
+.space-gallery-grid.is-collapsed .space-lookbook-card:nth-child(n + 7) { display: none; }
+/* Ngưỡng ẩn bám số cột của từng breakpoint (3 cột → 6 card, 2 cột → 4), nên mỗi
+   block `@media` bên dưới lặp lại ngưỡng của mình; đổi số cột thì đổi luôn ngưỡng
+   cùng chỗ. */
+/* Hàng điều khiển dưới lưới: MỘT container flex chứa tối đa hai nút, nên hai nút
+   không bao giờ chồng nhau (lỗi cũ: nút bung và nút tải thêm hiện đồng thời, cùng
+   màu đen, xếp chồng). Container tự ẩn khi rỗng — React không render con nào khi
+   cả hai điều kiện đều sai nên `:empty` khớp.
+   Thứ tự trong DOM: [tải thêm] rồi [bung/thu] — nút phụ (thu gọn) nằm sau, đúng
+   phân cấp thị giác. */
+.lookbook-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 26px;
+}
+.lookbook-controls:empty { display: none; }
+/* Desktop thu gọn: ẩn nút tải thêm — 6 bối cảnh đang có trong trang còn chưa xem
+   hết, hiện thêm nút nạp 24 mẫu nữa là thừa và gây nhiễu. */
+.space-gallery-grid.is-collapsed + .lookbook-controls .lookbook-load-more { display: none; }
+/* Cổng `:not(:has())`: lưới 3 cột chỉ ẩn từ card thứ 7, nên nếu dữ liệu có 4–6 bối
+   cảnh thì chẳng có gì bị ẩn — nút "Xem tiếp" sẽ hiện số âm (`4 - 6 = -2`). Giữ
+   đúng ngữ nghĩa cổng cũ: chỉ hiện nút khi thật sự có card bị ẩn. Ngưỡng lặp lại
+   theo số cột ở từng `@media` bên dưới. */
+.space-gallery-grid.is-collapsed:not(:has(> .space-lookbook-card:nth-child(7))) + .lookbook-controls .lookbook-expand-toggle { display: none; }
+.lookbook-load-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 18px;
+  background: var(--ink);
+  color: #fffaf3;
+  border: 1px solid var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.lookbook-load-more:hover { background: #2c3d44; }
+.lookbook-load-more svg { transition: transform 180ms var(--ease-out); }
+.lookbook-load-more svg.is-down { transform: rotate(90deg); }
+.lookbook-expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 18px;
+  background: var(--ink);
+  color: #fffaf3;
+  border: 1px solid var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.lookbook-expand-toggle:hover { background: #2c3d44; }
+/* Nút phụ "Thu gọn bối cảnh": viền mảnh trên nền section, KHÔNG dùng nền đen như
+   nút chính — hai nút đen cạnh nhau đọc thành hai hành động ngang cấp và tái diễn
+   đúng cái rối mà thanh này sinh ra để dẹp. */
+.lookbook-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 18px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid #beb29e;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.lookbook-collapse-toggle:hover { background: rgba(31, 43, 51, 0.06); border-color: var(--ink); }
+.lookbook-expand-toggle svg,
+.lookbook-collapse-toggle svg { transition: transform 180ms var(--ease-out); }
+/* `ArrowUpRight` mặc định chỉ ĐÔNG BẮC. Xoay 90° → chỉ ĐÔNG NAM (mũi tên "bung
+   xuống"); xoay −90° → chỉ TÂY BẮC (mũi tên "thu lên"). Hai hướng ngược nhau nên
+   hai nút phải mang hai class riêng, không dùng chung một class như bản cũ. */
+.lookbook-expand-toggle svg.is-down { transform: rotate(90deg); }
+.lookbook-collapse-toggle svg.is-up { transform: rotate(-90deg); }
+/* Số bối cảnh còn ẩn khác nhau theo bề rộng nên nút có sẵn 3 nhãn; CSS chọn đúng
+   nhãn theo cùng breakpoint với ngưỡng ẩn. */
+.lookbook-expand-toggle .label-tablet,
+.lookbook-expand-toggle .label-mobile { display: none; }
 
 .space-lookbook-card {
   display: flex;
@@ -3055,10 +3387,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .btn-anchor-detail {
     flex: 1;
   }
+/* 2 cột → 2 hàng = 4 bối cảnh. */
   .space-gallery-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
   }
+  .space-gallery-grid.is-collapsed .space-lookbook-card:nth-child(n + 5) { display: none; }
+  /* Ngưỡng 4 bối cảnh (2 hàng × 2 cột): dưới ngưỡng này không có gì bị ẩn → giấu nút. */
+  .space-gallery-grid.is-collapsed:not(:has(> .space-lookbook-card:nth-child(5))) + .lookbook-controls .lookbook-expand-toggle { display: none; }
+  .lookbook-expand-toggle .label-wide { display: none; }
+  .lookbook-expand-toggle .label-tablet { display: inline; }
   .space-material-footer {
     grid-template-columns: 48px 1fr;
   }
@@ -3073,11 +3411,131 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   }
 }
 
-@media (max-width: 768px) {
-  .space-gallery-grid {
-    grid-template-columns: 1fr;
-    gap: 24px;
+/* Bộ lọc Không gian & Gam màu ở bề rộng HẸP: hai dải thành CAROUSEL cuộn ngang.
+   Ngưỡng 900px chứ không 768px: 7 pill cần 785px bề rộng tự nhiên, cộng padding
+   5vw*2 thì chỉ vừa 1 hàng từ ~873px trở lên. Khoảng 769–872px (tablet dọc) nếu để
+   flex-wrap sẽ rớt thành 6+1 với pill `F&B` mồ côi — đúng lỗi cũ. Carousel phủ luôn
+   khoảng đó. Trên 900px chỗ rộng gấp đôi nên một hàng tự nhiên, không cần cuộn. */
+@media (max-width: 900px) {
+  /* Dải pill Không gian: CAROUSEL cuộn ngang 1 hàng. Bố cục cũ chia lưới 4 cột cố
+     định để ép đúng 4+3, nhưng 7 pill trong lưới 4 cột để lại một Ô TRỐNG ở góc phải
+     hàng 2 — đọc thành "thiếu nút"/"lỗi layout". Cuộn ngang triệt tiêu vấn đề đó:
+     không ô trống, không hàng mồ côi, và pill dài ngắn tuỳ chữ (không bị kéo bè).
+     Đây là ĐẢO NGƯỢC quyết định "cấm cuộn ngang" trước đây — lý do cũ là khách lướt
+     dọc không biết phải vuốt ngang. Hoá giải bằng kỹ thuật PEEK: 7 pill ≈ 700px, thừa
+     bề rộng nên pill cuối bị cắt ở mép phải — mắt thấy "còn nữa" và tự vuốt.
+     `min-height` phải khai tường minh: `src/styles.css` áp `min-height: 2.5rem` cho
+     mọi `button` dưới 640px. */
+  .space-tabs-scroll {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    /* Chừa mép phải để pill cuối hé ra thay vì bị cắt cụt sát viền. */
+    scroll-padding-inline: 5vw;
+    padding-bottom: 4px;
+    scrollbar-width: none;
   }
+  .space-tabs-scroll::-webkit-scrollbar { display: none; }
+  .space-tab-pill {
+    padding: 7px 13px;
+    font-size: 12px;
+    gap: 6px;
+    min-height: 0;
+    flex: 0 0 auto;
+  }
+  /* Số đếm 3 chữ số hiện đủ ở carousel: không còn bị ép vào cột hẹp nên không cắt
+     cụt — giữ đúng kiểu badge của desktop. */
+  .space-tab-count {
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    padding: 0 5px;
+    font-size: 10px;
+    background: rgba(0, 0, 0, 0.08);
+    opacity: 1;
+  }
+  /* Dải gam màu: cũng cuộn ngang 1 hàng, thẳng trục với dải pill phía trên. 12 chấm
+     đứng sát nhau tạo thành dải quang phổ liền mạch — bản cũ chia lưới 6 cột kéo
+     giãn khoảng cách giữa các chấm ra ~30px khiến chúng rời rạc như nốt ruồi.
+     Nhãn "Gam màu:" đứng NGOÀI vùng cuộn (chỉ `.space-color-swatches` cuộn) để khi
+     khách vuốt sang phải, nhãn vẫn neo lại — mất nhãn thì dải chấm thành vô danh. */
+  .space-color-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0 12px;
+    min-width: 0;
+  }
+  .space-color-swatches {
+    flex-wrap: nowrap;
+    gap: 10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 5vw;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .space-color-swatches::-webkit-scrollbar { display: none; }
+  .space-color-dot {
+    width: 26px;
+    height: 26px;
+    min-height: 26px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Card bối cảnh thành CAROUSEL cuộn ngang (snap). Trước đây 1 cột dọc: 3 card
+     ≈ 1.000px cuộn, và mỗi card cao ~550px với phần ảnh thừa mứa. Carousel giữ
+     ảnh lớn (thứ bán được hàng) mà gói cả khu Lookbook vào ~1 khung nhìn.
+     `grid-auto-flow: column` + `grid-auto-columns` cho mỗi card rộng 82% → card kế
+     hé ra ở mép phải, báo hiệu "còn nữa, vuốt đi" (kỹ thuật peek).
+     `overflow-x: auto` + `scroll-snap-type` cho cảm giác dừng đúng card.
+     Bỏ hẳn cơ chế progressive-disclosure `nth-child` ở mobile: cuộn ngang nên mọi
+     card đều tới được, không còn "hàng bị ẩn" để bung. */
+  .space-gallery-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 82%;
+    gap: 14px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    /* Chừa mép để card không dán sát viền section khi cuộn tới đầu/cuối. */
+    scroll-padding-inline: 5vw;
+    padding-bottom: 4px;
+    /* Ẩn thanh cuộn nhưng vẫn cuộn được (Firefox/Edge dùng scrollbar-width). */
+    scrollbar-width: none;
+  }
+  .space-gallery-grid::-webkit-scrollbar { display: none; }
+  .space-gallery-grid .space-lookbook-card {
+    scroll-snap-align: start;
+    /* Card cao bằng nhau dù ảnh/caption dài ngắn khác nhau. */
+    height: auto;
+  }
+  /* Bỏ ngưỡng ẩn 3-card cũ — mọi card đều cuộn tới được. */
+  .space-gallery-grid.is-collapsed .space-lookbook-card:nth-child(n + 4) { display: flex; }
+  /* Nút bung/thu hàng vô nghĩa với carousel → ẩn hẳn. Chỉ còn nút "tải thêm" khi
+     kho còn mẫu (nạp thêm card vào chính dải cuộn ngang này). */
+  .lookbook-expand-toggle,
+  .lookbook-collapse-toggle { display: none; }
+  .space-caption-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .lookbook-controls {
+    margin-top: 20px;
+  }
+  /* Mobile KHÔNG có khái niệm "lưới thu gọn" (carousel cuộn ngang), nhưng React vẫn
+     gắn class `is-collapsed` lên lưới — nên rule desktop
+     `is-collapsed + .lookbook-controls .lookbook-load-more { display:none }` sẽ ẩn
+     luôn nút tải thêm ở mobile, khiến khách đăng nhập không nạp được mẫu nữa. Ghi đè
+     lại: ở mobile nút tải thêm luôn hiện khi kho còn mẫu. */
+  .space-gallery-grid.is-collapsed + .lookbook-controls .lookbook-load-more { display: inline-flex; }
   .space-lookbook-section {
     padding: 70px 5vw 76px;
   }
@@ -3099,6 +3557,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     gap: 12px;
   }
 }
+
 /* ==========================================================================
    DEDICATED MATERIAL LIBRARY PAGE
    ========================================================================== */

@@ -52,6 +52,9 @@ function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/** Mục nav gắn với một section trên trang — dùng cho scroll-spy của header. */
+const NAV_SECTION_IDS = ["dong-gach", "vat-lieu-tuyen-chon", "khong-gian", "quy-trinh"] as const;
+
 export function ArchitectLanding({
   heroImage: customHeroImage,
   heroImage2: customHeroImage2,
@@ -65,6 +68,9 @@ export function ArchitectLanding({
   } = useShortlistStorage([]);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [materialsExpanded, setMaterialsExpanded] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [activeNavSection, setActiveNavSection] = useState("dong-gach");
   const [moodboardOpen, setMoodboardOpen] = useState(false);
   const [activeModalMaterial, setActiveModalMaterial] = useState<Material | null>(null);
   const [modalInitialTab, setModalInitialTab] = useState<"surface" | "context">("surface");
@@ -117,6 +123,37 @@ export function ArchitectLanding({
       .catch(() => {
         setLiveMaterials([]);
       });
+  }, [currentView]);
+
+  // Header dính: đổi sang nền kính mờ đặc sau khi rời đỉnh trang, và scroll-spy
+  // highlight mục đang xem. Chỉ gắn observer khi ở view home (library là view
+  // riêng, không có các section này).
+  useEffect(() => {
+    if (currentView !== "home") return;
+    const onScroll = () => setIsScrolled(window.scrollY > 60);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveNavSection(entry.target.id);
+            break;
+          }
+        }
+      },
+      { rootMargin: "-45% 0px -45% 0px" },
+    );
+    for (const id of NAV_SECTION_IDS) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      observer.disconnect();
+    };
   }, [currentView]);
 
   // KHÔNG bắn `ViewContent` ở đây.
@@ -200,8 +237,18 @@ export function ArchitectLanding({
       ) : (
         /* VIEW 2: MAIN EDITORIAL LANDING PAGE */
         <div className="architect-landing">
-          {/* 1. Header */}
-          <header className="landing-header">
+          {/* 1. Header — dính trên đỉnh viewport cho cả PC lẫn mobile (xem
+              `.landing-header` trong styles-lp.css).
+              LÀ `<div role="banner">` chứ KHÔNG phải `<header>`: `src/styles.css` (CSS
+              app CRM, cũng được nạp ở landing) có `header{background:…!important}` cho
+              thanh TopBar, và `!important` đè sạch nền kính mờ của header này (nền thành
+              kem, chữ trắng mất tương phản). Đổi thẻ là cách sửa gốc — cùng lối đã dùng
+              cho `.consent-bar`; thêm `!important` ngược lại chỉ đẩy cuộc chiến
+              specificity đi xa. `role="banner"` giữ nguyên ngữ nghĩa của `<header>`. */}
+          <div
+            className={`landing-header ${isScrolled ? "is-scrolled" : ""}`}
+            role="banner"
+          >
             <a
               className="brand-lockup cursor-pointer"
               onClick={() => handleSwitchView("home")}
@@ -215,13 +262,25 @@ export function ArchitectLanding({
               className={menuOpen ? "nav-links is-open" : "nav-links"}
               aria-label="Điều hướng chính"
             >
-              <a href="#dong-gach" onClick={() => setMenuOpen(false)}>
+              <a
+                href="#dong-gach"
+                className={activeNavSection === "dong-gach" ? "is-current" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
                 Chọn dòng gạch
               </a>
-              <a href="#vat-lieu-tuyen-chon" onClick={() => setMenuOpen(false)}>
+              <a
+                href="#vat-lieu-tuyen-chon"
+                className={activeNavSection === "vat-lieu-tuyen-chon" ? "is-current" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
                 Vật liệu tuyển chọn
               </a>
-              <a href="#khong-gian" onClick={() => setMenuOpen(false)}>
+              <a
+                href="#khong-gian"
+                className={activeNavSection === "khong-gian" ? "is-current" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
                 Không gian
               </a>
               <a
@@ -234,7 +293,11 @@ export function ArchitectLanding({
               >
                 Thư viện mã gạch
               </a>
-              <a href="#quy-trinh" onClick={() => setMenuOpen(false)}>
+              <a
+                href="#quy-trinh"
+                className={activeNavSection === "quy-trinh" ? "is-current" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
                 Quy trình &amp; Cam kết
               </a>
             </nav>
@@ -271,7 +334,7 @@ export function ArchitectLanding({
                 {menuOpen ? <X size={21} /> : <Menu size={21} />}
               </button>
             </div>
-          </header>
+          </div>
 
           <main id="top">
             {/* 2. Hero Section */}
@@ -396,17 +459,66 @@ export function ArchitectLanding({
 
               {/* Materials Grid */}
               {liveMaterials.length > 0 ? (
-                <div className="materials-grid">
-                  {liveMaterials.map((material) => (
-                    <MaterialCard
-                      key={material.id}
-                      material={material}
-                      selected={selectedIds.includes(material.id)}
-                      onToggle={toggleMaterial}
-                      onOpenModal={(mat) => handleOpenMaterialModal(mat, "surface")}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div
+                    className={`materials-grid ${materialsExpanded ? "is-expanded" : "is-collapsed"}`}
+                  >
+                    {liveMaterials.map((material) => (
+                      <MaterialCard
+                        key={material.id}
+                        material={material}
+                        selected={selectedIds.includes(material.id)}
+                        onToggle={toggleMaterial}
+                        onOpenModal={(mat) => handleOpenMaterialModal(mat, "surface")}
+                      />
+                    ))}
+                  </div>
+                  {/* Nhãn đếm phải khớp số mã thật sự bị ẩn ở bề rộng đang xem:
+                      4 mã ở lưới 4 cột, 6 ở 3 cột, 8 ở 2 cột. CSS chọn đúng nhãn.
+                      Điều kiện ở đây lấy ngưỡng NHỎ NHẤT (5 mã) — thanh chỉ thật sự
+                      hiện khi lưới có card bị ẩn, việc đó do `:has()` trong CSS quyết. */}
+                  {liveMaterials.length > 4 && (
+                    <div className="materials-expand-bar">
+                      <button
+                        type="button"
+                        className="materials-expand-toggle"
+                        onClick={() => setMaterialsExpanded((v) => !v)}
+                        aria-expanded={materialsExpanded}
+                      >
+                        {materialsExpanded ? (
+                          "Thu gọn danh sách"
+                        ) : (
+                          <>
+                            <span className="label-wide">
+                              Xem tiếp {liveMaterials.length - 8} mã tuyển chọn (
+                              {liveMaterials.length} mã)
+                            </span>
+                            <span className="label-tablet">
+                              Xem tiếp {liveMaterials.length - 6} mã tuyển chọn (
+                              {liveMaterials.length} mã)
+                            </span>
+                            <span className="label-mobile">
+                              Xem tiếp {liveMaterials.length - 4} mã tuyển chọn
+                            </span>
+                          </>
+                        )}
+                        <ChevronRight
+                          size={16}
+                          className={materialsExpanded ? "is-up" : ""}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        className="materials-expand-library"
+                        onClick={() => handleSwitchView("library")}
+                      >
+                        Mở Thư viện đầy đủ
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-border/80 bg-surface-strong/30 p-8 text-center my-6">
                   <p className="text-sm font-semibold text-foreground">
@@ -531,9 +643,8 @@ export function ArchitectLanding({
                 <div className="brief-promise">
                   <Sparkles size={18} />
                   <span>
-                    Ưu tiên tư vấn theo context dự án,
-                    <br />
-                    không gửi một bảng giá chung chung.
+                    Tư vấn theo bối cảnh &amp; tinh thần từng công trình — em không gửi một bảng
+                    giá chung chung.
                   </span>
                 </div>
               </div>

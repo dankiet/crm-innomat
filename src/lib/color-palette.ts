@@ -117,6 +117,28 @@ export const COLOR_PALETTES: ColorPaletteGroup[] = [
   },
 ];
 
+/**
+ * Chấm "Đa sắc" — nút chọn TẤT CẢ gam màu, đứng đầu dải lọc thay cho nút chữ cũ.
+ *
+ * Nút chữ `[Tất cả]` là một viên thuốc đen nằm cạnh 11 chấm tròn: phá vỡ nhịp thị
+ * giác của dải màu, tốn ~60px bề ngang (đủ để đẩy một chấm xuống dòng thừa trên
+ * mobile), và lặp lại y hệt chữ "Tất cả" của dải Không gian ngay phía trên. Dùng
+ * chấm tròn cùng cỡ (28px PC / 26px mobile — lấy từ `.space-color-dot`) thì dải màu
+ * thành 12 chấm đồng nhất, mobile xếp đúng 6 + 6.
+ *
+ * Gradient là quang phổ khoáng chất của gạch kiến trúc, dựng từ chính `hex` của 6
+ * gam màu trong `COLOR_PALETTES` (đất nung → vàng → xanh lá → xanh dương → tím →
+ * hồng → về đất nung để khép vòng conic) nên chấm đa sắc không lệch tông với các
+ * chấm bên cạnh.
+ */
+export const ALL_COLOR_SWATCH = {
+  /** Cũng là `aria-label` + `title` của nút. */
+  label: "Tất cả gam màu (Đa sắc)",
+  /** Là `background` (không phải `backgroundColor`) vì giá trị là `conic-gradient`. */
+  background: "conic-gradient(#B94A2E, #E5A93C, #386641, #264653, #7E57C2, #D98A8A, #B94A2E)",
+  dotBorder: "rgba(0,0,0,0.15)",
+} as const;
+
 // Bản đồ tra cứu O(1) chính xác cho các giá trị canonical từ DB
 const CANONICAL_MAP = new Map<string, string>();
 for (const p of COLOR_PALETTES) {

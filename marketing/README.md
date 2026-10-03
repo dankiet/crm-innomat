@@ -77,7 +77,7 @@ Kế thừa tinh thần `AGENTS.md` (nguồn luật duy nhất của repo) — k
 | Trọn bộ **ảnh Map vật liệu** (SketchUp/3dsMax) khi mở khóa | `MaterialLibraryPage.tsx` — copy gate |
 | Thư viện **300+ mã gạch** | `MaterialLibraryPage.tsx` — copy gate. ⚠️ **Chưa đối chiếu DB**, và catalog public **cap 200 item/lần đọc** (`lp.server.ts:327`). Trang **không có UI phân trang** ⇒ **không list được toàn bộ 300+ trong một màn**; muốn xem thêm phải **lọc**. **Không claim "xem toàn bộ thư viện"** — nói "hơn 300 mã, lọc theo dòng/tông". Xác nhận số live trước khi dùng. |
 | Không gate phần xem cơ bản trên LP | Chỉ trang **Thư viện mã gạch** mới có gate; gate hiện **ngay** với khách chưa đăng nhập (12 mã là số card preview, không phải ngưỡng) |
-| Tư vấn theo context dự án, **không gửi bảng giá chung** | `ArchitectLanding.tsx` — brief-promise |
+| Tư vấn theo **bối cảnh & tinh thần từng công trình**, không gửi bảng giá chung | `ArchitectLanding.tsx` — brief-promise |
 | Giao **toàn quốc**, nội thành HCM 1–2 ngày | `lp-content.ts` — FAQ |
 
 > Chi tiết cách dùng các cam kết này trong content: xem `05-thong-diep-copy-bank.md`
