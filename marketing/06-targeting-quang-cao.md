@@ -25,8 +25,8 @@
 |---|---|---|
 | GTM container | `GTM-P4SQ7HBB` | Nơi cấu hình tag; **chỉ nạp sau khi khách đồng ý cookie** |
 | Cookie đồng thuận | `ebg_gtm_consent` = `granted`/`denied` | Chưa chọn ⇒ **không có pixel, không có số liệu** |
-| Meta Pixel | bắn qua `fbq` (do GTM định nghĩa) | **Phải tạo tag trong GTM** |
-| GA4 | bắn qua `gtag` (do GTM định nghĩa) | **Phải tạo tag trong GTM** |
+| Meta Pixel | Code gọi thẳng `fbq('track', …)`; GTM chỉ tải `fbevents.js` + `init` | ❌ **KHÔNG tạo tag event** — code đã bắn, tạo là **đếm trùng** |
+| GA4 | Code gọi thẳng `gtag('event', …)`; GTM chỉ tải `gtag.js` + `config` | ❌ **KHÔNG tạo tag GA4 Event** — code đã bắn, tạo là **đếm trùng** |
 | Event đang bắn | `ViewContent`, `AddToCart`, `Lead` (dịch tên riêng cho Meta và GA4) | Xem `07` §1 |
 | Biến thể LP | `/` (= gach-trang-tri), `/lp/gach-the`, `/lp/mosaic` | Mỗi camp dùng 1 slug |
 
