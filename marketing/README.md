@@ -46,7 +46,7 @@ Nếu code đổi mà docs chưa đổi, **docs sai** — sửa docs trong cùng
 | `src/lib/lp-types.ts` | `LP_PROJECT_TYPES`, `LP_PROJECT_STAGES`, UTM, loại form |
 | `src/lib/types.ts` | `SPACE_TYPES` (bối cảnh phòng), `IMAGE_ROOM_TAGS` |
 | `src/lib/color-tones.ts` | 8 nhóm tông màu — dùng cho creative & ads interest |
-| `src/lib/lp-tracking.ts` | 3 event **đang bắn**: `ViewContent`, `AddToCart`, `Lead` (`UnlockLibrary` khai báo nhưng chưa gọi) |
+| `src/lib/lp-tracking.ts` | 3 event: `ViewContent`, `AddToCart`, `Lead` — dịch tên riêng cho Meta và GA4 |
 | `docs/tong-quan-tinh-nang.md` | Bản đồ tính năng, trạng thái |
 
 ## Luật của thư mục này
@@ -90,7 +90,7 @@ Khi viết content/ads, **đừng tin các điểm sau cho tới khi code đư�
 | Điểm | Thực tế code | Hệ quả cho marketing |
 |---|---|---|
 | **Biến thể LP chưa render** | `LP_VARIANTS` + `SHARED_FAQ` (`src/lib/lp-content.ts`) **không có consumer**; mọi slug render cùng `ArchitectLanding` | 3 track chỉ khác URL, **thông điệp giống hệt**. Đừng quảng cáo offer riêng theo track. |
-| **`UnlockLibrary` chưa bắn** | Khai báo trong `LpEvent` nhưng **không có callsite** | Không dựng audience/KPI trên event này. Proxy: đếm lead `google-unlock`. |
+| **Không có event "mở thư viện"** | Luồng mở khoá đi qua Google OAuth, **không** qua `trackEvent` | Không dựng audience/KPI cho tầng này. Proxy: đếm lead `google-unlock`. |
 
 > ✅ **GTM đã publish (sửa 2026-09-29).** Container `GTM-P4SQ7HBB` giờ có tag Meta
 > Pixel `1086936020738731`. Kiểm chứng bằng browser (bấm "Đồng ý" rồi đọc

@@ -13,19 +13,24 @@
 
 | Event | Khi nào bắn | Tham số | Trạng thái |
 |---|---|---|---|
-| `ViewContent` | Vào trang LP / đổi view | `content_name`, `page` | ✅ **Đang bắn** (`ArchitectLanding.tsx:86`) |
-| `AddToCart` | Lưu 1 mã vào shortlist | `material_id` | ✅ **Đang bắn** (`ArchitectLanding.tsx:123`) |
-| `Lead` | Submit form brief | (form data) | ✅ **Đang bắn** (`ProjectBriefForm.tsx:161`) |
-| `UnlockLibrary` | — | — | ❌ **CHƯA TỪNG BẮN** — khai báo trong type nhưng **không có callsite** |
+| `ViewContent` | Mở chi tiết 1 mã gạch | `content_ids`, `content_name` | ✅ **Đang bắn** (`ArchitectLanding.tsx`) |
+| `AddToCart` | Lưu 1 mã vào shortlist | `content_ids`, `material_id` | ✅ **Đang bắn** (`ArchitectLanding.tsx`) |
+| `Lead` | Submit form brief | (form data) | ✅ **Đang bắn** (`ProjectBriefForm.tsx`) |
 
-> ⚠️ **`UnlockLibrary` là event chết.** Luồng mở khoá thư viện đi qua Google OAuth
-> (`MaterialLibraryPage.tsx` → `auth-public.server.ts`) và ghi thẳng `lp_leads`, **không**
-> đi qua `trackEvent`. Bất kỳ audience, KPI hay báo cáo nào dựa trên event này sẽ **luôn = 0**.
-> Muốn dùng → phải instrument (`trackEvent("UnlockLibrary")` ở nhánh unlock thành công) trước.
+**Một sự kiện nội bộ → hai tên xuất** (Meta và GA4 dùng bộ tên chuẩn khác nhau):
 
-> **Bất biến:** `trackEvent` **tự chặn nếu chưa `granted`**. Chưa đồng thuận ⇒ không có
-> event nào. Cộng thêm container GTM đang rỗng (xem §9) ⇒ **hiện tại chưa có dữ liệu pixel
-> nào**, kể cả khi khách đã đồng ý.
+| nội bộ | Meta | GA4 |
+| --- | --- | --- |
+| `ViewContent` | `ViewContent` | `view_item` |
+| `AddToCart` | `AddToCart` | `add_to_cart` |
+| `Lead` | `Lead` | `generate_lead` |
+
+Tham số cũng dịch: Meta dùng `content_ids`/`content_name`, GA4 dùng
+`items: [{ item_id, item_name }]`. Chi tiết: `docs/tong-quan-tinh-nang.md` §9.
+
+> **Bất biến:** `trackEvent` **KHÔNG** chặn theo cờ đồng thuận — sự kiện bắn cho mọi khách.
+> Mô hình hiện tại là **opt-out**: GTM nạp cho tất cả, lựa chọn của khách đi vào `dataLayer`
+> (`ebg_consent`) để lọc bằng audience. Xem `docs/tong-quan-tinh-nang.md` §9.
 
 ## 2. Phễu đo lường (funnel)
 
@@ -198,7 +203,7 @@ Lead `form_kind='lp'` mang 5 cột UTM. Cách nối với camp:
 - [ ] **Container `GTM-P4SQ7HBB` đã có tag GA4 + Meta Pixel và đã Publish** (kiểm bằng
       `curl` `"tags":[]`). **Không có bước này thì mọi bước sau vô nghĩa.**
 - [ ] Meta Pixel + GA4 nhận đúng 3 event đang bắn: `ViewContent`, `AddToCart`, `Lead`.
-- [ ] (Tùy chọn) Instrument `UnlockLibrary` nếu muốn đo lượt mở thư viện.
+- [ ] (Tùy chọn) Instrument `trackEvent` ở nhánh mở khoá thư viện thành công nếu muốn đo lượt mở thư viện.
 - [ ] Đã bắn thử 1 lead test và **thấy nó trong `lp_leads`** với UTM đúng.
 - [ ] Track chung dùng `/` (không dùng `/lp/gach-trang-tri` — sẽ mất UTM khi 301).
 - [ ] Banner consent hiện đúng, bấm "đồng ý" ⇒ GTM nạp.
@@ -212,7 +217,7 @@ Lead `form_kind='lp'` mang 5 cột UTM. Cách nối với camp:
 | Lấy số pixel làm tổng lead | Sai do consent gate |
 | Tính lead `spam` vào KPI | Làm loãng chất lượng |
 | Dùng CPL nền tảng để quyết ngân sách | Pixel thấp hơn CRM ⇒ CPL nền tảng sai lệch; dùng CPL thật |
-| Dựng audience/KPI trên `UnlockLibrary` | Event chưa từng bắn ⇒ audience luôn rỗng |
+| Dựng audience/KPI cho tầng "mở thư viện" | Không có event nào ⇒ luôn rỗng |
 | Lọc/báo cáo theo `form_kind='library-gate'` | Giá trị chết, không caller nào gửi |
 | Đổi tên UTM giữa chiến dịch | Vỡ chuỗi dữ liệu |
 | Bỏ qua kênh Zalo/điện thoại | Offline thường chiếm tỷ trọng lớn |

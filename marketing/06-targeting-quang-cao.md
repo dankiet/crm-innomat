@@ -27,7 +27,7 @@
 | Cookie đồng thuận | `ebg_gtm_consent` = `granted`/`denied` | Chưa chọn ⇒ **không có pixel, không có số liệu** |
 | Meta Pixel | bắn qua `fbq` (do GTM định nghĩa) | **Phải tạo tag trong GTM** |
 | GA4 | bắn qua `gtag` (do GTM định nghĩa) | **Phải tạo tag trong GTM** |
-| Event đang bắn | `ViewContent`, `AddToCart`, `Lead` | `UnlockLibrary` **chưa có callsite** — xem `07` §1 |
+| Event đang bắn | `ViewContent`, `AddToCart`, `Lead` (dịch tên riêng cho Meta và GA4) | Xem `07` §1 |
 | Biến thể LP | `/` (= gach-trang-tri), `/lp/gach-the`, `/lp/mosaic` | Mỗi camp dùng 1 slug |
 
 > ✅ **ĐÃ SỬA (2026-09-29) — container đã publish.** Ghi chú cũ (đo 2026-09-28:
@@ -71,7 +71,7 @@
 - **Nguồn tốt nhất:** `Lead` (form brief) — nhưng **phải có ≥ ~100 seed** trong một quốc gia
   thì Meta mới dựng được LAL 1%.
 - **Nguồn bổ sung:** `AddToCart` (lưu mã) — volume lớn hơn `Lead`.
-- **KHÔNG dùng `UnlockLibrary`** làm nguồn — event chưa từng bắn (xem `07` §1).
+- **Không có event nào cho "mở thư viện"** — luồng đó đi qua Google OAuth, không qua `trackEvent` (xem `07` §1).
 - **Chưa đủ seed** ⇒ chạy interest-based trước, tích luỹ rồi mới bật LAL.
 
 ## 2. Cấu trúc campaign (khuyến nghị)
@@ -197,8 +197,8 @@ https://embangach.com/lp/mosaic?utm_source=facebook&utm_medium=paid&utm_campaign
 | **Warm** | Retarget `AddToCart` 14 ngày | Pixel | "Shortlist của bạn còn đó" |
 | **Hot** | Lead cũ trong CRM | Truy vấn DB + hash SĐT/email | Email/Zalo chăm sóc |
 
-> ⚠️ **`UnlockLibrary` không dùng được làm nguồn audience** — event chưa từng bắn
-> (`07` §1). Muốn có tầng "mở thư viện" → instrument event trước.
+> ⚠️ **Chưa có event cho tầng "mở thư viện"** — luồng đó đi qua Google OAuth, không qua
+> `trackEvent` (`07` §1). Muốn có thì phải instrument trước.
 >
 > **Lưu ý về retargeting:** do consent model + container GTM rỗng, kích thước audience
 > retarget **rất nhỏ hoặc bằng 0**. Nếu audience <1000, **dùng interest/lookalike thay vì
@@ -279,7 +279,7 @@ Hiện doc này mới phủ Meta. Với thị trường VN, bổ sung theo tần
 | Điểm mù | Hệ quả | Cách xử lý |
 |---|---|---|
 | Không có event giữa `AddToCart` và `Lead` | Không biết bao nhiêu người **bắt đầu điền form rồi bỏ** | Thêm event kiểu `InitiateCheckout` khi focus field đầu, hoặc chấp nhận mù |
-| `UnlockLibrary` chưa bắn | Không đo được lượt mở thư viện | Instrument event trước khi dựng audience |
+| Không có event "mở thư viện" | Không đo được lượt mở thư viện | Instrument `trackEvent` ở nhánh unlock thành công trước khi dựng audience |
 | UTM chỉ phủ lead `lp` | Lead `google-unlock` không gắn được camp | Ghi nhận giới hạn, hoặc instrument UTM cho OAuth |
 
 ## 12. Điều KHÔNG làm
@@ -291,7 +291,7 @@ Hiện doc này mới phủ Meta. Với thị trường VN, bổ sung theo tần
 | Dùng `/lp/gach-trang-tri` cho track chung | 301 strip UTM ⇒ lead về UTM rỗng |
 | Dùng cùng link cho 3 track | Không biết dòng nào hiệu quả |
 | Target theo chức danh "kiến trúc sư" | Meta đã bỏ — không chọn được |
-| Dựng audience trên `UnlockLibrary` | Event chưa bắn ⇒ audience rỗng |
+| Dựng audience cho tầng "mở thư viện" | Không có event nào ⇒ audience rỗng |
 | Tối ưu theo "giá rẻ" | Phá định vị, hút sai khách |
 | Chạy retarget với audience quá nhỏ | Không phân phối được |
 | Đổi tên camp giữa chiến dịch | Vỡ dữ liệu lịch sử |

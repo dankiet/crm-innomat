@@ -13,9 +13,9 @@
 | 3 | **Lưu shortlist** (engagement) | Số `AddToCart` | A, C |
 | 4 | **Nhận diện thương hiệu** (top) | Reach, `ViewContent` | A, B, C |
 
-> ⚠️ **Mục tiêu 2 chưa đo được bằng event.** `UnlockLibrary` **chưa từng bắn** (`07` §1).
-> Proxy duy nhất hiện có là **đếm lead `google-unlock` trong CRM**. Muốn đo bằng pixel →
-> instrument event trước.
+> ⚠️ **Mục tiêu 2 chưa đo được bằng event.** Luồng mở khoá thư viện đi qua Google OAuth và
+> ghi thẳng `lp_leads`, **không** đi qua `trackEvent` — nên không có event nào để đo.
+> Proxy duy nhất hiện có là **đếm lead `google-unlock` trong CRM**.
 
 > **Nguyên tắc:** content không bán gạch — content **giúp chọn đúng mã**. Mọi bài
 > phải dẫn được về một hành động: lưu mã / mở thư viện / gửi brief.
