@@ -27,7 +27,9 @@ import {
   pushConsentToDataLayer,
   readConsent,
   setConsent,
+  setMetaConsent,
   subscribeConsent,
+  updateConsentMode,
   type ConsentValue,
 } from "@/lib/lp-consent";
 
@@ -57,11 +59,13 @@ export function ConsentBanner() {
   const applyConsent = (value: ConsentValue) => {
     setConsent(value);
     // GTM đã nạp sẵn cho mọi khách (snippet ở `head()`), nên KHÔNG nạp lại và
-    // cũng KHÔNG dừng. Việc duy nhất cần làm là cập nhật cờ trong `dataLayer`
-    // để GTM biết khách vừa chọn gì — nền tảng cho tệp loại trừ.
+    // cũng KHÔNG dừng. Ba việc cần làm:
+    //   1. Cập nhật Consent Mode → Google mở/khoá cookie NGAY, không chờ F5.
+    //   2. Cập nhật cờ `dataLayer` để GTM lọc audience.
+    //   3. Nạp bù container nếu chưa có (khách bấm trước khi snippet chạy).
+    updateConsentMode(value);
+    setMetaConsent(value);
     pushConsentToDataLayer(value);
-    // Chưa có container (khách chọn trước khi snippet kịp chạy, hoặc bị chặn):
-    // nạp bù để không mất phiên này.
     loadGtm();
   };
 
