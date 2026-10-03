@@ -202,7 +202,19 @@ Lead `form_kind='lp'` mang 5 cột UTM. Cách nối với camp:
 
 - [ ] **Container `GTM-P4SQ7HBB` đã có tag GA4 + Meta Pixel và đã Publish** (kiểm bằng
       `curl` `"tags":[]`). **Không có bước này thì mọi bước sau vô nghĩa.**
-- [ ] Meta Pixel + GA4 nhận đúng 3 event đang bắn: `ViewContent`, `AddToCart`, `Lead`.
+- [ ] Meta Pixel nhận 3 event **tên Meta**: `ViewContent`, `AddToCart`, `Lead`.
+- [ ] GA4 nhận 3 event **tên GA4**: `view_item`, `add_to_cart`, `generate_lead`.
+
+> ⚠️ **Nếu tag GA4 trong GTM đọc biến `event` của dataLayer, tên sẽ SAI.**
+> `event` giữ camelCase (`ViewContent`) để tag Meta và các trigger cũ không vỡ;
+> tên GA4 nằm ở khoá riêng **`ga4_event_name`** (`view_item`).
+> Trong GTM: **Variables → New → Data Layer Variable**, tên `ga4_event_name`;
+> rồi ở tag GA4 Event, ô **Event Name** trỏ vào biến đó (không dùng `{{Event}}`).
+> Không làm bước này thì GA4 nhận `ViewContent` — vẫn vào, nhưng là **custom
+> event**, không khớp báo cáo thương mại điện tử dựng sẵn.
+>
+> Đường gọi thẳng (`gtag("event", …)` từ code) đã dùng đúng tên GA4 rồi; ghi chú
+> trên là cho đường **qua GTM**, phòng khi dựng thêm tag Custom Event.
 - [ ] (Tùy chọn) Instrument `trackEvent` ở nhánh mở khoá thư viện thành công nếu muốn đo lượt mở thư viện.
 - [ ] Đã bắn thử 1 lead test và **thấy nó trong `lp_leads`** với UTM đúng.
 - [ ] Track chung dùng `/` (không dùng `/lp/gach-trang-tri` — sẽ mất UTM khi 301).
